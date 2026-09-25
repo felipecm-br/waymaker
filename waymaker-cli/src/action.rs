@@ -495,11 +495,10 @@ pub fn action_handler(
 
         MMAction::ReloadReady(_) => {
             state.reloading = false;
+            state.picker_ui.worker.refind();
             state.picker_ui.worker.nucleo.tick(20);
             if state.filtering {
                 state.picker_ui.update();
-            } else {
-                state.picker_ui.worker.find("");
             }
 
             let target_opt = crate::start::TARGET_ITEM

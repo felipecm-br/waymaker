@@ -428,6 +428,47 @@ impl<T: SSS> Worker<T> {
         }
     }
 
+    /// Force reparsing the pattern on all filter columns regardless of whether
+    /// the query string changed. Essential when items in the worker are reloaded
+    /// or replaced so nucleo immediately evaluates newly injected items.
+    pub fn refind(&mut self) {
+        #[cfg(feature = "frizbee")]
+        if self.engine == crate::config::MatcherEngineType::Frizbee {
+            self.matcher_dirty.store(true, Ordering::Release);
+            if let Some(cb) = self.notify_callback.load().as_ref() {
+                (cb.0)();
+            }
+            return;
+        }
+        for (i, column) in self
+            .columns
+            .iter()
+            .filter(|column| column.filter)
+            .enumerate()
+        {
+            let pattern = self
+                .query
+                .get(&column.name)
+                .map(|s| &**s)
+                .unwrap_or_else(|| {
+                    self.column_options[i]
+                        .contains(ColumnOptions::OrUseDefault)
+                        .then(|| self.query.primary_column_query())
+                        .flatten()
+                        .unwrap_or_default()
+                });
+
+            self.nucleo.pattern.reparse(
+                i,
+                pattern,
+                nucleo::pattern::CaseMatching::Smart,
+                nucleo::pattern::Normalization::Smart,
+                false,
+            );
+        }
+    }
+
+
     fn get_sorted_decorated<'a>(
         &'a self,
         snapshot: &'a nucleo::Snapshot<T>,

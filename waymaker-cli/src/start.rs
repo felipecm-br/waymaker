@@ -474,6 +474,7 @@ pub static COMMAND_ARGS: Mutex<Vec<std::ffi::OsString>> = Mutex::new(Vec::new())
 pub static TARGET_ITEM: Mutex<Option<String>> = Mutex::new(None);
 pub static PREV_RELOAD_ITEM: Mutex<Option<(Option<String>, u32, std::path::PathBuf)>> =
     Mutex::new(None);
+pub static CHDIR_NEW_DIR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn parse_border_type(s: &str) -> ratatui::widgets::BorderType {
     match s.trim().to_ascii_lowercase().as_str() {
@@ -1178,6 +1179,7 @@ pub async fn start(
         if let Err(e) = std::env::set_current_dir(&target_dir) {
             log::warn!("ChDir({}) failed: {e}", target_dir.display());
         } else {
+            CHDIR_NEW_DIR.store(true, std::sync::atomic::Ordering::SeqCst);
             if let Some(t) = target_to_select {
                 *TARGET_ITEM.lock().unwrap() = Some(t.clone());
                 unsafe {
@@ -1190,6 +1192,10 @@ pub async fn start(
                     std::env::remove_var("WM_TARGET_ITEM");
                     std::env::remove_var("MM_TARGET_ITEM");
                 }
+                // Entering a child directory (or new directory with no specific target):
+                // Reset cursor to 0 and clear any previous reload item.
+                state.picker_ui.results.cursor_jump(0);
+                *PREV_RELOAD_ITEM.lock().unwrap() = None;
             }
 
             if let Ok(new_cwd) = std::env::current_dir() {
@@ -1369,14 +1375,20 @@ pub async fn start(
 
     mm.register_interrupt_handler(Interrupt::Reload, move |state| {
         let current_dir = std::env::current_dir().unwrap_or_default();
-        let prev_idx = state.picker_ui.results.current_index();
-        let prev_item = state
-            .picker_ui
-            .worker
-            .get_nth(prev_idx)
-            .map(|raw| state.picker_ui.worker.columns[0].raw(raw).to_string());
-        *crate::start::PREV_RELOAD_ITEM.lock().unwrap() =
-            Some((prev_item, prev_idx, current_dir.clone()));
+        let just_chdir = CHDIR_NEW_DIR.swap(false, std::sync::atomic::Ordering::SeqCst);
+        if just_chdir {
+            *crate::start::PREV_RELOAD_ITEM.lock().unwrap() = None;
+            state.picker_ui.results.cursor_jump(0);
+        } else {
+            let prev_idx = state.picker_ui.results.current_index();
+            let prev_item = state
+                .picker_ui
+                .worker
+                .get_nth(prev_idx)
+                .map(|raw| state.picker_ui.worker.columns[0].raw(raw).to_string());
+            *crate::start::PREV_RELOAD_ITEM.lock().unwrap() =
+                Some((prev_item, prev_idx, current_dir.clone()));
+        }
 
         let cmd = if !state.payload().is_empty() {
             use_formatter(&reload_formatter, state, state.payload(), None)

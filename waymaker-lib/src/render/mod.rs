@@ -2208,7 +2208,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
         if state.filtering {
             picker_ui.update();
         } else if did_reload || state.reloading {
-            picker_ui.worker.find("");
+            picker_ui.worker.refind();
         }
         if did_cursor_wrap {
             log::trace!("cursor wrapped"); // todo: event handler?

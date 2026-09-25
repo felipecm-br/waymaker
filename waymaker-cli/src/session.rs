@@ -30,7 +30,7 @@ pub fn get_tmux_sessions() -> Vec<String> {
 pub fn strip_icon(s: &str) -> &str {
     let s = s.trim();
     // Common Nerd Font prefixes used by sesh and waymaker
-    for prefix in [" ", " ", " ", "⚡ ", " ", " ", " "] {
+    for prefix in [" ", " ", " ", "⚡ ", " ", " ", " ", "⚙️ ", "📁 ", "🔎 "] {
         if let Some(rest) = s.strip_prefix(prefix) {
             return rest.trim();
         }
@@ -385,6 +385,50 @@ pub fn last() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Kill a Tmux session or remove/unpin a directory from frecency store.
+pub fn kill(target: &str) -> anyhow::Result<()> {
+    let trimmed = target.trim().trim_matches('\'').trim_matches('"');
+    let clean = strip_icon(trimmed);
+    if clean.is_empty() {
+        return Ok(());
+    }
+
+    // 1. If target corresponds to an active Tmux session
+    let tmux_sessions = get_tmux_sessions();
+    if tmux_sessions.iter().any(|s| s == clean) {
+        let status = Command::new("tmux")
+            .args(["kill-session", "-t", clean])
+            .status();
+        match status {
+            Ok(s) if s.success() => return Ok(()),
+            Ok(s) => {
+                log::warn!("tmux kill-session -t {clean} exited with status: {s}");
+            }
+            Err(e) => {
+                log::warn!("failed to execute tmux kill-session: {e}");
+            }
+        }
+    }
+
+    // 2. Also remove/unpin path from frecency store
+    let expanded = expand_tilde(clean);
+    let store = waymaker::frecency::FrecencyStore::open();
+    let _ = store.unpin(clean);
+    let _ = store.remove(clean);
+    let exp_str = expanded.to_string_lossy();
+    if exp_str != clean {
+        let _ = store.unpin(&exp_str);
+        let _ = store.remove(&exp_str);
+    }
+
+    // Fallback: try tmux kill-session directly in case clean was a session name not caught by get_tmux_sessions
+    let _ = Command::new("tmux")
+        .args(["kill-session", "-t", clean])
+        .status();
+
+    Ok(())
+}
+
 /// List sessions and frecency directories with icons and filtering.
 pub fn list(
     icons: bool,
@@ -594,6 +638,18 @@ pub async fn handle_sesh_cli() -> i32 {
             }
             0
         }
+        "kill" => {
+            if let Some(target) = args.get(1) {
+                if let Err(e) = kill(target) {
+                    eprintln!("sesh kill error: {}", e);
+                    return 1;
+                }
+                0
+            } else {
+                eprintln!("Usage: sesh kill <session_or_dir>");
+                1
+            }
+        }
         "preview" => {
             if let Some(target) = args.get(1) {
                 if let Err(e) = preview(target) {
@@ -612,6 +668,7 @@ pub async fn handle_sesh_cli() -> i32 {
             println!("    sesh [command] [options]");
             println!("\nCOMMANDS:");
             println!("    connect <target>     Connect to or create a session");
+            println!("    kill <target>        Kill a session or remove from frecency");
             println!("    last                 Switch to the previous session");
             println!("    list [--icons]       List sessions and frecency directories");
             println!("    preview <target>     Live preview for session or directory");
@@ -649,6 +706,20 @@ pub async fn handle_session_cli(config_args: &[String]) -> Option<i32> {
 
             let sub = config_args[1].as_str();
             match sub {
+                "kill" => {
+                    let target = config_args.iter().skip(2).find(|a| !a.starts_with('-'));
+                    if let Some(t) = target {
+                        if let Err(e) = kill(t) {
+                            eprintln!("Error: {}", e);
+                            Some(1)
+                        } else {
+                            Some(0)
+                        }
+                    } else {
+                        eprintln!("Usage: wm session kill <target>");
+                        Some(1)
+                    }
+                }
                 "list" => {
                     let mut icons = false;
                     let mut tmux_only = false;
@@ -740,6 +811,20 @@ pub async fn handle_session_cli(config_args: &[String]) -> Option<i32> {
                 }
             } else {
                 eprintln!("Usage: wm connect [--switch] <target>");
+                Some(1)
+            }
+        }
+        "kill" => {
+            let target = config_args.iter().skip(1).find(|a| !a.starts_with('-'));
+            if let Some(t) = target {
+                if let Err(e) = kill(t) {
+                    eprintln!("Error: {}", e);
+                    Some(1)
+                } else {
+                    Some(0)
+                }
+            } else {
+                eprintln!("Usage: wm kill <target>");
                 Some(1)
             }
         }
@@ -973,5 +1058,30 @@ path = "~/Downloads"
     async fn test_handle_session_cli_empty_and_unknown() {
         assert_eq!(handle_session_cli(&[]).await, None);
         assert_eq!(handle_session_cli(&["unrelated".to_string()]).await, None);
+    }
+
+    #[tokio::test]
+    async fn test_kill_and_handle_session_cli_kill() {
+        // kill empty or non-existent does not crash
+        assert!(kill("").is_ok());
+        assert!(kill("   ").is_ok());
+        assert!(kill("non_existent_tmux_session_12345").is_ok());
+        assert!(kill("\"non_existent_quoted\"").is_ok());
+
+        // handle_session_cli kill invocations
+        assert_eq!(
+            handle_session_cli(&["kill".into(), "non_existent_sess".into()]).await,
+            Some(0)
+        );
+        assert_eq!(
+            handle_session_cli(&["session".into(), "kill".into(), "non_existent_sess".into()]).await,
+            Some(0)
+        );
+        // Missing target returns code 1
+        assert_eq!(handle_session_cli(&["kill".into()]).await, Some(1));
+        assert_eq!(
+            handle_session_cli(&["session".into(), "kill".into()]).await,
+            Some(1)
+        );
     }
 }

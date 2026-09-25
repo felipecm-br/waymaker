@@ -4,6 +4,7 @@ basic = true
 bar = "Plain"
 color = "Black"
 prompt = ""
+focus_on_start = "picker"
 
 [start]
 sort = false
@@ -63,10 +64,11 @@ percentage = 55
 "ctrl-g" = [ "SetPrompt(⚙️  )", "Reload(wm session list -c --icons)" ]
 "ctrl-x" = [ "SetPrompt(📁  )", "Reload(wm list --dirs)" ]
 "ctrl-f" = [ "SetPrompt(🔎  )", "Reload(fd -H -d 2 -t d -E .Trash . ~)" ]
-"ctrl-d" = [ 'ExecuteAsync(sess="{=}"; sess="${sess#* }"; tmux kill-session -t "$sess")', "SetPrompt(⚡  )", "SetQuery()", "Reload(wm session list --icons)" ]
+"ctrl-d" = [ 'ExecuteAsync(wm session kill "{=}")', "SetPrompt(⚡  )", "SetQuery()", "Reload(wm session list --icons)" ]
 "nav^^a" = [ "SetPrompt(⚡  )", "Reload(wm session list --icons)" ]
 "nav^^t" = [ "SetPrompt(🪟  )", "Reload(wm session list -t --icons)" ]
 "nav^^g" = [ "SetPrompt(⚙️  )", "Reload(wm session list -c --icons)" ]
 "nav^^x" = [ "SetPrompt(📁  )", "Reload(wm list --dirs)" ]
 "nav^^f" = [ "SetPrompt(🔎  )", "Reload(fd -H -d 2 -t d -E .Trash . ~)" ]
-"nav^^d" = [ 'ExecuteAsync(sess="{=}"; sess="${sess#* }"; tmux kill-session -t "$sess")', "SetPrompt(⚡  )", "SetQuery()", "Reload(wm session list --icons)" ]
+"nav^^d" = [ 'ExecuteAsync(wm session kill "{=}")', "SetPrompt(⚡  )", "SetQuery()", "Reload(wm session list --icons)" ]
+
