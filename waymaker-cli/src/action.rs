@@ -496,7 +496,10 @@ pub fn action_handler(
         MMAction::ReloadReady(_) => {
             state.reloading = false;
             state.picker_ui.worker.refind();
-            state.picker_ui.worker.nucleo.tick(20);
+            let mut iters = 0;
+            while state.picker_ui.worker.nucleo.tick(10).running && iters < 50 {
+                iters += 1;
+            }
             if state.filtering {
                 state.picker_ui.update();
             }

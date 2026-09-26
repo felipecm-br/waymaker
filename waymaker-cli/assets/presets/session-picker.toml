@@ -58,6 +58,14 @@ command = 'wm session preview {=}'
 side = "right"
 percentage = 55
 
+[ui.nav.binds]
+"a" = "Reload(wm session list --icons)"
+"t" = "Reload(wm session list -t --icons)"
+"g" = "Reload(wm session list -c --icons)"
+"x" = "Reload(wm list --dirs)"
+"f" = "Reload(fd -H -d 2 -t d -E .Trash . ~)"
+"d" = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload(wm session list --icons)" ]
+
 [binds]
 "ctrl-a" = [ "SetPrompt(⚡  )", "Reload(wm session list --icons)" ]
 "ctrl-t" = [ "SetPrompt(🪟  )", "Reload(wm session list -t --icons)" ]
@@ -65,10 +73,4 @@ percentage = 55
 "ctrl-x" = [ "SetPrompt(📁  )", "Reload(wm list --dirs)" ]
 "ctrl-f" = [ "SetPrompt(🔎  )", "Reload(fd -H -d 2 -t d -E .Trash . ~)" ]
 "ctrl-d" = [ 'ExecuteAsync(wm session kill "{=}")', "SetPrompt(⚡  )", "SetQuery()", "Reload(wm session list --icons)" ]
-"nav^^a" = [ "SetPrompt(⚡  )", "Reload(wm session list --icons)" ]
-"nav^^t" = [ "SetPrompt(🪟  )", "Reload(wm session list -t --icons)" ]
-"nav^^g" = [ "SetPrompt(⚙️  )", "Reload(wm session list -c --icons)" ]
-"nav^^x" = [ "SetPrompt(📁  )", "Reload(wm list --dirs)" ]
-"nav^^f" = [ "SetPrompt(🔎  )", "Reload(fd -H -d 2 -t d -E .Trash . ~)" ]
-"nav^^d" = [ 'ExecuteAsync(wm session kill "{=}")', "SetPrompt(⚡  )", "SetQuery()", "Reload(wm session list --icons)" ]
 
