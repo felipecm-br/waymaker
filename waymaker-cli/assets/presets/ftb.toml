@@ -1,0 +1,75 @@
+# Matchmaker FZF-Tab Completion Preset (`mm -o ftb`)
+# Fast, intelligent, multi-column tab completion with Nucleo matching
+
+[tui]
+percentage = 40
+min = 10
+max = 35
+
+[ui]
+border = { type = "Rounded" }
+
+[query]
+status_inline = true
+prompt = ">"
+prompt_style.fg = "Cyan"
+prompt_style.modifier = "BOLD"
+
+[matcher]
+typo_tolerance = true
+
+[matcher.sort]
+threshold = "smart"
+
+[results]
+reverse = false
+icons = false
+
+[columns]
+split = "\\x00"
+default = "candidate"
+names = [
+    { name = "prefix", hidden = true },
+    { name = "candidate" },
+    { name = "suffix", hidden = true },
+]
+
+[previewer]
+debounce_ms = 30
+
+[preview]
+show = true
+wrap = true
+scroll_wrap = true
+
+[[preview.layout]]
+command = '''
+item="{=candidate}"
+p="${item%% *}"
+
+if [ -f "$p" ]; then
+    bat --style=numbers --color=always --line-range=:150 "$p" 2>/dev/null || cat "$p"
+elif [ -d "$p" ]; then
+    eza --tree --level=2 --icons=always --color=always "$p" 2>/dev/null || ls -la "$p"
+elif git rev-parse --verify "$p" >/dev/null 2>&1; then
+    git log --graph --color=always --format="%C(yellow)%h%Creset %C(green)%ad%Creset %C(auto)%d%Creset %s %C(bold blue)<%an>%Creset" --date=short -n 20 "$p" 2>/dev/null
+elif [[ "$p" =~ ^[0-9]+$ ]] && kill -0 "$p" 2>/dev/null; then
+    ps -fp "$p" 2>/dev/null
+elif command -v tldr >/dev/null 2>&1 && tldr "$p" >/dev/null 2>&1; then
+    tldr "$p" 2>/dev/null
+fi
+'''
+side = "right"
+percentage = 80
+min = 25
+
+[start]
+ansi = true
+output_template = "{=}"
+
+[binds]
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"tab" = "Down"
+"shift-tab" = "Up"
+"ctrl-p" = "SwitchPreview"

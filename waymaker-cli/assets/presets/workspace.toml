@@ -1,0 +1,235 @@
+# Matchmaker / Waymaker Workspace Inspector Preset (`wm -o workspace` / `wm -o files`)
+# Optimized for quick inspection of workspace files, markdown diagrams, and AI-generated content.
+# Supports 60% Golden Ratio split and 100% Full-Modal preview toggle via Ctrl+P / Enter.
+# Supports Ctrl+V to insert the file path directly into the origin pane/AI prompt.
+# Tab / Shift+Tab cycles data sources (Local files -> Frecency -> Bookmarks).
+
+[ui.nav]
+active = true
+focus_on_start = "filter"
+bar = "Plain"
+color = "Darkgray"
+hints = true
+hints_columns = 4
+
+[tui]
+percentage = 100
+max = 9999
+
+[query]
+prompt = " > "
+prompt_style.fg = "Cyan"
+status_inline = true
+
+# Data source mode prompts and styling (aligning with jump.toml)
+[query.local]
+prompt = "> "
+prompt_style.fg = "cyan"
+underline_style.fg = "cyan"
+
+[query.frecency]
+prompt = "󱅤 "
+prompt_style.fg = "#8999f1"
+underline_style.fg = "#8999f1"
+
+[query.bookmarks]
+prompt = " "
+prompt_style.fg = "#f9e2af"
+underline_style.fg = "#f9e2af"
+
+[matcher]
+depth_penalty = 15
+typo_tolerance = true
+dir_first = true
+
+[matcher.sort]
+threshold = "smart"
+cap = 2000
+
+[matcher.frecency]
+active = true
+weight = 2
+
+[results]
+icons = true
+scroll_wrap = true
+row_connection = "Full"
+
+[results.tier]
+separator = "Underline"
+
+[results.tier.style]
+fg = "#555555"
+
+[results.current_style]
+fg = "black"
+bg = "Darkgray"
+modifier = "BOLD"
+
+[results.current_nav_bar_style]
+fg = "white"
+
+[results.bookmark]
+folder_icon = "󰮟"
+file_icon = "󱀻"
+icon_style.fg = "#f9e2af"
+
+[results.frecency]
+folder_icon = "󰪻"
+folder_icon_style.fg = "#8999f1"
+icon = "󱋢"
+icon_style.fg = "#8999f1"
+
+[previewer]
+debounce_ms = 40
+delay_clear = true
+
+[preview]
+show = true
+wrap = true
+scrollbar = true
+markdown = true
+
+[preview.media]
+active = true
+fit = "fit"
+
+[preview.diagrams]
+active = true
+inline = true
+theme = "auto"
+background = "transparent"
+
+# Layout 0: Standard split (60% preview, 40% list)
+[[preview.layout]]
+side = "right"
+percentage = 60
+
+# Layout 1: Exclusive Fullscreen Preview (100% modal for preview, list hidden)
+[[preview.layout]]
+side = "right"
+percentage = 100
+
+# Layout 2: Overrides and disables the 3rd layout from base config (strictly toggles 60% <-> 100%)
+[[preview.layout]]
+max = 0
+
+[preview.border]
+sides = "LEFT"
+color = "Darkgray"
+title_fg = "Cyan"
+
+[footer]
+# content = " {cyan,bold:[Enter]} {darkgray:Full}  •  {magenta,bold:[Tab]} {darkgray:Cycle}  •  {yellow,bold:[C-h/l]} {darkgray:Dir}  •  {cyan,bold:[C-j/k]} {darkgray:Move}  •  {blue,bold:[C-d/u]} {darkgray:Scroll}  •  {green,bold:[C-v]} {darkgray:Insert}  •  {yellow,bold:[C-e]} {darkgray:Edit}  •  {magenta,bold:[C-y]} {darkgray:Copy}  •  {red,bold:[Esc]} {darkgray:Nav}"
+match_indent = false
+row_connection = "Full"
+separator = "light"
+
+[exit]
+abort_empty = true
+
+[start]
+
+[start.command]
+command = ""
+# Fontes de dados cicláveis via @reloadnext (Tab / Shift+Tab):
+# Índice 0: "" -> Usa AsyncWalker nativo para pasta/arquivos locais.
+# Índice 1: Lista global por frecência via wm list.
+# Índice 2: Lista exclusiva de favoritos via wm list --bookmarks.
+additional = [
+    "",
+    "wm list 2>/dev/null",
+    "wm list --bookmarks 2>/dev/null"
+]
+
+[binds]
+# Data source cycling (aligning with jump.toml)
+tab = "@reloadnext"
+shift-backtab = "@reloadprev"
+backtab = "@reloadprev"
+shift-tab = "@reloadprev"
+"@dirs" = "ReloadNext(1)"
+"@bookmarks" = "ReloadNext(2)"
+"@local" = "ReloadNext(0)"
+ctrl-f = "@dirs"
+ctrl-b = "@bookmarks"
+"*" = "@bookmark"
+
+enter = "CyclePreview"
+esc = "ToggleFocus"
+ctrl-c = "Quit"
+ctrl-j = "Down"
+ctrl-k = "Up"
+ctrl-shift-j = "PreviewDown(5)"
+ctrl-shift-k = "PreviewUp(5)"
+ctrl-J = "PreviewDown(5)"
+ctrl-K = "PreviewUp(5)"
+ctrl-y = "Accept"
+ctrl-d = "@delete"
+ctrl-u = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+ctrl-s = "ToggleDiagram"
+"ctrl-=" = "DiagramZoomIn"
+"ctrl-+" = "DiagramZoomIn"
+"ctrl--" = "DiagramZoomOut"
+"ctrl-0" = "DiagramResetZoom"
+ctrl-v = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {})'
+ctrl-e = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-o = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-l = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+ctrl-h = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+
+[ui.nav.binds]
+# Data source cycling (aligning with jump.toml)
+tab = "@reloadnext"
+shift-backtab = "@reloadprev"
+backtab = "@reloadprev"
+shift-tab = "@reloadprev"
+f = "@dirs"
+b = "@bookmarks"
+"*" = "@bookmark"
+
+enter = "CyclePreview"
+y = "Accept"
+ctrl-y = "Accept"
+esc = "Quit"
+q = "Quit"
+"/" = "FocusFilter"
+ctrl-c = "Quit"
+ctrl-v = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {})'
+j = "Down"
+k = "Up"
+up = "Up"
+down = "Down"
+left = "PreviewHScroll(-6)"
+right = "PreviewHScroll(6)"
+ctrl-j = "Down"
+ctrl-k = "Up"
+ctrl-shift-j = "PreviewDown(5)"
+ctrl-shift-k = "PreviewUp(5)"
+ctrl-J = "PreviewDown(5)"
+ctrl-K = "PreviewUp(5)"
+J = "PreviewDown(5)"
+K = "PreviewUp(5)"
+shift-j = "PreviewDown(5)"
+shift-k = "PreviewUp(5)"
+d = "PreviewHalfPageDown"
+ctrl-d = "PreviewHalfPageDown"
+u = "PreviewHalfPageUp"
+ctrl-u = "PreviewHalfPageUp"
+s = "ToggleDiagram"
+ctrl-s = "ToggleDiagram"
+"n" = "NextDiagram"
+"N" = "PrevDiagram"
+"]" = "NextDiagram"
+"[" = "PrevDiagram"
+"+" = "DiagramZoomIn"
+"=" = "DiagramZoomIn"
+"-" = "DiagramZoomOut"
+"0" = "DiagramResetZoom"
+" " = "Toggle"
+e = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
+o = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-e = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-o = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
+l = ["ChDir({=})", "Cancel", "Reload", "Pos(0)"]
+h = ["ChDir(..)", "Cancel", "Reload"]

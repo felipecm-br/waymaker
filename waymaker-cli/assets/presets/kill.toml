@@ -1,0 +1,62 @@
+# Matchmaker Port & Process Killer (`mm -o kill`)
+# Interactive port and process selector with signal termination support
+
+
+[tui]
+percentage = 65
+
+[query]
+status_inline = true
+prompt = "Kill Port/Process > "
+prompt_style.fg = "Red"
+prompt_style.modifier = "BOLD"
+
+[footer]
+content = "  Enter: SIGTERM (15)  •  Ctrl+X: SIGKILL (-9)  •  Ctrl+P: Toggle Preview"
+style.fg = "DarkGray"
+style.modifier = "DIM"
+separator = "light"
+
+[columns]
+split = "\t"
+names = [
+    { name = "port" },
+    { name = "pid" },
+    { name = "command" },
+    { name = "user" }
+]
+
+[preview]
+show = true
+
+[preview.border]
+sides = "LEFT"
+color = "Darkgray"
+
+[[preview.layout]]
+command = '''
+pid="{=pid}"
+port="{=port}"
+echo "━━━ Process Details (PID: $pid) ━━━━━━━━━━━━━━"
+ps -u -p "$pid" 2>/dev/null || ps -fp "$pid" 2>/dev/null
+echo ""
+echo "━━━ Listening Port Connections ($port) ━━━━━━━"
+lsof -i :"$port" 2>/dev/null
+'''
+side = "right"
+percentage = 60
+
+[start.command]
+command = '''
+lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk 'NR>1 {
+    split($9, a, ":");
+    port = a[length(a)];
+    printf ":%s\t%s\t%s\t%s\n", port, $2, $1, $3
+}' | sort -n -u
+'''
+
+[binds]
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"ctrl-x" = ["ExecuteSilent(kill -9 {=pid})", "Reload"]
+"ctrl-p" = "SwitchPreview"

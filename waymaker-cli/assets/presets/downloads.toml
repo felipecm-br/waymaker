@@ -1,0 +1,65 @@
+# Matchmaker Downloads Preset (`mm -o downloads`)
+# Optimized for browsing ~/Downloads with native terminal image previews
+
+[tui]
+percentage = 70 # height
+min = 15
+
+[ui.nav]
+active = true               # true (modo navegação habilitado) / false
+bar = "Plain"             # Estilo da barra na lista: "Plain" (│), "Thick" (█), "Double" (║), "Rounded" (│), "QuadrantOutside" (▌), "QuadrantInside" (▐)
+color = "black"           # Cor da barra: nomes ("black", "gray", "cyan", "lightblue", etc.) ou hex ("#000000", "#1e1e2e")
+# bold = false            # true / false (barra em negrito)
+# blink = false           # true / false (barra piscando)
+# blink_rate = "Slow"     # "Slow", "Medium", "Fast"
+
+[query]
+status_inline = true          # true (contador de resultados na barra de busca) / false
+cursor = "none"                  # Hides terminal hardware cursor to prevent Ghostty shader flicker/trails
+prompt = "> "
+prompt_style.fg = "Cyan"
+prompt_style.modifier = "BOLD"
+
+[results]
+max = 15
+icons = true
+
+[results.symlink]
+active = true
+
+[matcher.sort]
+threshold = "smart"
+
+[matcher.frecency]
+active = true
+
+[preview]                 # Quantidade máxima de linhas visíveis
+show = true
+wrap = true
+scroll_wrap = true
+
+[preview.media]
+active = true
+fit = "fit"
+
+[previewer]
+debounce_ms = 20                # Delay em ms para atualizar o preview ao mover o cursor
+delay_clear = true              # true: retém preview anterior para zero-flicker
+
+[preview.border]
+sides = "LEFT"
+color = "Darkgray"
+
+[[preview.layout]]
+side = "right"
+percentage = 65
+min = 25
+
+[start]
+directory = "~/Downloads"
+
+[binds]
+"ctrl-l" = "@look"
+"alt-=" = "ExpandPreview(5)"
+"alt-hyphen" = "ShrinkPreview(5)"
+"ctrl-/" = "CyclePreview"

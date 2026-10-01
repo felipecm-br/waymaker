@@ -1,0 +1,60 @@
+[ui.nav]
+active = true
+bar = "Plain"
+color = "Black"
+
+[tui]
+percentage = 100
+min = 10
+max = 100
+
+[preview]
+show = true
+wrap = true
+
+[preview.border]
+sides = ""
+padding = 0
+
+[[preview.layout]]
+command = "imv-msg $(cat /tmp/imv-$USER.pid 2>/dev/null) goto $(( {=#} + 1 )) 2>/dev/null"
+side = "right"
+percentage = 0
+min = 0
+max = 1
+
+[columns]
+split = "\t"
+names = [
+  "label",
+  { name = "path", hidden = true }
+]
+
+[start.command]
+cmd = '''
+theme_name=""
+if [ -f "$HOME/.config/omarchy/current/theme.name" ]; then
+  theme_name=$(cat "$HOME/.config/omarchy/current/theme.name")
+fi
+
+{
+  [ -d "$HOME/.config/omarchy/current/theme/backgrounds" ] && find -L "$HOME/.config/omarchy/current/theme/backgrounds" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.bmp' -o -iname '*.webp' \) 2>/dev/null | sort
+  if [ -n "$theme_name" ] && [ -d "$HOME/.config/omarchy/backgrounds/$theme_name" ]; then
+    find -L "$HOME/.config/omarchy/backgrounds/$theme_name" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.bmp' -o -iname '*.webp' \) 2>/dev/null | sort
+  fi
+} | awk '{ fullpath = $0; filename = fullpath; sub(/.*\//, "", filename); if (!seen[filename]++) { label = filename; sub(/\.[^.]+$/, "", label); gsub(/^[0-9]+-?/, "", label); gsub(/-/, " ", label); n = split(label, words, " "); label = ""; for (i = 1; i <= n; i++) { word = words[i]; word = toupper(substr(word, 1, 1)) substr(word, 2); label = label (i > 1 ? " " : "") word }; print label "\t" fullpath } }'
+'''
+[query]
+prompt = ""
+
+[start]
+mode = "nav"
+
+[binds]
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"                                
+"nav^^g" = "Pos(0)"
+"nav^^G" = "Pos(-1)"
+"nav^^q" = "Quit"
+"nav^^esc" = "Quit"
+"nav^^enter" = "Accept"

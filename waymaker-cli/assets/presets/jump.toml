@@ -1,34 +1,19 @@
-# Waymaker Jump Mode Preset (`wm -o jump`)
+# Matchmaker Jump Mode Preset (`mm -o jump`)
 # Interactive directory navigation, frecency ranking, and TUI traversal.
 
-[ui.nav]
-active = true
-profile = "fm"
-focus_on_start = "picker"
-bar = "Plain"
-color = "Black"
-notify = true
-hints = true
-hints_columns = 4
-
-[ui.parent_peek]
-enabled = true
-
-[ui.parent_peek.border]
-show = false
-
-[footer]
-style.fg = "DarkGray"
-style.modifier = "DIM"
-match_indent = false
+[tui]
+percentage = 43               # Altura do TUI em % da tela (descomente para modo inline)
 
 [query]
-status_inline = true
+status_inline = true          # true (contador de resultados na barra de busca) / false
 
 [query.filter]
-underline = true
-underline_style.fg = "DarkGray"
+prompt_style.fg = "blue"          # Muda a cor (ex: Yellow, Cyan, #fab387, etc.)
+prompt_style.modifier = "BOLD"      # Aplica Negrito ("BOLD", "ITALIC", "DIM", etc.)
+underline = true       # Underline aparece quando o filtro está focado e desaparece no modo de navegação
+underline_style.fg = "#8999f1" # Cor do underline no foco ("blue", "gray", "cyan", etc.)
 
+# Prompts e cores por modo:
 [query.local]
 prompt = "> "
 prompt_style.fg = "cyan"
@@ -36,69 +21,125 @@ underline_style.fg = "cyan"
 
 [query.frecency]
 prompt = "󱅤 "
-prompt_style.fg = "blue"
-underline_style.fg = "blue"
+prompt_style.fg = "#8999f1"
+underline_style.fg = "#8999f1"
 
 [query.bookmarks]
 prompt = " "
-prompt_style.fg = "yellow"
-underline_style.fg = "yellow"
+prompt_style.fg = "#f9e2af"
+underline_style.fg = "#f9e2af"
+
+[ui.nav]
+active = true               # true (modo navegação habilitado) / false
+profile = "fm"              # Perfil de File Manager completo (atalhos de criação/edição/remoção de arquivos e traversal h/l)
+focus_on_start = "picker" # Inicia na lista de resultados (NavBar) para navegação VIM instantânea na Home Row
+bar = "Plain"             # Estilo da barra na lista: "Plain" (│), "Thick" (█), "Double" (║), "Rounded" (│), "QuadrantOutside" (▌), "QuadrantInside" (▐)
+color = "Darkgray"        # Cor da barra: nomes ("black", "gray", "cyan", "lightblue", etc.) ou hex ("#000000", "#1e1e2e")
+# bold = false            # true / false (barra em negrito)
+# blink = false           # true / false (barra piscando)
+# blink_rate = "Slow"     # "Slow", "Medium", "Fast"
+hints = true              # Dicas de atalhos em modo navegação
+hints_columns = 4         # Grid de atalhos alinhado em 4 colunas no rodapé (estilo sort menu)
+
+[ui.parent_peek]
+enabled = false               # true (mostra painel com pasta pai à esquerda) / false
+
+[ui.parent_peek.border]
+show = false                  # true / false (borda do painel pai)
+
+[footer]
+separator = "light"
+# content = "  h/l: Nav  •  Ctrl+F: Cycle Mode  •  Ctrl+P: Toggle Preview  •  Ctrl+U: Ancestors  •  Enter: Select"
+style.fg = "gray"             # Cor do texto do rodapé ("gray", "cyan", "#RRGGBB", etc.)
+style.modifier = "DIM"        # "DIM", "BOLD", "ITALIC", "UNDERLINED", "REVERSED"
+match_indent = false          # true / false
 
 [matcher]
-depth_penalty = 15
-typo_tolerance = true
-dir_first = true
+engine = "frizbee"                # "nucleo" ou "frizbee" (motor de fuzzy matching)
+depth_penalty = 15            # Penalidade por profundidade de pasta
+typo_tolerance = true         # true / false (tolerância a erros de digitação)
+dir_first = true              # true / false (prioriza pastas no topo da lista)
 
 [matcher.sort]
-threshold = "smart"
-cap = 2000
+threshold = "smart"                # Algoritmo de ordenação: "smart", "score", "exact", "alphabetical", "frecency", "none"
+cap = 2000               # Limite máximo de itens a ordenar
 
 [matcher.frecency]
-active = true
-weight = 2
+active = true               # true / false (histórico de relevância/frecência)
+weight = 2           # Peso do score de frecência
 
 [results]
-scroll_wrap = true
-max = 15
-reverse = false
-icons = true
+scroll_wrap = true             # true (navegação circular: volta ao início no último item e vice-versa)
+# Grossura / tipo de borda do navbar exclusivo para o item focado:
+current_nav_bar = "Plain" # "Plain" (│), "Thick" (█), "Double" (║), "Rounded" (│), "QuadrantOutside" (▌), "QuadrantInside" (▐)
+max = 15                      # Quantidade máxima de linhas visíveis
+reverse = false               # true (ordem de baixo para cima) / false (cima para baixo)
+icons = true                  # true (ativa ícones Nerd Font por tipo de arquivo) / false
+uncolor_current_icon = true   # true (ícone focado herda cor do foco - estilo Yazi) / false
+invert_current_icon = false   # true (inverte cor do ícone no foco: Azul<->Amarelo, Vermelho<->Ciano) / false
+row_connection = "Full"       # Destaque da linha: "Full" (barra sólida contínua), "Capped" (somente coluna ativa), "Disjoint" (colunas separadas)
+
+[results.tier]
+separator = "Underline"
+
+[results.tier.style]
+fg = "#555555"   # ou "Cyan", "Blue", "Gray", "#555555", etc.
+
+[results.symlink]
+active = true         # true (mostra '-> destino' em links simbólicos) / false
+style.fg = "cyan" # Cor do texto de destino do symlink
 
 [results.bookmark]
 folder_icon = "󰮟"
 file_icon = "󱀻"
-icon_style.fg = "yellow"
+icon_style.fg = "#f9e2af"
 
 [results.frecency]
 folder_icon = "󰪻"
-folder_icon_style.fg = "blue"
+folder_icon_style.fg = "#8999f1"
 icon = "󱋢"
-icon_style.fg = "blue"
+icon_style.fg = "#8999f1"
 
-[results.symlink]
-active = true
-style.fg = "cyan"
+# Estilo independente para a célula da barra do navbar no item focado:
+[results.current_nav_bar_style]
+fg = "white"                 # Cor do glifo da barra focada ("yellow", "cyan", "black", "#89b4fa", etc.)
+# bg = "lightblue"            # Cor de fundo da barra focada (se omitido, herda current_style.bg)
+# modifier = "BOLD"           # "BOLD", "DIM", "ITALIC", "UNDERLINED"
+
+# Estilo da linha em foco (cursor):
+[results.current_style]
+fg = "black"                  # Cor do texto no foco: "black", "#000000", "white", "reset", etc.
+bg = "Darkgray"              # Cor de fundo do destaque: "lightblue", "gray", "#1e1e2e", "reset" (transparente), etc.
+modifier = "BOLD"             # "BOLD", "DIM", "ITALIC", "UNDERLINED", "REVERSED"
+
+# (Opcional) Cor e estilo exclusivos para o glifo do ícone no foco:
+# [results.current_icon_style]
+# fg = "black"                # Força uma cor de primeiro plano específica apenas para o ícone
+
+[results.autoscroll]
+indicator = ""               # Caractere indicador de scroll automático
+indicator_style.fg = "blue"   # Cor do indicador de autoscroll
 
 [previewer]
-debounce_ms = 35
-delay_clear = true
+debounce_ms = 200              # Delay em ms para atualizar o preview ao mover o cursor (evita floods em scroll rápido)
+delay_clear = true            # true (evita flicker retendo preview anterior até o novo estar pronto)
 
 [preview]
-markdown = true
+show = true
+scrollbar = true
 
 [preview.media]
 active = true
-size = 1280
+fit = "fit"
+size = 0             # Resolução máxima do downscaling em pixels (ex: 512, 800, 1280, 1920; 0 = original/sem downscale)
 
 [preview.border]
 sides = "LEFT"
 color = "Darkgray"
-title_fg = "Cyan"
 
 [[preview.layout]]
-command = '''p={1}; p="${p/#\~/$HOME}"; if [ -d "$p" ]; then wm tree "$p" 2>/dev/null || eza --tree --level=2 --icons=always --git-ignore --color=always "$p" 2>/dev/null || ls -la "$p"; elif [[ "$p" =~ \.(md|markdown|mdown|mkd)$ ]]; then wm md "$p" 2>/dev/null || bat --style=numbers --color=always --line-range=:300 "$p" 2>/dev/null || cat "$p"; elif [[ "$p" =~ \.(mmd|mermaid)$ ]]; then wm mermaid "$p" 2>/dev/null || bat --style=numbers --color=always --line-range=:300 "$p" 2>/dev/null || cat "$p"; else mime=$(file -b --mime-type "$p" 2>/dev/null); if [[ "$mime" == image/* ]]; then if command -v chafa >/dev/null 2>&1; then chafa --probe=off --format=symbols --size=80x35 "$p" 2>/dev/null; elif command -v img2txt >/dev/null 2>&1; then img2txt -f ansi -W 60 "$p" 2>/dev/null; fi; echo ""; identify "$p" 2>/dev/null || file "$p"; else bat --style=numbers --color=always --line-range=:300 "$p" 2>/dev/null || cat "$p"; fi; fi'''
-side = "right"
-percentage = 50
-
+side = "right"                # Posição do preview: "right", "left", "top", "bottom"
+percentage = 60               # Tamanho balanceado do painel em % (Proporção Áurea 60/40)
 
 [binds]
 # Modos de dados (ciclar fontes e favoritos)
@@ -112,11 +153,15 @@ percentage = 50
 # Foco e modos
 "esc"           = "ToggleFocus"
 
-# Navegação do cursor
+# Navegação do cursor e preview no modo filtro
 "ctrl-j"        = "Down"
 "ctrl-k"        = "Up"
 "alt-j"         = "Down"
 "alt-k"         = "Up"
+"ctrl-shift-j"  = "PreviewDown(5)"
+"ctrl-shift-k"  = "PreviewUp(5)"
+"ctrl-shift-J"  = "PreviewDown(5)"
+"ctrl-shift-K"  = "PreviewUp(5)"
 
 # Navegação de diretórios (entrar / descer)
 "ctrl-l"        = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
@@ -151,13 +196,22 @@ percentage = 50
 "esc"           = "Quit"
 "q"             = "Quit"
 
-# Navegação do cursor
+# Navegação do cursor e preview
 "j"             = "Down"
 "k"             = "Up"
 "ctrl-j"        = "Down"
 "ctrl-k"        = "Up"
 "alt-j"         = "Down"
 "alt-k"         = "Up"
+"J"             = "PreviewDown(5)"
+"K"             = "PreviewUp(5)"
+"shift-j"       = "PreviewDown(5)"
+"shift-k"       = "PreviewUp(5)"
+"ctrl-shift-j"  = "PreviewDown(5)"
+"ctrl-shift-k"  = "PreviewUp(5)"
+"ctrl-shift-J"  = "PreviewDown(5)"
+"ctrl-shift-K"  = "PreviewUp(5)"
+"ctrl-d"        = "PreviewHalfPageDown"
 
 # Navegação de diretórios (entrar / descer)
 "l"             = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
@@ -196,26 +250,30 @@ percentage = 50
 "\\"            = "ToggleParentPeek"
 
 [breadcrumb]
-show = true
-separator = " / "
-style.fg = "Cyan"
-style.modifier = "BOLD"
-separator_style.fg = "Blue"
+show = true                   # true (exibe caminho atual como breadcrumb no topo) / false
+separator = "/"               # Caractere separador de diretório (ex: "/", " › ", " > ")
+style.fg = "Cyan"             # Cor do texto do caminho
+style.modifier = "BOLD"       # "BOLD", "DIM", "ITALIC", "UNDERLINED"
+separator_style.fg = "Cyan"   # Cor do separador
 
 [start]
 
 [start.command]
 command = ""
+# Fontes de dados cicláveis via @reloadnext (ctrl-f / f / b):
+# Índice 0: "" -> Usa AsyncWalker nativo para pasta/arquivos locais.
+# Índice 1: Lista global de pastas por frecência via wm list --dirs.
+# Índice 2: Lista exclusiva de pastas favoritadas via wm list --bookmarks.
 additional = [
     "",
     "wm list --dirs 2>/dev/null",
     "wm list --bookmarks 2>/dev/null"
 ]
 
-# Automatic folder-specific sort rules
+# Regras automáticas de ordenação por pasta (avaliadas em ordem top-to-bottom)
 [[folder_rules]]
 path = "~/Downloads"
-sort = "ModifiedReverse"
+sort = "ModifiedReverse" # arquivos modificados recentemente primeiro
 
 [[folder_rules]]
 path = "*/Downloads"
@@ -223,7 +281,7 @@ sort = "ModifiedReverse"
 
 [[folder_rules]]
 path = "*/screenshots"
-sort = "CreatedReverse"
+sort = "CreatedReverse"  # capturas de tela criadas recentemente primeiro
 
 [[folder_rules]]
 path = "*/Screenshots"

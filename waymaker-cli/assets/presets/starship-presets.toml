@@ -1,0 +1,56 @@
+# Matchmaker Starship Preset Selector (`mm -o starship-presets`)
+# Interactive picker to browse, preview, and apply starship prompt presets
+
+[ui.nav]
+active = true
+bar = "Plain"
+color = "Cyan"
+
+[tui]
+percentage = 80
+min = 15
+max = 95
+
+[query]
+prompt = " Starship Preset > "
+status_inline = true
+
+[matcher.sort]
+threshold = "smart"
+
+[preview]
+show = true
+wrap = true
+
+[preview.border]
+sides = "LEFT"
+color = "Darkgray"
+title_fg = "Cyan"
+
+[previewer]
+debounce_ms = 15
+delay_clear = true
+
+[[preview.layout]]
+command = 'omarchy-starship-preset --render-preview "{2}" "{1}"'
+side = "right"
+percentage = 65
+
+[columns]
+split = "\t"
+names = [
+  "label",
+  { name = "path", hidden = true }
+]
+
+[footer]
+content = " {magenta,bold:[Enter]} {darkgray:Selecionar}  •  {cyan,bold:[j/k | ↓/↑]} {darkgray:Navegar}  •  {yellow,bold:[Ctrl-L/H]} {darkgray:Modo Vim (Ins/Norm/Vis)}  •  {darkgray,bold:[Esc]} {darkgray:Cancelar}"
+row_connection = "Full"
+match_indent = false
+separator = "light"
+
+[binds]
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"ctrl-l" = ["ExecuteSilent($OMARCHY_STARSHIP_CYCLE_SCRIPT $OMARCHY_MODE_FILE fwd)", '''RunPreview(omarchy-starship-preset --render-preview "{2}" "{1}")''']
+"ctrl-h" = ["ExecuteSilent($OMARCHY_STARSHIP_CYCLE_SCRIPT $OMARCHY_MODE_FILE bwd)", '''RunPreview(omarchy-starship-preset --render-preview "{2}" "{1}")''']

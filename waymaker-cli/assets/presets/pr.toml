@@ -1,0 +1,164 @@
+# Matchmaker / Waymaker Pull Request Preset (`wm -o pr`)
+# Interactive GitHub PR browser, review manager, and worktree provisioner with live preview.
+
+[tui]
+percentage = 75
+min = 12
+max = 40
+restore_fullscreen = false
+
+[ui.nav]
+active = true
+bar = "Plain"
+color = "white"
+
+[ui.parent_peek]
+enabled = false
+
+[query]
+status_inline = true
+prompt = "PR > "
+prompt_style.fg = "white"
+prompt_style.modifier = "BOLD"
+
+[header]
+header_lines = 1
+style.fg = "Cyan"
+style.modifier = "BOLD"
+
+[footer]
+content = " {cyan,bold:[Enter]} {darkgray:Checkout Worktree}  •  {magenta,bold:[Tab]} {darkgray:Cycle Tab}  •  {blue,bold:[C-e]} {darkgray:Chrome}  •  {yellow,bold:[C-d]} {darkgray:Diff}  •  {blue,bold:[p]} {darkgray:Preview}  •  {darkgray,bold:[q]} {darkgray:Quit}"
+row_connection = "Full"
+match_indent = false
+style.fg = "gray"
+style.modifier = "DIM"
+
+[matcher]
+typo_tolerance = true
+
+[matcher.sort]
+threshold = "smart"
+
+[results]
+reverse = false
+column_spacing = 2
+
+[results.current_style]
+bg = "darkgray"
+modifier = "BOLD"
+
+[results.current_nav_bar_style]
+fg = "cyan"
+modifier = "BOLD"
+
+[columns]
+split = "\t"
+default = "title"
+max_columns = 5
+names = [
+    { name = "number" },
+    { name = "branch" },
+    { name = "author" },
+    { name = "updated" },
+    { name = "title" },
+]
+
+[previewer]
+debounce_ms = 20
+delay_clear = true
+
+[preview]
+show = true
+wrap = true
+
+# ── Preview Layout 0: PR Overview & Metadata ──
+[[preview.layout]]
+command = '''
+num="{=number}"
+num="${num#\#}"
+if [ -n "$num" ]; then
+    echo "━━━ GitHub Pull Request #$num ━━━━━━━━━━━━━━━━━━━━━━━━━"
+    gh pr view "$num" 2>/dev/null | head -n 120
+fi
+'''
+side = "right"
+percentage = 55
+
+# ── Preview Layout 1: PR Full Diff ──
+[[preview.layout]]
+command = '''
+num="{=number}"
+num="${num#\#}"
+if [ -n "$num" ]; then
+    echo "━━━ GitHub Pull Request #$num Diff ━━━━━━━━━━━━━━━━━━━━"
+    gh pr diff "$num" --color=always 2>/dev/null | head -n 150
+fi
+'''
+side = "right"
+percentage = 60
+
+[exit]
+abort_empty = false
+
+[start.command]
+command = '''
+printf "NUMBER\tBRANCH\tAUTHOR\tUPDATED\tTITLE  [Review Requested]\n"
+if command -v gh >/dev/null 2>&1; then
+    gh pr list --search "review-requested:@me" --limit 50 --json number,title,author,headRefName,updatedAt --template \
+      '{{range .}}{{tablerow (printf "#%v" .number) .headRefName .author.login (timeago .updatedAt) .title}}{{end}}' 2>/dev/null
+fi
+'''
+additional = [
+'''
+printf "NUMBER\tBRANCH\tAUTHOR\tUPDATED\tTITLE  [My PRs]\n"
+if command -v gh >/dev/null 2>&1; then
+    gh pr list --author "@me" --limit 50 --json number,title,author,headRefName,updatedAt --template \
+      '{{range .}}{{tablerow (printf "#%v" .number) .headRefName .author.login (timeago .updatedAt) .title}}{{end}}' 2>/dev/null
+fi
+''',
+'''
+printf "NUMBER\tBRANCH\tAUTHOR\tUPDATED\tTITLE  [All Open]\n"
+if command -v gh >/dev/null 2>&1; then
+    gh pr list --state open --limit 50 --json number,title,author,headRefName,updatedAt --template \
+      '{{range .}}{{tablerow (printf "#%v" .number) .headRefName .author.login (timeago .updatedAt) .title}}{{end}}' 2>/dev/null
+fi
+'''
+]
+
+[start]
+ansi = true
+mode = "nav"
+output_template = "{=number}\t{=branch}"
+
+[binds]
+"tab" = "ReloadNext"
+"shift-tab" = "ReloadPrev"
+"shift-backtab" = "ReloadPrev"
+"backtab" = "ReloadPrev"
+
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"ctrl-p" = "SwitchPreview"
+"ctrl-e" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
+"ctrl-b" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
+"ctrl-d" = '''Execute(~/.config/waymaker/scripts/pr-diff.sh "{=number}")'''
+
+# Nav Mode Binds (active when mode = "nav")
+"nav^^tab" = "ReloadNext"
+"nav^^shift-tab" = "ReloadPrev"
+"nav^^shift-backtab" = "ReloadPrev"
+"nav^^backtab" = "ReloadPrev"
+"nav^^j" = "Down"
+"nav^^k" = "Up"
+"nav^^down" = "Down"
+"nav^^up" = "Up"
+"nav^^enter" = "Accept"
+"nav^^q" = "Quit"
+"nav^^esc" = "Quit"
+"nav^^p" = "SwitchPreview"
+"nav^^g" = "Pos(0)"
+"nav^^G" = "Pos(-1)"
+"nav^^e" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
+"nav^^b" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
+"nav^^w" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
+"nav^^d" = '''Execute(~/.config/waymaker/scripts/pr-diff.sh "{=number}")'''

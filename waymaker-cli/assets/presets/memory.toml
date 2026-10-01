@@ -1,0 +1,30 @@
+# Matchmaker AI Memory & Agent Rules Explorer (`mm -o memory`)
+
+[tui]
+percentage = 70
+
+[query]
+status_inline = true
+prompt = "AI Memory & Rules > "
+prompt_style.fg = "Magenta"
+prompt_style.modifier = "BOLD"
+
+[preview]
+show = true
+
+[[preview.layout]]
+side = "right"
+percentage = 70
+
+[start.command]
+command = '''
+find "$PWD" "$HOME/.dotfiles/main" \
+    -maxdepth 4 \
+    \( -name "AGENTS.md" -o -name "CLAUDE.md" -o -name "SKILL.md" -o -path "*/ai-memory/*" \) \
+    -type f 2>/dev/null
+'''
+
+[binds]
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"ctrl-p" = "SwitchPreview"

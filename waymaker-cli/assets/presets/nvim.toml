@@ -1,0 +1,94 @@
+# Matchmaker Neovim File Picker Preset (`mm -o nvim`)
+# Optimized for high-performance file searching, frecency scoring, and live preview inside Neovim float windows.
+
+[tui]
+percentage = 100
+min = 10
+max = 9999
+
+[ui.nav]
+active = false
+
+[ui.border]
+sides = ""
+
+[query]
+prompt = " "
+prompt_style.fg = "Cyan"
+status_inline = true
+
+[matcher]
+depth_penalty = 15
+typo_tolerance = true
+dir_first = false
+
+[matcher.sort]
+threshold = "smart"
+cap = 2000
+
+[matcher.frecency]
+active = true
+weight = 2
+
+[results]
+icons = true
+reverse = false
+current_prefix = " "
+unselected_prefix = "  "
+column_spacing = 1
+
+[results.border]
+sides = ""
+
+[results.autoscroll]
+indicator = ""
+indicator_style.fg = "blue"
+
+[previewer]
+debounce_ms = 20
+delay_clear = true
+
+[preview]
+show = true
+wrap = true
+scroll_wrap = true
+
+[preview.media]
+active = true
+protocol = "kitty"
+
+[preview.border]
+sides = "LEFT"
+color = "Darkgray"
+
+[[preview.layout]]
+side = "right"
+percentage = 50
+
+[start.command]
+command = '''
+if [ -d .git ]; then
+    git ls-files --cached --others --exclude-standard 2>/dev/null || fd --type f --strip-cwd-prefix --hidden --exclude .git 2>/dev/null || find . -type f
+elif command -v fd >/dev/null 2>&1; then
+    fd --type f --strip-cwd-prefix --hidden --exclude .git 2>/dev/null
+else
+    find . -type f
+fi
+'''
+additional = [
+    "",
+    "wm list 2>/dev/null"
+]
+
+[start]
+ansi = false
+
+[binds]
+"ctrl-c" = "Quit"
+"esc" = "Quit"
+"enter" = "@accept"
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"ctrl-p" = "SwitchPreview"
+"ctrl-f" = "ReloadNext"
+"@accept" = "Accept"

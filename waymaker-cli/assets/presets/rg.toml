@@ -1,97 +1,198 @@
-# Full text search
+# Matchmaker Live Ripgrep Search Preset (`mm -o rg`)
+# Fast live full-text search with ripgrep, debounced query reload, 45/55 foveal layout,
+# line-synced bat syntax preview, Enter opening nvim at +{line} {file}, and Ctrl+V inserting {file}:{line}.
+# Search mode toggles: Ctrl+S = Match Case (Aa), Ctrl+W = Whole Word (W). Default: ignore-case.
 
 [matcher]
 ansi = true
-require_column = 1
 
 [start]
-[start.command]
-command = '''rg --column --line-number --no-heading --color=always --smart-case "$FZF_QUERY"'''
-output = "{=1}:{=2}"
+ansi = true
+
+[ui.nav]
+active = true
+focus_on_start = "filter"
+bar = "Plain"
+color = "Darkgray"
+hints = true
+hints_columns = 4
+
+[tui]
+percentage = 100
+max = 9999
+
+[query]
+prompt = " > "
+prompt_style.fg = "Cyan"
+status_inline = true
 
 [columns]
 max = 3
-names = ["file", "pos", ""]
-split = '^(.*?):(\d+:\d+):(.*)$'
-default = "file"
+names = ["file", "line", "text"]
+split = '^(.*?):(\d+):(.*)$'
+
+[previewer]
+debounce_ms = 40
+delay_clear = true
+
+[preview]
+show = true
+wrap = true
+scrollbar = true
+scroll.percentage = 50
+scroll.index = "line"
+
+[preview.media]
+active = false
+
+# Layout 0: Standard 45/55 foveal split (45% list on left, 55% preview on right)
+[[preview.layout]]
+side = "right"
+percentage = 55
+min = 30
+command = '''
+file={1}
+line={2}
+file="${file#\'}"; file="${file%\'}"
+line="${line#\'}"; line="${line%\'}"
+if [ -f "$file" ]; then
+    if command -v bat >/dev/null 2>&1; then
+        bat --style=numbers --color=always --paging=never --highlight-line "$line" "$file"
+    else
+        cat "$file"
+    fi
+fi
+'''
+
+# Layout 1: Exclusive Fullscreen Preview (100% modal for preview, list hidden)
+[[preview.layout]]
+side = "right"
+percentage = 100
+command = '''
+file={1}
+line={2}
+file="${file#\'}"; file="${file%\'}"
+line="${line#\'}"; line="${line%\'}"
+if [ -f "$file" ]; then
+    if command -v bat >/dev/null 2>&1; then
+        bat --style=numbers --color=always --paging=never --highlight-line "$line" "$file"
+    else
+        cat "$file"
+    fi
+fi
+'''
+
+# Layout 2: Overrides and disables the 3rd layout from base config (strictly toggles 55% <-> 100%)
+[[preview.layout]]
+max = 0
+
+[preview.border]
+sides = "LEFT"
+color = "Darkgray"
+title = " Preview "
+title_fg = "Cyan"
+
+[footer]
+content = " {cyan,bold:[Enter]} {darkgray:Nvim}  •  {green,bold:[C-v]} {darkgray:Insert}  •  {magenta,bold:[y]} {darkgray:Copy}  •  {blue,bold:[J/K]} {darkgray:Scroll}  •  {cyan,bold:[C-/]} {darkgray:Layout}  •  {yellow,bold:[C-s]} {darkgray:Case}  •  {green,bold:[C-w]} {darkgray:Word}  •  {red,bold:[Esc]} {darkgray:Quit}"
+match_indent = false
+row_connection = "Full"
+separator = "light"
 
 [exit]
 abort_empty = false
 
-# --- Preview ---
-[preview]
-show = true
-scroll.percentage = 70
-scroll.index = "pos"
-
-[[preview.layout]]
+# MM_STORE encodes the active search mode:
+#   (empty or "ic") = ignore-case (default)
+#   "cs"            = case-sensitive (Match Case, [Aa] badge)
+#   "ww"            = whole-word + ignore-case ([W] badge)
+#   "cs+ww"         = case-sensitive + whole-word ([Aa][W] badges)
+#
+# The start.command reads MM_STORE on every Reload to pick the correct rg flags.
+[start.command]
 command = '''
-line={2}
-if command -v bat >/dev/null 2>&1; then
-    bat --wrap=never --color=always -pp --highlight-line ${line%%:*} {1}
-else
-    cat {1}
-fi
+QUERY="${MM_QUERY:-${FZF_QUERY:-}}"
+MODE="${MM_STORE:-ic}"
+[ -z "$QUERY" ] && exit 0
+case "$MODE" in
+  cs)    RG_FLAGS="--case-sensitive" ;;
+  ww)    RG_FLAGS="--ignore-case --word-regexp" ;;
+  cs+ww) RG_FLAGS="--case-sensitive --word-regexp" ;;
+  *)     RG_FLAGS="--ignore-case" ;;
+esac
+rg --hidden --glob '!.git' --line-number --no-heading --color=always $RG_FLAGS -- "$QUERY" 2>/dev/null || true
 '''
-border = { type = "LightDoubleDashed", color = "DarkGray", title = "File Contents" }
-side = "top"
-percentage = 50
-min = 5
-padding = 0
+cmd = '''
+QUERY="${MM_QUERY:-${FZF_QUERY:-}}"
+MODE="${MM_STORE:-ic}"
+[ -z "$QUERY" ] && exit 0
+case "$MODE" in
+  cs)    RG_FLAGS="--case-sensitive" ;;
+  ww)    RG_FLAGS="--ignore-case --word-regexp" ;;
+  cs+ww) RG_FLAGS="--case-sensitive --word-regexp" ;;
+  *)     RG_FLAGS="--ignore-case" ;;
+esac
+rg --hidden --glob '!.git' --line-number --no-heading --color=always $RG_FLAGS -- "$QUERY" 2>/dev/null || true
+'''
+separator = "\n"
 
-# --- UI ---
-
-[query]
-prompt_style.fg = "Red"
-
-[tui]
-percentage = 100
-
-[results]
-inactive_current_style.fg = "DarkGray"
-inactive_current_style.bg = "Black"
-scroll_wrap = true
 
 [binds]
-"enter" = "@accept"
-"ctrl-r" = "@reload"
-"ctrl-." = "NextColumn"
-"?" = "SwitchPreview"
-
-"0,1^^@accept" = "Become($EDITOR {1})"
-
-# --- Scripts ---
 "Start" = "@enter_rg"
-# Reload on query change, disable reparsing, update bind
 "@enter_rg" = [
     "Filtering(false)",
-    '''Bind(QueryChange = Reload)''',
-    # Prompt indicator
-    '''Transform(
-    if [[ -n "$MM_QUERY" ]]; then
-        echo "SetStyledPrompt({blue,italic:(${MM_QUERY#\%1 })} )"
-    else
-        echo "SetPrompt(rg> )"
-    fi
-
-    echo "SetQuery($MM_STORE)"
-    echo "Store($MM_QUERY)"
-)''',
-    "Bind(@reload = @enter_mm)",
+    '''Bind(QueryChange = Reload)'''
 ]
-"@enter_mm" = [
-    "Filtering(true)",
-    "Unbind(QueryChange)",
-    '''Transform(
-    if [[ -n "$MM_QUERY" ]]; then
-        echo "SetPrompt(($MM_QUERY) )"
-    else
-        echo "SetStyledPrompt({blue,italic:wm> })"
-    fi
+"enter" = "Become(nvim +{2} {1})"
+"ctrl-v" = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {1}:{2})'
+"ctrl-e" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"ctrl-o" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"ctrl-y" = 'ExecuteSilent(test -n "{1}" && printf "%s:%s" {1} {2} | (command -v wl-copy >/dev/null 2>&1 && wl-copy || xclip -in -selection clipboard 2>/dev/null || tmux load-buffer -))'
+"ctrl-c" = "Quit"
+"esc" = "ToggleFocus"
+"ctrl-/" = "CyclePreview"
+"ctrl-p" = "SwitchPreview"
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"ctrl-shift-j" = "PreviewDown(5)"
+"ctrl-shift-k" = "PreviewUp(5)"
+"ctrl-d" = "PreviewHalfPageDown"
+"ctrl-u" = "PreviewHalfPageUp"
 
-    echo "SetQuery($MM_STORE)"
-    echo "Store($MM_QUERY)"
-)
-''',
-    "Bind(@reload = @enter_rg)",
-]
+# Toggle Match Case (Ctrl+S = S for Sensitive)
+# Flips: ic <-> cs  and  ww <-> cs+ww
+"ctrl-s" = "Transform(sh ~/.config/waymaker/scripts/rg-toggle-case.sh)"
+
+# Toggle Whole Word (Ctrl+W = W for Word)
+# Flips: ic <-> ww  and  cs <-> cs+ww
+"ctrl-w" = "Transform(sh ~/.config/waymaker/scripts/rg-toggle-word.sh)"
+
+[ui.nav.binds]
+"enter" = "Become(nvim +{2} {1})"
+"ctrl-v" = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {1}:{2})'
+"y" = 'ExecuteSilent(test -n "{1}" && printf "%s:%s" {1} {2} | (command -v wl-copy >/dev/null 2>&1 && wl-copy || xclip -in -selection clipboard 2>/dev/null || tmux load-buffer -))'
+"ctrl-y" = 'ExecuteSilent(test -n "{1}" && printf "%s:%s" {1} {2} | (command -v wl-copy >/dev/null 2>&1 && wl-copy || xclip -in -selection clipboard 2>/dev/null || tmux load-buffer -))'
+"esc" = "Quit"
+"q" = "Quit"
+"e" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"o" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"ctrl-e" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"ctrl-o" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"/" = "FocusFilter"
+"ctrl-/" = "CyclePreview"
+"ctrl-p" = "SwitchPreview"
+"j" = "Down"
+"k" = "Up"
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"ctrl-shift-j" = "PreviewDown(5)"
+"ctrl-shift-k" = "PreviewUp(5)"
+"J" = "PreviewDown(5)"
+"K" = "PreviewUp(5)"
+"shift-j" = "PreviewDown(5)"
+"shift-k" = "PreviewUp(5)"
+"d" = "PreviewHalfPageDown"
+"ctrl-d" = "PreviewHalfPageDown"
+"u" = "PreviewHalfPageUp"
+"ctrl-u" = "PreviewHalfPageUp"
+# Note: ctrl-s (match-case) and ctrl-w (whole-word) are defined in [binds] and
+# automatically apply in nav mode too via the standard bind fallback mechanism.

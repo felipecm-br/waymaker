@@ -1,362 +1,399 @@
-<a href="https://repology.org/project/waymaker-cli/versions"><img align="right" src="https://repology.org/badge/vertical-allrepos/waymaker-cli.svg?exclude_unsupported=1" alt="Packaging status"></a>
+# Waymaker (`wm`)
 
-# Waymaker [![Crates.io](https://img.shields.io/crates/v/waymaker-cli)](https://crates.io/crates/waymaker-cli) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://github.com/squirreljetpack/waymaker/blob/main/waymaker-cli/LICENSE)
+<div align="center">
 
-Waymaker is fast, configurable and intuitive fuzzy searcher. It is useful for browsing and building [workflows](#presets) around any list or kind of data you can wrangle into a tabular format.
+[![Crates.io](https://img.shields.io/crates/v/waymaker-cli?color=orange&style=flat-square)](https://crates.io/crates/waymaker-cli)
+[![GitHub Release](https://img.shields.io/github/v/release/fcmiranda/waymaker?style=flat-square&color=blue)](https://github.com/fcmiranda/waymaker/releases)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=flat-square)](https://github.com/fcmiranda/waymaker/blob/main/waymaker-cli/LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-brightgreen?style=flat-square)](https://github.com/fcmiranda/waymaker/releases)
+[![Rust](https://img.shields.io/badge/built%20with-Rust-dea584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 
-It takes inspiration from [fzf](https://github.com/junegunn/fzf) in features and design, but reimagines the user experience. Built from the ground up in Rust, it brings a fully robust, modern and elegant search experience to the console.
+**Next-generation terminal fuzzy finder, in-process file manager, media & markdown viewer, and tmux session orchestrator.**
 
-![screen1](https://github.com/Squirreljetpack/waymaker/blob/main/waymaker-lib/assets/screen1.png)
+[Features](#-features) • [Lineage & Inspirations](#-lineage--inspirations) • [The Dotfiles Workflow Flow](#-the-dotfiles-workflow-flow) • [Presets Suite](#-presets-suite) • [Installation](#-installation) • [Configuration](#-configuration) • [CLI & Subcommands](#-cli--subcommands) • [Library](#-rust-library)
 
-## Features
-
-- Matching with [nucleo](https://github.com/helix-editor/nucleo).
-- *Fully* configurable via a type-checked [toml file](./waymaker-cli/assets/config.toml). [^11]
-- A minimal yet powerful [syntax](./waymaker-cli/assets/docs/options.md) for overriding the configuration on the command line.
-- Interactive preview supports color, scrolling, wrapping, multiple layouts, maximizing, and **native media previews (Images, Videos, PDFs)**.
-- Most of the familiar actions from [fzf](https://github.com/junegunn/fzf), as well as several new ones[^12].
-- Mouse (location aware) scrolling! Drag to resize! Horizontal scrolling!
-- Grapheme-width correct input wrapping!
-- Nice text wrapping and width sizing.
-- Split input lines into multiple columns, that you can individually filter on (`%col query`[^17]), hide, and highlight.[^14]
-- Split input lines by *regex capture groups*.
-- Group headers using `--group-prefix`! Any lines that start with this prefix are parsed as non-selectable group headers.
-- Define `Execute/Preview/Print/Accept` actions with [templates](https://github.com/Squirreljetpack/waymaker/blob/main/waymaker-cli/assets/docs/template.md) which *safely* inject the current item(s) (yes, columns are supported here too).
-- All the dynamic UI support you could hope for: preview offsets, styled status lines, responsive header tables, wrapped footers, active and inactive column colors, stacked columns, programmable status and header bars, multiple preview layouts[^15]... even overlays! (in the library).
-- Bind keys to multiple actions, bind actions to mouse triggers, bind actions to event triggers, bind keys to rebind keys, bind keys to modify the configuration, bind keys to run a shell script and use its output to execute actions and bind more keys, bind keys to set the header, footer, status, input, bind semantic triggers to actions, bind keys to semantic triggers, bind keys to -- wait nope thats about it.
-- Comprehensive logging in case you need to debug applications.
-- oh yeah, and `wm --last-key` gives you the last key that was pressed in a previous run of the program.[^13]
-- a *[panoply](#presets)* of amazing presets which manifest as *dashing* TUIs to boost your productivity.
-- **Native In-Process Parallel Walker**: Multi-threaded, git-aware directory tree scanner using `ignore` (same as `ripgrep`), eliminating `fork+exec` shell subprocess overhead.
-- **Persistent Root Directory Cache**: Embedded `redb` KV store (`~/.local/state/waymaker/dir_cache.redb`) delivering **< 5ms instant TUI warm-starts** on repeated runs in large repositories.
-- Available as a rust library to use in your own code!
-
-On the way:
-
-- Matching with [frizbee](https://github.com/saghen/frizbee), a faster, typo-resistant matching algorithm.
-
-[^11]: The benefits of a structured, hierarchical, global baseline configuration are many, including but not limited to the fact that toml strings make it much easier to bind keys to complex shell scripts.
-
-[^12]: Custom exit codes, select all (`CycleAll`), PageUp/Down, Show Help, Cycle columns (`NextColumn`), Multiple input commands (`ReloadNext`), etc. ...
-
-[^13]: This is useful for when you want to write a shell script that dispatches different actions on the output of waymaker based on the key that was pressed.
-
-[^14]: If no column names are configured, the autogenerated column names are sequential: 1, 2, 3...
-
-[^15]: I like this so much i had to mention it twice
-
-[^17]: https://github.com/Squirreljetpack/waymaker/blob/main/waymaker-cli/assets/docs/other.md
-
-## Installation
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/Squirreljetpack/waymaker/main/install.sh | sh
-```
-
-```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/Squirreljetpack/waymaker/releases/latest/download/waymaker-cli-installer.ps1 | iex"
-```
-
-##### Homebrew
-
-```sh
-brew install Squirreljetpack/tap/waymaker
-```
-
-##### AUR
-
-```sh
-yay -S waymaker-bin
-```
-
-##### npm
-
-```sh
-npm install -g @squirreljetpack/waymaker
-```
-
-##### Cargo
-
-```sh
-# requires cargo and does not come with certain features patched into dependencies, better to build from source.
-cargo install waymaker-cli
-```
-
-##### From Source
-
-After every local source change, run this command to build and update the `wm` command in your `PATH`:
-
-```sh
-just install
-```
-
-This builds the release workspace and updates `$HOME/.local/bin/wm`. `cargo build --workspace` only updates `target/debug/wm`; it does not update an installed `wm` binary.
+</div>
 
 ---
 
-Pass it some items:
+![Waymaker Preview](https://github.com/Squirreljetpack/waymaker/blob/main/waymaker-lib/assets/screen1.png)
 
-```sh
-find . | wm
+## 🌟 Overview
+
+**Waymaker (`wm`)** is a blazing-fast, keyboard-anchored, and infinitely composable TUI fuzzy searcher, file navigator, and workflow engine written in Rust. It takes terminal productivity beyond traditional fuzzy finders by unifying multi-column data filtering, in-process filesystem crawling, native media/markdown rendering, Tmux session management, and extensible TOML presets into a single sub-perceptual latency experience ($T_R < 10\text{ ms}$).
+
+### 🧬 Lineage & Inspirations
+
+Waymaker is an evolutionary, feature-rich **fork of [matchmaker](https://github.com/Squirreljetpack/matchmaker)** (`mm`), designed to expand its core matching capabilities into a comprehensive terminal control plane inspired by state-of-the-art terminal tools:
+
+- 🎯 **[matchmaker](https://github.com/Squirreljetpack/matchmaker)**: The foundational DNA — Nucleo SIMD matching algorithm, hierarchical TOML partial-merge configuration, dynamic CLI overrides, multi-column tab splitting, and interactive preview layouts.
+- 🖼️ **[mcat](https://github.com/Skardyy/mcat)**: State-of-the-art terminal Markdown and media inspection — native CommonMark/GFM rendering, syntax-highlighted code fences, inline Kitty Unicode Placeholders (`\u{10EEEE}`) for Mermaid diagrams, and modal zoomable diagram inspection with dynamic theme synchronization.
+- ⚡ **[sesh](https://github.com/joshmedeski/sesh)**: First-class Tmux session orchestration — deterministic session derivation, `session.toml` and `sesh.toml` wildcard patterns, directory auto-detection, startup commands, and seamless session switching via `wm session` / `wm connect`.
+- 🗂️ **[yazi](https://github.com/sxyazi/yazi)**: Asynchronous non-blocking architecture — zero-fork in-process parallel filesystem walker (`ignore`), off-thread media previews (`ratatui-image`), embedded file manager operations with `UndoStack` (`fm.rs`), and instant responsiveness.
+
+---
+
+## ✨ Features
+
+### 🔍 Search & Filtering
+- **Nucleo SIMD Fuzzy Matcher**: Multi-threaded, cache-conscious fuzzy filtering powered by [nucleo](https://github.com/helix-editor/nucleo) with path depth penalty (`depth_penalty = 15`), directory-first weighting, and typo tolerance.
+- **Headless Filter Mode (`wm -f <query>`)**: Filter stdin streams or local directories instantly without initializing the TUI — perfect for ultra-fast shell scripts and Zsh ZLE widgets.
+- **Multi-Column Filtering & Regex Captures**: Split tabular input with delimiters or regex capture groups; filter individually per column (`%col query`), hide helper columns, and colorize active fields.
+- **Tri-Modal Data Source Cycling (`@reloadnext`)**: Seamlessly cycle between **Local Workspace** (native crawler), **Global Frecency** (`wm list --dirs`), and **Starred Bookmarks** (`wm list --bookmarks`) with a single keypress.
+
+### ⚡ Performance & Systems Architecture
+- **Native In-Process Parallel Walker**: Multi-threaded, git-aware directory tree scanner using Rust's `ignore` crate, completely eliminating `fork+exec` subprocess overhead.
+- **Persistent Root Directory Cache**: Embedded [redb](https://github.com/cberner/redb) key-value store (`~/.local/state/waymaker/dir_cache.redb`) delivering **< 5ms instant warm-starts** on repeated invocations in large monorepos.
+- **Zero-Friction Home Row Anchoring ($H = 0$)**: Complete keyboard navigation engineered for vim motions (`hjkl`), modal Nav mode, and dual-function CapsLock (`Esc` tap / `Ctrl` hold) without awkward `Alt/Option` chords.
+
+### 🖼️ Rich Previews & Media Rendering
+- **Native Terminal Media**: High-performance graphic rendering for Images (`.png`, `.jpg`, `.webp`, `.gif`), Videos (thumbnails via `ffmpegthumbnailer`), and PDFs (via `pdftoppm`) using Kitty graphics protocol, Sixel, and iTerm2 via `ratatui-image`.
+- **In-Terminal Markdown & Mermaid Diagrams**: Built-in CommonMark parser with syntax-highlighted code fences, inline Mermaid diagram rasterization (`\u{10EEEE}`), and interactive modal viewer (`ToggleDiagram` / `s` / `Ctrl+S`) with zoom (`+`/`-`/`0`) and pan controls.
+- **Native Directory Tree**: Instant colored directory tree view with file sizes, permissions, and Nerd Font icons (`wm tree`), eliminating the need for external `eza` or `tree` processes.
+- **Dynamic Layout Engine**: Drag-to-resize dividers, sticky header lines, responsive horizontal/vertical splits, auto-scrolling line synchronization, and multiple layout toggles (`Ctrl+/`).
+
+### 🗄️ Integrated File Manager & Actions
+- **Embedded File Operations (`fm.rs`)**: In-place file creation (`a`), rename (`r`), trash (`d`), archive compression (`z`/`Z`), and clipboard yanking (`y`/`x`/`p`/`P`) with recursive drill-down (`l`) and parent ascension (`h`).
+- **Transactional Undo Stack (`u`)**: Dedicated `@undo` action to safely reverse accidental file operations and restore clipboard states.
+- **Ancestor Hierarchy Jump (`Ctrl+U`)**: Instantly jump up multi-level folder hierarchies directly to the repository or filesystem root.
+
+---
+
+## 🔬 The Dotfiles Workflow Flow
+
+Waymaker is the central nervous system of modern, low-latency dotfiles environments. Here is how the end-to-end workflow is orchestrated across Tmux, Zsh, and system window managers (as documented in `~/.dotfiles`):
+
+```mermaid
+flowchart TD
+    subgraph InputTriggers ["Ergonomic Triggers (H = 0)"]
+        CAPS["keyd Dual-Function CapsLock<br/>Hold: Ctrl | Tap: Esc (120ms)"]
+        REFLEX["j + Enter Neural Reflex<br/>Bilateral Inward Roll &lt;100ms &rarr; cd ~"]
+        SMART_TAB["Zsh Smart Tab (_smart_tab)<br/>Tab on empty buffer &rarr; wm -o jump"]
+        TMUX_POP["Tmux Golden Ratio Popups (75% × 60%)<br/>Prefix + e (files) | Prefix + / (rg) | Prefix + y (yank)"]
+    end
+
+    subgraph WaymakerEngine ["Waymaker Core Engine (wm)"]
+        WALKER["Async Parallel Walker<br/>(ignore crate / 0-fork)"]
+        CACHE["Persistent redb KV Store<br/>(&lt;5ms Warm-Start)"]
+        MATCHER["Nucleo SIMD Matcher<br/>(dir-first / depth-penalty)"]
+        PREVIEWS["Native Preview Pipeline<br/>Markdown &bull; Mermaid &bull; Media &bull; Trees"]
+    end
+
+    subgraph ActionsOutput ["Productivity Actions"]
+        BUFFER["Object-First Zsh Buffer<br/>BUFFER=' &lt;paths&gt;' & CURSOR=0"]
+        NVIM["Golden Ratio Neovim Split<br/>62% &times; 38% pane beside AI session"]
+        SESH["Tmux Session Connect<br/>wm session / session.toml"]
+        TRANSFERS["Frecency Transfers<br/>pt / ptg / ptl / mt / mtg / mtl"]
+    end
+
+    CAPS --> TMUX_POP
+    SMART_TAB --> WaymakerEngine
+    TMUX_POP --> WaymakerEngine
+    REFLEX --> BUFFER
+
+    WaymakerEngine --> WALKER
+    WaymakerEngine --> CACHE
+    WaymakerEngine --> MATCHER
+    WaymakerEngine --> PREVIEWS
+
+    WaymakerEngine --> BUFFER
+    WaymakerEngine --> NVIM
+    WaymakerEngine --> SESH
+    WaymakerEngine --> TRANSFERS
 ```
 
-> [!TIP]
-> The [default](./waymaker-cli/assets/config.toml) input and preview commands detect `fd`, `bat` and `eza` (otherwise falling back to `ls` and `cat`). Install them for a better experience!
+### 1. Biomechanical Ergonomics & Home Row Anchoring ($H = 0$)
+- **Zero Hand Homing ($T_H = 0\text{ ms}$)**: Hands stay permanently anchored to the Home Row (`ASDF / JKL;`).
+- **Kernel Modifiers (`keyd`)**: Dual-function `CapsLock` acts as `Ctrl` when held and `Esc` when tapped.
+- **No `Alt/Option` Chords**: Eliminates thumb adduction and ulnar wrist deviation; all primary actions trigger via home-row taps, inward rolls (`CapsLock + J/K`, `CapsLock + Space`), or single-key navigation mode.
+- **The Sacred `j + Enter` Reflex**: Bilateral inward roll (`j` with right index, `Enter` with right pinky) executes in $<100\text{ ms}$ to navigate straight to `$HOME` (`cd ~`).
 
-## Configuration
+### 2. Tmux Golden Ratio Popups ($\phi \approx 1.618$)
+Modal pickers launch in centered Tmux popups sized to the Golden Ratio **$75\% \times 60\%$**, providing an optimal $2^\circ\text{–}5^\circ$ foveal viewing cone with an internal 40/60 candidate/preview division:
+- `Prefix + e` / `Prefix + C-e`: **Workspace Files** (`wm -o workspace`) — browse files, markdown, and Mermaid diagrams.
+- `Prefix + /`: **Live Ripgrep** (`wm -o rg`) — full-text search with line-synchronized preview.
+- `Prefix + y` / `Prefix + C-y`: **Scrollback Extractor** (`wm -o yank`) — extrakto-style regex token and URL extractor.
+- `Prefix + P`: **GitHub Pull Request Review** (`wm -o pr`) — interactive PR inspection and diff viewer.
+- `Prefix + ?`: **Keybindings HUD** (`wm -o keybindings`) — searchable workflow cheat sheet.
 
-To begin, you can dump the default configuration to a file:
+### 3. Polymorphic Zsh ZLE & Smart Tab
+- **Empty Buffer + `Tab`**: Instantly launches `_jump_widget` (`wm --no-read -o jump`) — jump anywhere without typing verbs (`cd`, `z`).
+- **Ghost Text Suggestion + `Tab`**: Accepts the suggestion (`autosuggest-accept`).
+- **Buffer with Text + `Tab`**: Invokes context-aware argument completion via `wm-ftb` (`wm -o ftb`).
+- **Object-First Buffer Ergonomics**: Selecting a directory jumps immediately; selecting files formats their paths and injects them into the Zsh buffer with a leading space and `CURSOR = 0` (`BUFFER=" <paths>"`), allowing immediate typing of verbs (`nvim`, `bat`, `git add`).
+
+### 4. High-Speed File Transfers & Frecency 2.0
+- `pt [files]`: Interactive paste to a directory picked via `wm -o jump`.
+- `ptg [files]`: Paste and immediately navigate (`cd`) to destination.
+- `ptl [files]`: Paste directly to the **last selected target directory** (`_MM_LAST_TARGET`), bypassing the UI entirely ($T = 220\text{ ms}$).
+- `mt`, `mtg`, `mtl`: Equivalent zero-friction move operations.
+
+---
+
+## 🧰 Presets Suite
+
+Waymaker presets are modular, reusable TOML configurations stored in `~/.config/waymaker/presets/<name>.toml`, invoked cleanly via `wm -o <name>`:
+
+| Preset | Invocation | Description | Key Ergonomic Actions |
+| :--- | :--- | :--- | :--- |
+| **`jump`** | `wm -o jump` | Flagship frecency directory navigator, file manager, and tree inspector. | `Enter`: `cd` to path<br>`e` / `Ctrl+E`: Open in Neovim<br>`l`: Drill into directory<br>`h`: Jump to parent<br>`u`: `@undo` file action<br>`Ctrl+U`: Ancestor hierarchy jump<br>`y` / `x` / `p`: Yank, Cut, Paste |
+| **`workspace`** | `wm -o workspace` | Workspace file inspector for code, markdown, and Mermaid diagrams. | `Enter`: Toggle 60% / 100% fullscreen preview<br>`Tab`: Cycle sources (Local $\to$ Frecency $\to$ Bookmarks)<br>`s` / `Ctrl+S`: Modal diagram viewer<br>`Ctrl+V`: Insert path into origin pane<br>`e`: Open in Neovim |
+| **`rg`** | `wm -o rg` | Live workspace full-text search with ripgrep and line-synced `bat` preview. | `Enter`: Open at line (`nvim +{line} {file}`)<br>`Ctrl+S`: Toggle Case Sensitivity (`[Aa]`)<br>`Ctrl+W`: Toggle Whole Word (`[W]`)<br>`Ctrl+/`: Cycle preview layouts |
+| **`yank`** | `wm -o yank` | Extrakto-style regex token, path, URL, and git hash extractor from scrollback. | `Enter`: Copy to clipboard<br>`Ctrl+V`: Insert into origin pane<br>`Tab`: Cycle filter tabs (`all` $\to$ `cmd` $\to$ `path` $\to$ `url` $\to$ `sha`)<br>`b`: Open URL in browser |
+| **`session-picker`** | `wm session` / `wm -o session-picker` | High-performance Tmux session switcher with live pane previews and icon badges. | `Enter`: Connect to session (`wm connect`)<br>`d`: Terminate session<br>`Tab`: Filter active vs configured sessions |
+| **`ftb`** | `wm -o ftb` | Tab completion backend for Zsh `fzf-tab` with multi-column Nucleo fuzzy matching. | `Tab`: Select item<br>`Shift-Tab`: Previous<br>`Ctrl+P`: Toggle preview |
+| **`kill`** | `wm -o kill` | Interactive TCP listening port and process terminator with live connection telemetry. | `Enter`: Send `SIGTERM` (15)<br>`Ctrl+X`: Force `SIGKILL` (-9) |
+| **`keybindings`** | `wm -o keybindings` | Dotfiles workflow HUD across Tmux, Zsh, Hyprland, and Neovim. | `Enter`: Execute workflow<br>`Tab`: Cycle categories<br>`y`: Copy keybinding |
+| **`wt`** | `wm -o wt` | Interactive Git worktree switcher integrated with worktrunk and status preview. | `Enter`: Checkout worktree |
+| **`memory`** | `wm -o memory` | AI agent memory, instructions, skills, and rules explorer. | `Enter`: Open file in editor |
+| **`pr`** | `wm -o pr` | GitHub Pull Request review modal with diff inspection. | `Enter`: Open PR in browser<br>`d`: View full diff |
+| **`borders`** | `wm -o borders` | Live Hyprland window border gradient switcher. | `j` / `k`: Live preview on window<br>`Enter`: Persist style |
+| **`animations`** | `wm -o animations` | Live Hyprland window animation curve switcher. | `j` / `k`: Live preview curve<br>`Enter`: Persist animation |
+
+---
+
+## 📦 Installation
+
+Waymaker includes an all-in-one installation script that installs the binary **and automatically deploys all `.toml` configuration files and presets to the correct system directories**.
+
+### 1-Line Universal Installer (Binary + Configs + Presets)
 
 ```sh
-waymaker --dump-config
+curl -fsSL https://raw.githubusercontent.com/fcmiranda/waymaker/main/install.sh | sh
 ```
 
-The default locations are in order:
+### From Local Source (Repository Clone)
 
-- `~/.config/waymaker/config.toml` (If the folder exists already).
-- `{PLATFORM_SPECIFIC_CONFIG_DIRECTORY}/waymaker` (Generally the same as above when on linux)
+Clone the repository and run `install.sh`:
 
-Waymaker options are hierarchical, although most categories live at the top level:
+```sh
+git clone https://github.com/fcmiranda/waymaker.git
+cd waymaker
+
+# Build release binary and deploy all .toml configs and presets
+./install.sh
+```
+
+Or using `just`:
+
+```sh
+# Builds release workspace and installs binary to ~/.local/bin/wm
+just install
+
+# Deploy .toml configurations and presets
+./install.sh --configs-only
+```
+
+### Installer CLI Options
+
+The `install.sh` script provides dedicated options for managing binaries and configuration files:
+
+```sh
+# Deploy or update .toml configs and presets only (leaves binary untouched)
+./install.sh --configs-only
+
+# Install or update the 'wm' binary only
+./install.sh --binary-only
+
+# Overwrite existing configs without generating timestamped .bak backups
+./install.sh --force
+
+# View installer help
+./install.sh --help
+```
+
+### Destination Layout
+
+The installer deploys configuration assets directly into standard XDG locations:
+
+```
+~/.local/bin/
+└── wm                              # Executable binary
+
+~/.config/waymaker/
+├── config.toml                     # Master configuration file
+├── session.toml                    # Session & wildcard orchestration config
+└── presets/                        # Specialized workflow presets
+    ├── jump.toml                   # Frecency directory navigator
+    ├── workspace.toml              # Workspace file & diagram inspector
+    ├── rg.toml                     # Live ripgrep searcher
+    ├── yank.toml                   # Tmux scrollback token extractor
+    ├── session-picker.toml         # Tmux session manager
+    ├── ftb.toml                    # Zsh tab completion backend
+    ├── kill.toml                   # Process & port terminator
+    ├── keybindings.toml            # Interactive workflow HUD
+    └── ...                         # Domain-specific presets
+```
+
+---
+
+## ⚙️ Configuration
+
+Waymaker configuration files are strictly type-checked TOML files.
+
+### Base Configuration (`config.toml`)
+
+Dump the active default configuration at any time:
+
+```sh
+wm --dump-config
+```
+
+Example `~/.config/waymaker/config.toml`:
 
 ```toml
+[tui]
+percentage = 60
+min = 10
+max = 120
+
+[ui]
+border = { type = "Rounded" }
+
 [preview]
 show = true
 wrap = true
-media = true # enable native image/video/pdf previews
-header_lines = 3 # sticky the top 3 lines
+markdown = true                     # Native CommonMark & syntax highlighting
+media = true                        # Native Kitty / Sixel image & video previews
+diagrams = true                     # Native Mermaid diagram rasterization
+inline_diagrams = true              # Kitty Unicode Placeholders (\u{10EEEE})
+diagram_theme = "auto"              # Auto-sync with terminal dark/light palette
+diagram_background = "transparent"  # Borderless diagram flow
 
-# Full specification of (the default values of) a single layout. Multiple layouts can be specified.
-# Previews can also be adjusted on the fly (by dragging).
 [[preview.layout]]
-command = ""
 side = "right"
 percentage = 60
 min = 30
-max = 120
+
+[matcher]
+sort = "smart"                      # Natural order on empty query, fuzzy sort on typing
+depth_penalty = 15                  # SIMD-accelerated root file priority
+dir_first = true                    # Prioritize directories in file pickers
 ```
 
-The structure of the config file is defined [here](./waymaker-cli/src/config.rs)[^1], and the full specification lives [here](./waymaker-lib/src/config.rs)[^2]. You can also view your current config using `wm --dump-config | cat`[^30] or a quick reference using `wm --doc options`.
+### Session Configuration (`session.toml`)
 
-Options can be overridden on the command line, where abbreviations are supported:
+Compatible with both Waymaker and Sesh session definitions (`~/.config/waymaker/session.toml` or `~/.config/sesh/sesh.toml`):
+
+```toml
+# Wildcard auto-session definitions
+[[wildcard]]
+pattern = "~/dev/github/**"
+startup_command = "nvim"
+
+[[wildcard]]
+pattern = "~/.dotfiles/*"
+startup_command = "nvim"
+
+# Explicit pinned sessions
+[[session]]
+name = " Downloads"
+path = "~/Downloads"
+startup_command = "wm -o jump"
+```
+
+### Dynamic CLI Overrides
+
+Waymaker features a compact, expressive override syntax allowing on-the-fly customization:
 
 ```sh
+# Override preview command, layout percentage, and remove single quotes
 wm p.l "cmd=echo {}|||p=50|||max=20" cmd "ls" o "{=}"
 
-# 1. Start mm with the following overrides:
-# 2. List the contents of the current directory by executing `ls`
-# 3. Show the current item name in the preview pane
-# 4. Set a preferred percentage of 50 and a max width of 20 for the preview pane
-# 5. Output the result without single quotes
+# Start directly in Nav mode with plain borders
+wm ui.nav_mode=true ui.border.type=Plain
 ```
 
-For quick reference, `wm --doc` provides fairly readable and comprehensive guides to various topics. The rendered markdown is also available [here](./waymaker-cli/assets/docs/options.md).
+---
 
+## 💻 CLI & Subcommands
 
-[^1]: Note that the flatten attribute on the render field means that the subfields of RenderConfig should be specified at the top level of the toml (i.e. your toml should specify `[results]` instead of `[render.results]`).
-
-[^2]: and parts of it [here](./waymaker-lib/src/config-types.rs).
-
-[^30]: Beware that without piping, this overwrites your config location with the default config!
-
-### Media Previews (Kitty / Sixel / iTerm2)
-
-- **Native Terminal Image rendering**: Uses `ratatui-image` to render high quality graphics in Kitty, Sixel, and iTerm2 terminals.
-- **Media Thumbnails**: Native PDF and Video previewing using `pdftoppm` and `ffmpegthumbnailer` out of the box.
-
-Waymaker supports native terminal media previews! When enabled, visual assets are rendered directly within the preview pane using high-performance terminal graphics protocols.
-
-- **Supported Formats**:
-  - **Images** (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.ico`, `.tiff`): Rendered natively via `ratatui-image`.
-  - **Videos** (`.mp4`, `.mkv`, `.avi`, `.mov`): Thumbnailed automatically using `ffmpegthumbnailer` if installed.
-  - **PDFs** (`.pdf`): Thumbnailed automatically using `pdftoppm` if installed.
-- **Usage**:
-  - Simply pass the `--media` flag: `wm --media`
-  - Or add `media = true` under `[preview]` in your `config.toml`.
-
-### Keybindings
-
-Actions can be defined in your `config.toml` or on the command line.
-
-The list of currently supported actions can be found [here](./waymaker-lib/src/action.rs) and [here](./waymaker-cli/src/action.rs) or from `wm --doc binds`.
-
-To get the names of keys, type `wm --test-keys`.
-
-In addition to keys, actions can also be bound to Events and Crossterm events (check your default config for details).
-
-## Examples
-
-Examples can be found [here](https://github.com/Squirreljetpack/waymaker/tree/main/waymaker-cli/assets) (toml files), and [here](https://github.com/Squirreljetpack/waymaker/tree/main/waymaker-lib/examples) (library use).
-
-Currently, the first includes an example for interactively performing a full text search with [ripgrep](https://github.com/BurntSushi/ripgrep):
-
-- Toggle between ripgrep and mm with `ctrl-r`
-- The displayed preview autoscrolls to matched line: `?` to toggle.
-- `Enter` opens the file in your editor (or when piped, prints `file:line:col`).
-- Previous queries in each mode are stashed and restored upon switching.
-- `ctrl-.` to cycle between columns.
-
-![ripgrep](https://github.com/Squirreljetpack/waymaker/blob/main/waymaker-lib/assets/ripgrep.png)
-
-```shell
-# Try it yourself
-mkdir -p ~/.config/waymaker/presets
-curl -L https://raw.githubusercontent.com/Squirreljetpack/waymaker/main/waymaker-cli/assets/presets/rg.toml -o ~/.config/waymaker/presets/rg.toml
-wm --config ~/.config/waymaker/presets/rg.toml
-```
-
-### Presets
-
-Waymaker is really good for creating workflows. It's like a swiss army knife for building and sharing great TUIs -- check out the [collection](https://github.com/Squirreljetpack/waymaker/tree/main/waymaker-cli/assets/presets)![^50]
-
-```shell
-# download a preset (collection)
-wm --download=git
-
-# invoke a preset (browse/restore by ref)
-wm -o git/restore
-
-# You can also run the first example this way:
-wm --download=rg.toml
-wm -o rg
-```
-
-<img src="https://raw.githubusercontent.com/Squirreljetpack/waymaker/main/waymaker-lib/assets/git-restore.png" alt="git-restore" style="width:416px;" /> <img src="https://raw.githubusercontent.com/Squirreljetpack/waymaker/main/waymaker-lib/assets/git-grep-help.png" alt="git-help" style="width:416px;" />
-<img src="https://raw.githubusercontent.com/Squirreljetpack/waymaker/main/waymaker-lib/assets/ps.png" alt="procs" style="width:416px;" /> <img src="https://raw.githubusercontent.com/Squirreljetpack/waymaker/main/waymaker-lib/assets/docker-containers.png" alt="docker-containers" style="width:416px;" />
-
-<video src="https://raw.githubusercontent.com/Squirreljetpack/waymaker/main/waymaker-lib/assets/webm/git.mp4" controls width="416"></video>
-
-<video src="https://raw.githubusercontent.com/Squirreljetpack/waymaker/main/waymaker-lib/assets/webm/ps.mp4" controls width="416"></video>
-
-[^50]: Contributions welcome!
-
-### Comparison with fzf
-
-To users of `fzf`, getting started with `wm` should be conceptually straightforward because the two tools are almost fully feature-compatible. You can continue using familiar actions, like `execute`, and they will function the same way.[^51]
-
-For example, opening a selected file in your editor:
-
-- In `fzf`:
-
-```bash
-fzf --bind "ctrl-o:execute($EDITOR {+})"
-```
-
-- In `wm`:
-
-```text
-wm b.ctrl-o="Execute($EDITOR {+})"
-```
-
-> [!NOTE]
-> Note that [templates](https://github.com/Squirreljetpack/waymaker/blob/main/waymaker-cli/assets/docs/template.md) can be named in waymaker, but they only replace valid keys.
-
-Here is a second demonstration, taken from [zoxide](https://github.com/ajeetdsouza/zoxide/blob/main/src/cmd/query.rs).
-
-- In `fzf`:
-
-```shell
-fzf \
-  --bind=ctrl-z:ignore,btab:up,tab:down \
-  --exact \
-  --no-sort \
-  --cycle \
-  --keep-right \
-  --border=sharp \
-  --height=45% \
-  --info=inline \
-  --layout=reverse \
-  --tabstop=1 \
-  --exit-0
-```
-
-- In `wm`:
-
-```shell
-mm \
-  binds.Shift-BackTab=Up \
-  binds.BackTab=Up \
-  binds.Tab=Down \
-  matcher.sort_threshold=0 \
-  results.scroll_wrap=true \
-  results.wrap=false \
-  results.autoscroll.end=true \
-  results.autoscroll.context=0 \
-  ui.border.type=Plain \
-  tui.percentage=45 \
-  results.reverse=true \
-  exit.abort_empty=true
-
-# Notes:
-# - in mm, results.scroll_wrap is by default true, while results.wrap = true is included in the default config.
-# - in wm --multi (from fzf) is always true. It can be disabled by not binding the Select actions, as is done here
-# - matcher.sort_threshold is not available on the cargo version and requires the installer.
-# - results.autoscroll.context=0 is a setting which does not appear in fzf but which is 4 by default in mm.
-```
-
-- In `wm` using aliases (and omitting defaults):
-
-```
-wm m.sort=0 ui.b.type=Plain tui.p=45 \
-r.r= r.w=false r.a.e= r.a.c=0 \
-b.Shift-BackTab=Up b.BackTab=Up b.Tab=Down
-```
-
-Waymaker aims to achieve feature-parity with fzf (though not necessarily by the same means). If there's any specific feature that you'd like to see, open an issue!
-
-[^51]: More on comparisons: https://github.com/Squirreljetpack/waymaker/issues/1
-
-## Library
-
-Waymaker can also be used as a library.
+Waymaker includes specialized standalone subcommands for high-speed terminal inspection without shell overhead:
 
 ```sh
-cargo add waymaker
+# 1. Fuzzy Picker & Presets
+wm                              # Interactive search on current directory
+find . | wm                     # Filter piped input
+wm -o jump                      # Launch jump preset
+wm -o workspace                 # Launch workspace preset
+
+# 2. Headless Filtering (no TUI)
+wm -f "search_term"             # Headless directory filter to stdout
+echo -e "apple\nbanana" | wm -f "ban" # Headless stdin stream filter
+
+# 3. Session Management (sesh compatible)
+wm session                      # Interactive Tmux session picker
+wm session list --icons         # List active and configured sessions
+wm connect <session-name>       # Connect or attach to session
+wm last                         # Switch to previous Tmux session
+
+# 4. In-Terminal Markdown & Mermaid Viewer
+wm md README.md                 # Render markdown with syntax highlighting & diagrams
+wm md README.md --watch         # Live auto-reloading markdown preview
+wm mermaid diagram.mmd          # Render standalone Mermaid diagram in terminal
+
+# 5. Native Directory Tree
+wm tree .                       # Render colored git-aware directory tree
+
+# 6. Frecency Management
+wm add ~/dev/project            # Asynchronously record directory visit
+wm list --dirs                  # Output ranked frecency directory list
+wm list --bookmarks             # Output starred bookmarks
 ```
 
-### Example
+---
 
-Here is how to use `Waymaker` to select from a list of strings.
+## 📚 Rust Library
+
+Waymaker can be embedded directly into your Rust applications as an ultra-fast picker engine:
+
+```toml
+[dependencies]
+waymaker = "0.1"
+tokio = { version = "1", features = ["full"] }
+```
 
 ```rust
 use waymaker::nucleo::{Indexed, Worker};
-use waymaker::{MatchError, Waymaker, Result, Selector};
+use waymaker::{MatchError, Result, Selector, Waymaker};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let items = vec!["item1", "item2", "item3"];
+    let items = vec!["alpha", "beta", "gamma", "delta"];
 
     let worker = Worker::new_single_column();
     worker.append(items);
     let selector = Selector::new(Indexed::identifier);
-    let mm = Waymaker::new(worker, selector);
+    let wm = Waymaker::new(worker, selector);
 
     match wm.pick_default().await {
-        Ok(v) => {
-            println!("{}", v[0]);
-        }
-        Err(err) => match err {
-            MatchError::Abort(1) => {
-                eprintln!("cancelled");
-            }
-            _ => {
-                eprintln!("Error: {err}");
-            }
-        },
+        Ok(selected) => println!("Selected: {}", selected[0]),
+        Err(MatchError::Abort(_)) => eprintln!("Cancelled"),
+        Err(err) => eprintln!("Error: {err}"),
     }
 
     Ok(())
 }
 ```
 
-For more information, check out the [examples](./waymaker-lib/examples/) and [Architecture.md](./waymaker-lib/ARCHITECTURE.md)
+See [ARCHITECTURE.md](waymaker-lib/ARCHITECTURE.md) for core event flow and internals.
 
-# See also
+---
 
-- [junegunn/fzf](https://github.com/junegunn/fzf)
-- [helix-editor/nucleo](https://github.com/helix-editor/nucleo)
-- [ratatui](https://github.com/ratatui/ratatui)
-- [Canop/crokey](https://github.com/Canop/crokey)
-- [skim-rs/skim](https://github.com/skim-rs/skim)
-- [autobib/nucleo-picker](https://github.com/autobib/nucleo-picker)
-- [alexpasmantier/television](https://github.com/alexpasmantier/television)
-- [helix-editor/helix](https://github.com/helix-editor/helix)
+## 🤝 Acknowledgements
+
+Waymaker stands on the shoulders of remarkable terminal software:
+
+- **[matchmaker](https://github.com/Squirreljetpack/matchmaker)** by Squirreljetpack — the upstream foundation.
+- **[mcat](https://github.com/Skardyy/mcat)** by Skardyy — inspiring in-terminal Markdown and Mermaid rendering.
+- **[sesh](https://github.com/joshmedeski/sesh)** by Josh Medeski — defining modern Tmux session workflow ergonomics.
+- **[yazi](https://github.com/sxyazi/yazi)** by sxyazi — pioneering async, non-blocking terminal file management.
+- **[fzf](https://github.com/junegunn/fzf)** by Junegunn Choi — setting the standard for command-line fuzzy finding.
+- **[nucleo](https://github.com/helix-editor/nucleo)** by Helix Editor — low-latency SIMD matcher engine.
+- **[ratatui](https://github.com/ratatui/ratatui)** — modern Rust terminal user interface library.
+
+---
+
+## 📄 License
+
+Waymaker is open-source software licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See the [LICENSE](waymaker-cli/LICENSE) file for details.
