@@ -274,22 +274,25 @@ install_binary_remote() {
     VERSION=$(get_latest_release)
     step "Target release version: $VERSION"
 
-    # Release asset mapping
+    # Release asset mapping (matches taiki-e/upload-rust-binary-action format)
     if [ "$OS" = "windows" ]; then
-        ASSET_NAME="waymaker-cli-x86_64-pc-windows-msvc.zip"
+        TARGET="x86_64-pc-windows-msvc"
+        ASSET_NAME="wm-${VERSION}-${TARGET}.zip"
     elif [ "$OS" = "mac" ]; then
         if [ "$ARCH" = "aarch64" ]; then
-            ASSET_NAME="waymaker-cli-aarch64-apple-darwin.tar.xz"
+            TARGET="aarch64-apple-darwin"
         else
-            ASSET_NAME="waymaker-cli-x86_64-apple-darwin.tar.xz"
+            TARGET="x86_64-apple-darwin"
         fi
+        ASSET_NAME="wm-${VERSION}-${TARGET}.tar.gz"
     else
-        # Linux (musl statically linked)
+        # Linux (musl statically linked standalone binary)
         if [ "$ARCH" = "aarch64" ]; then
-            ASSET_NAME="waymaker-cli-aarch64-unknown-linux-musl.tar.xz"
+            TARGET="aarch64-unknown-linux-musl"
         else
-            ASSET_NAME="waymaker-cli-x86_64-unknown-linux-musl.tar.xz"
+            TARGET="x86_64-unknown-linux-musl"
         fi
+        ASSET_NAME="wm-${VERSION}-${TARGET}.tar.gz"
     fi
 
     DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"

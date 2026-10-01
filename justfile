@@ -65,4 +65,8 @@ dist version:
 	@echo "Artifacts generated in dist/:"
 	@ls -lh dist/
 
+# Test install.sh in an isolated clean Docker container (Ubuntu non-root user)
+test-install-docker:
+	./scripts/test_install_docker.sh
+
 
