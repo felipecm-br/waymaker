@@ -38,7 +38,7 @@ The `fecavmi` branch (and the `features` branch it's based on) cleanly layers se
 
 ## 3. What Could Be Improved
 
-Based on the `TODO.md`, `PLAN.md`, and current architecture, there are several areas for optimization:
+Based on the current architecture and feature requirements, there are several areas for optimization:
 
 ### Performance & Responsiveness
 - **Preview Caching & Debouncing:** Offloading large previews to disk, and caching/debouncing the preview generation to prevent UI stuttering when scrolling quickly through large files.

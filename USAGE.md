@@ -5,8 +5,8 @@
 # Waymaker — Feature Usage Guide
 
 This document covers every feature added in the current fork, with concrete `wm` command
-examples and the equivalent `config.toml` snippets.  Each section maps to one implemented
-phase so you can cross-reference with `PLAN.md`.
+examples and the equivalent `config.toml` snippets. Each section maps to one implemented
+feature.
 
 ---
 
