@@ -27,6 +27,7 @@ INSTALL_DIR_CARGO="$HOME/.cargo/bin"
 INSTALL_BIN=true
 INSTALL_CONFIG=true
 FORCE_OVERWRITE=false
+CONFIGURE_SHELL=false
 
 # Styling / Colors
 BOLD='\033[1m'
@@ -48,6 +49,7 @@ print_help() {
     printf "Options:\n"
     printf "  -c, --configs-only    Deploy/update .toml configuration files and presets only\n"
     printf "  -b, --binary-only     Build or download the 'wm' binary only\n"
+    printf "  -s, --shell           Configure shell integration and Smart Tab in shell rc file\n"
     printf "  -f, --force           Overwrite existing configuration files without backups\n"
     printf "  -h, --help            Show this help dialog\n\n"
     printf "Target Locations:\n"
@@ -68,6 +70,9 @@ for arg in "$@"; do
         -b|--binary-only)
             INSTALL_BIN=true
             INSTALL_CONFIG=false
+            ;;
+        -s|--shell)
+            CONFIGURE_SHELL=true
             ;;
         -f|--force)
             FORCE_OVERWRITE=true
@@ -234,7 +239,7 @@ install_configs_remote() {
     download_or_backup "$raw_base/session.toml" "$CONFIG_DIR/session.toml" || true
 
     # Core Presets
-    core_presets="jump.toml rg.toml workspace.toml yank.toml scrollback-picker.toml session-picker.toml ftb.toml kill.toml keybindings.toml pr.toml animations.toml borders.toml backgrounds.toml downloads.toml sounds.toml memory.toml ps.toml cargo-rx.toml"
+    core_presets="jump.toml rg.toml workspace.toml session-picker.toml ftb.toml kill.toml pr.toml downloads.toml nvim.toml memory.toml ps.toml cargo-rx.toml csv.toml man.toml win.rg.toml"
 
     step "Fetching core presets..."
     for p in $core_presets; do
@@ -339,6 +344,63 @@ install_binary_remote() {
     info "Successfully installed $INSTALL_DIR/$BINARY_NAME"
 }
 
+configure_shell() {
+    step "Checking shell integration..."
+
+    current_shell=$(basename "${SHELL:-zsh}")
+    rc_file=""
+    init_cmd=""
+
+    case "$current_shell" in
+        zsh)
+            rc_file="${ZDOTDIR:-$HOME}/.zshrc"
+            init_cmd='eval "$(wm init zsh)"'
+            ;;
+        bash)
+            if [ "$OS" = "mac" ] && [ -f "$HOME/.bash_profile" ]; then
+                rc_file="$HOME/.bash_profile"
+            else
+                rc_file="$HOME/.bashrc"
+            fi
+            init_cmd='eval "$(wm init bash)"'
+            ;;
+        fish)
+            rc_file="${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish"
+            init_cmd="wm init fish | source"
+            ;;
+        *)
+            warn "Shell '$current_shell' is not automatically configured by this script. Add 'eval \"\$(wm init <shell>)\"' manually to your shell rc."
+            return 0
+            ;;
+    esac
+
+    # Check if already present
+    if [ -f "$rc_file" ] && grep -E '(wm init|waymaker init)' "$rc_file" >/dev/null 2>&1; then
+        info "Shell integration is already configured in $rc_file"
+        return 0
+    fi
+
+    # Interactive prompt if flag was not passed explicitly
+    if [ "$CONFIGURE_SHELL" = false ] && [ -t 0 ]; then
+        printf "\n%b? Enable Waymaker shell integration (Smart Tab, frecency tracking, 'z' alias) in %s? [y/N]%b " "${CYAN}" "$rc_file" "${NC}"
+        read -r reply </dev/tty || reply="n"
+        case "$reply" in
+            [yY][eE][sS]|[yY]) CONFIGURE_SHELL=true ;;
+            *) CONFIGURE_SHELL=false ;;
+        esac
+    fi
+
+    if [ "$CONFIGURE_SHELL" = true ]; then
+        mkdir -p "$(dirname "$rc_file")"
+        printf "\n# Waymaker Shell Integration (Smart Tab, frecency tracking & 'z' jumper)\n%s\n" "$init_cmd" >> "$rc_file"
+        info "Configured shell integration in $rc_file"
+        info "Run 'source $rc_file' or open a new terminal to start using Smart Tab!"
+    else
+        info "Shell integration skipped. You can enable it anytime by adding:"
+        printf "    %b%s%b to %s\n" "${CYAN}" "$init_cmd" "${NC}" "$rc_file"
+    fi
+}
+
 main() {
     OS=$(detect_os)
     ARCH=$(detect_arch)
@@ -398,12 +460,16 @@ main() {
         *) warn "$INSTALL_DIR is not currently in your PATH. Add it via: export PATH=\"\$PATH:$INSTALL_DIR\"" ;;
     esac
 
+    # 4. Shell Integration (Smart Tab, frecency tracking & 'z' jumper)
+    configure_shell
+
     printf "\n%b✨ Waymaker installation complete!%b\n" "${GREEN}${BOLD}" "${NC}"
     printf "Try running:\n"
     printf "  %bwm --help%b             # Verify installation & view options\n" "${CYAN}" "${NC}"
     printf "  %bwm -o jump%b            # Launch frecency file manager & jumper\n" "${CYAN}" "${NC}"
     printf "  %bwm -o workspace%b       # Inspect workspace files & markdown diagrams\n" "${CYAN}" "${NC}"
-    printf "  %bwm session%b            # Manage and switch tmux sessions\n\n" "${CYAN}" "${NC}"
+    printf "  %bwm session%b            # Manage and switch tmux sessions\n" "${CYAN}" "${NC}"
+    printf "  %b<Tab>%b (on empty line)  # Trigger Smart Tab jump in Zsh!\n\n" "${CYAN}" "${NC}"
 }
 
 main "$@"

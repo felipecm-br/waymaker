@@ -122,3 +122,36 @@ _wm_jump_widget() {
 zle -N _wm_jump_widget
 _mm_jump_widget() { _wm_jump_widget "$@"; }
 zle -N _mm_jump_widget 2>/dev/null || true
+
+# Smart Tab: Pressing Tab on an empty command line activates Waymaker Jump.
+# When the buffer has content, falls back to normal completion (or fzf-tab).
+_wm_smart_tab() {
+    # 1. Empty command line (or whitespace only) -> trigger Waymaker jump
+    if [[ -z "${BUFFER// /}" ]]; then
+        zle _wm_jump_widget
+        return
+    fi
+
+    # 2. Ghost text visible AND cursor at the end of the line -> accept autosuggestion
+    if [[ -n "$POSTDISPLAY" && $CURSOR -eq $#BUFFER ]] && (( $+widgets[autosuggest-accept] )); then
+        zle autosuggest-accept
+        return
+    fi
+
+    # 3. Middle-of-line or argument completion -> trigger normal completion or fzf-tab
+    if (( $+widgets[fzf-tab-complete] )); then
+        zle fzf-tab-complete
+    else
+        zle expand-or-complete
+    fi
+}
+zle -N _wm_smart_tab
+
+# Default interactive keybindings:
+# - Tab: Smart Tab (empty buffer -> jump, populated buffer -> normal completion)
+# - Ctrl+F: Direct Waymaker jump widget
+bindkey '^I' _wm_smart_tab
+bindkey -M viins '^I' _wm_smart_tab 2>/dev/null || true
+bindkey '^F' _wm_jump_widget
+bindkey -M viins '^F' _wm_jump_widget 2>/dev/null || true
+

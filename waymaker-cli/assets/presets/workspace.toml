@@ -173,8 +173,8 @@ ctrl-s = "ToggleDiagram"
 "ctrl--" = "DiagramZoomOut"
 "ctrl-0" = "DiagramResetZoom"
 ctrl-v = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {})'
-ctrl-e = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
-ctrl-o = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-e = 'Execute(${EDITOR:-nvim} {})'
+ctrl-o = 'Execute(${EDITOR:-nvim} {})'
 ctrl-l = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
 ctrl-h = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 
@@ -227,9 +227,9 @@ ctrl-s = "ToggleDiagram"
 "-" = "DiagramZoomOut"
 "0" = "DiagramResetZoom"
 " " = "Toggle"
-e = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
-o = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
-ctrl-e = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
-ctrl-o = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {} "$MM_ORIGIN_CWD")'
+e = 'Execute(${EDITOR:-nvim} {})'
+o = 'Execute(${EDITOR:-nvim} {})'
+ctrl-e = 'Execute(${EDITOR:-nvim} {})'
+ctrl-o = 'Execute(${EDITOR:-nvim} {})'
 l = ["ChDir({=})", "Cancel", "Reload", "Pos(0)"]
 h = ["ChDir(..)", "Cancel", "Reload"]

@@ -139,9 +139,9 @@ output_template = "{=number}\t{=branch}"
 "ctrl-j" = "Down"
 "ctrl-k" = "Up"
 "ctrl-p" = "SwitchPreview"
-"ctrl-e" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
-"ctrl-b" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
-"ctrl-d" = '''Execute(~/.config/waymaker/scripts/pr-diff.sh "{=number}")'''
+"ctrl-e" = '''ExecuteSilent(gh pr view --web "{=number}")'''
+"ctrl-b" = '''ExecuteSilent(gh pr view --web "{=number}")'''
+"ctrl-d" = '''Execute(gh pr diff "{=number}")'''
 
 # Nav Mode Binds (active when mode = "nav")
 "nav^^tab" = "ReloadNext"
@@ -158,7 +158,7 @@ output_template = "{=number}\t{=branch}"
 "nav^^p" = "SwitchPreview"
 "nav^^g" = "Pos(0)"
 "nav^^G" = "Pos(-1)"
-"nav^^e" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
-"nav^^b" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
-"nav^^w" = '''ExecuteSilent(~/.config/waymaker/scripts/pr-open-chrome.sh "{=number}")'''
-"nav^^d" = '''Execute(~/.config/waymaker/scripts/pr-diff.sh "{=number}")'''
+"nav^^e" = '''ExecuteSilent(gh pr view --web "{=number}")'''
+"nav^^b" = '''ExecuteSilent(gh pr view --web "{=number}")'''
+"nav^^w" = '''ExecuteSilent(gh pr view --web "{=number}")'''
+"nav^^d" = '''Execute(gh pr diff "{=number}")'''
