@@ -10,7 +10,7 @@
 
 **Next-generation terminal fuzzy finder, in-process file manager, media & markdown viewer, and tmux session orchestrator.**
 
-[Features](#-features) • [Lineage & Inspirations](#-lineage--inspirations) • [The Dotfiles Workflow Flow](#-the-dotfiles-workflow-flow) • [Presets Suite](#-presets-suite) • [Installation](#-installation) • [Configuration](#-configuration) • [CLI & Subcommands](#-cli--subcommands) • [Library](#-rust-library)
+[Features](#-features) • [Lineage & Inspirations](#-lineage--inspirations) • [Workflow Ecosystem](#-workflow-architecture--shell-ecosystem) • [Presets Suite](#-presets-suite) • [Installation](#-installation) • [Configuration](#-configuration) • [CLI & Subcommands](#-cli--subcommands) • [Library](#-rust-library)
 
 </div>
 
@@ -27,6 +27,8 @@
 Waymaker is an evolutionary, feature-rich **fork of [matchmaker](https://github.com/Squirreljetpack/matchmaker)** (`mm`), designed to expand its core matching capabilities into a comprehensive terminal control plane inspired by state-of-the-art terminal tools:
 
 - 🎯 **[matchmaker](https://github.com/Squirreljetpack/matchmaker)**: The foundational DNA — Nucleo SIMD matching algorithm, hierarchical TOML partial-merge configuration, dynamic CLI overrides, multi-column tab splitting, and interactive preview layouts.
+- 📺 **[television](https://github.com/alexpasmantier/television)**: Fast TUI engine architecture, preview channel pipelines, and multi-channel inspection — modern Rust design, sub-millisecond source switching, smart sorting thresholds, multi-threaded SIMD matching, and instant responsive previews.
+- 🚀 **[zoxide](https://github.com/ajeetdsouza/zoxide)**: Advanced frecency algorithm (frequency + recency) and adaptive directory navigation — learning historical directory habits, intelligent query scoring, and keyboard-anchored muscle memory (`j` / `zi`). Waymaker builds upon zoxide's principles by embedding a persistent `redb` KV store in-process, unifying frecency ranking directly into interactive multi-column pickers and file manager overlays.
 - 🖼️ **[mcat](https://github.com/Skardyy/mcat)**: State-of-the-art terminal Markdown and media inspection — native CommonMark/GFM rendering, syntax-highlighted code fences, inline Kitty Unicode Placeholders (`\u{10EEEE}`) for Mermaid diagrams, and modal zoomable diagram inspection with dynamic theme synchronization.
 - ⚡ **[sesh](https://github.com/joshmedeski/sesh)**: First-class Tmux session orchestration — deterministic session derivation, `session.toml` and `sesh.toml` wildcard patterns, directory auto-detection, startup commands, and seamless session switching via `wm session` / `wm connect`.
 - 🗂️ **[yazi](https://github.com/sxyazi/yazi)**: Asynchronous non-blocking architecture — zero-fork in-process parallel filesystem walker (`ignore`), off-thread media previews (`ratatui-image`), embedded file manager operations with `UndoStack` (`fm.rs`), and instant responsiveness.
@@ -59,9 +61,9 @@ Waymaker is an evolutionary, feature-rich **fork of [matchmaker](https://github.
 
 ---
 
-## 🔬 The Dotfiles Workflow Flow
+## 🔬 Workflow Architecture & Shell Ecosystem
 
-Waymaker is the central nervous system of modern, low-latency dotfiles environments. Here is how the end-to-end workflow is orchestrated across Tmux, Zsh, and system window managers (as documented in `~/.dotfiles`):
+Waymaker is engineered as an ultra-low-latency control plane for keyboard-driven terminal environments. Here is how seamless, zero-friction workflows are orchestrated across Tmux, Zsh, and Neovim:
 
 ```mermaid
 flowchart TD
@@ -143,7 +145,7 @@ Waymaker presets are modular, reusable TOML configurations stored in `~/.config/
 | **`session-picker`** | `wm session` / `wm -o session-picker` | High-performance Tmux session switcher with live pane previews and icon badges. | `Enter`: Connect to session (`wm connect`)<br>`d`: Terminate session<br>`Tab`: Filter active vs configured sessions |
 | **`ftb`** | `wm -o ftb` | Tab completion backend for Zsh `fzf-tab` with multi-column Nucleo fuzzy matching. | `Tab`: Select item<br>`Shift-Tab`: Previous<br>`Ctrl+P`: Toggle preview |
 | **`kill`** | `wm -o kill` | Interactive TCP listening port and process terminator with live connection telemetry. | `Enter`: Send `SIGTERM` (15)<br>`Ctrl+X`: Force `SIGKILL` (-9) |
-| **`keybindings`** | `wm -o keybindings` | Dotfiles workflow HUD across Tmux, Zsh, Hyprland, and Neovim. | `Enter`: Execute workflow<br>`Tab`: Cycle categories<br>`y`: Copy keybinding |
+| **`keybindings`** | `wm -o keybindings` | Interactive workflow HUD and shortcut cheat sheet across Tmux, Zsh, Hyprland, and Neovim. | `Enter`: Execute workflow<br>`Tab`: Cycle categories<br>`y`: Copy keybinding |
 | **`wt`** | `wm -o wt` | Interactive Git worktree switcher integrated with worktrunk and status preview. | `Enter`: Checkout worktree |
 | **`memory`** | `wm -o memory` | AI agent memory, instructions, skills, and rules explorer. | `Enter`: Open file in editor |
 | **`pr`** | `wm -o pr` | GitHub Pull Request review modal with diff inspection. | `Enter`: Open PR in browser<br>`d`: View full diff |
@@ -282,7 +284,7 @@ pattern = "~/dev/github/**"
 startup_command = "nvim"
 
 [[wildcard]]
-pattern = "~/.dotfiles/*"
+pattern = "~/projects/**"
 startup_command = "nvim"
 
 # Explicit pinned sessions
@@ -385,6 +387,8 @@ See [ARCHITECTURE.md](waymaker-lib/ARCHITECTURE.md) for core event flow and inte
 Waymaker stands on the shoulders of remarkable terminal software:
 
 - **[matchmaker](https://github.com/Squirreljetpack/matchmaker)** by Squirreljetpack — the upstream foundation.
+- **[television](https://github.com/alexpasmantier/television)** by Alex Pasmantier — inspiring modern Rust TUI engine design and multi-channel previewing.
+- **[zoxide](https://github.com/ajeetdsouza/zoxide)** by Ajeet D'Souza — the gold standard for smart directory frecency jumping.
 - **[mcat](https://github.com/Skardyy/mcat)** by Skardyy — inspiring in-terminal Markdown and Mermaid rendering.
 - **[sesh](https://github.com/joshmedeski/sesh)** by Josh Medeski — defining modern Tmux session workflow ergonomics.
 - **[yazi](https://github.com/sxyazi/yazi)** by sxyazi — pioneering async, non-blocking terminal file management.

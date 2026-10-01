@@ -18,7 +18,7 @@ percentage = 70
 
 [start.command]
 command = '''
-find "$PWD" "$HOME/.dotfiles/main" \
+find "$PWD" "${XDG_CONFIG_HOME:-$HOME/.config}" \
     -maxdepth 4 \
     \( -name "AGENTS.md" -o -name "CLAUDE.md" -o -name "SKILL.md" -o -path "*/ai-memory/*" \) \
     -type f 2>/dev/null

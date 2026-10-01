@@ -150,3 +150,12 @@ Unlike filesystem-only indexers (such as FFF daemon) that only index directory p
   Session names you switch to most often appear at the top.
 - **Make / Just / Task Recipes**: `just $(just --summary | tr ' ' '\n' | wm)`  
   Build and test tasks used daily are ranked higher than rarely used recipes.
+
+---
+
+## 8. Inspiration & Synergy with Zoxide
+
+Waymaker's frecency model draws inspiration from [**`zoxide`**](https://github.com/ajeetdsouza/zoxide) by Ajeet D'Souza, the modern standard for smart directory jumping.
+
+- **Complementary Ergonomics**: While `zoxide` provides fast headless terminal navigation (`z <query>`), Waymaker integrates frecency ranking directly into an interactive TUI with multi-column filtering, preview panels, in-process directory trees, and modal file manager operations (`wm -o jump`).
+- **Habit-Forming Navigation**: Waymaker automatically boosts directory access on interactive selection or via `wm add <path>`, keeping historical directory rankings aligned with your active workflows.

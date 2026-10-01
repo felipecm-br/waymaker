@@ -7,7 +7,7 @@ pattern = "~/dev/**"
 startup_command = ""
 
 [[wildcard]]
-pattern = "~/.dotfiles/*"
+pattern = "~/projects/**"
 startup_command = ""
 
 [[session]]
