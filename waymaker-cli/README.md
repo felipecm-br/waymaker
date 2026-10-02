@@ -16,7 +16,7 @@
 
 ---
 
-![Waymaker Preview](https://github.com/Squirreljetpack/waymaker/blob/main/waymaker-lib/assets/screen1.png)
+![waymaker preview](image.png)
 
 ## 🌟 Overview
 
