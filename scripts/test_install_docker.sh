@@ -17,18 +17,31 @@ docker run --rm \
       set -euo pipefail
       sh /tmp/install.sh -s
 
-      export PATH="$HOME/.local/bin:$PATH"
-      echo -n "Installed binary version: "
-      wm --version
+      # Verify that ~/.zshrc now contains PATH export and eval wm init zsh
+      grep -F ".local/bin" "$HOME/.zshrc" >/dev/null
+      grep -F "wm init zsh" "$HOME/.zshrc" >/dev/null
+
+      # Test Zsh shell invocation WITHOUT manual export: ~/.zshrc must handle it
+      zsh -i -c "
+        which wm >/dev/null
+        echo -n \"Installed binary version: \"
+        wm --version
+
+        which z >/dev/null
+        echo \"'z' function: OK\"
+
+        # Verify Tab binding is now _wm_smart_tab
+        tab_binding=\$(bindkey '^I')
+        echo \"Tab binding: \$tab_binding\"
+        echo \"\$tab_binding\" | grep -q \"_wm_smart_tab\"
+        echo \"Smart Tab keybinding: OK\"
+      "
 
       test -f "$HOME/.config/waymaker/config.toml"
       test -f "$HOME/.config/waymaker/session.toml"
       test -f "$HOME/.config/waymaker/presets/jump.toml"
       test -f "$HOME/.config/waymaker/presets/rg.toml"
       echo "Preset verification: OK"
-
-      zsh -c "source ~/.zshrc && which z >/dev/null"
-      echo "Zsh integration verification: OK"
 EOF
     echo "✨ All isolated Docker tests PASSED successfully!"
 '

@@ -395,7 +395,29 @@ configure_shell() {
 
     if [ "$CONFIGURE_SHELL" = true ]; then
         mkdir -p "$(dirname "$rc_file")"
-        printf "\n# Waymaker Shell Integration (Smart Tab, frecency tracking & 'z' jumper)\n%s\n" "$init_cmd" >> "$rc_file"
+
+        path_export=""
+        case ":$PATH:" in
+            *":$INSTALL_DIR:"*) ;;
+            *)
+                if [ "$OS" != "windows" ] && ! ( [ -f "$rc_file" ] && grep -F "$INSTALL_DIR" "$rc_file" >/dev/null 2>&1 ); then
+                    if [ "$current_shell" = "fish" ]; then
+                        path_export="fish_add_path \"$INSTALL_DIR\""
+                    else
+                        path_export="export PATH=\"$INSTALL_DIR:\$PATH\""
+                    fi
+                fi
+                ;;
+        esac
+
+        {
+            printf "\n# Waymaker Shell Integration (Smart Tab, frecency tracking & 'z' jumper)\n"
+            if [ -n "$path_export" ]; then
+                printf "%s\n" "$path_export"
+            fi
+            printf "%s\n" "$init_cmd"
+        } >> "$rc_file"
+
         info "Configured shell integration in $rc_file"
         info "Run 'source $rc_file' or open a new terminal to start using Smart Tab!"
     else
