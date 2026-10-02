@@ -152,6 +152,25 @@ zle -N _wm_smart_tab
 # - Ctrl+F: Direct Waymaker jump widget
 bindkey '^I' _wm_smart_tab
 bindkey -M viins '^I' _wm_smart_tab 2>/dev/null || true
+bindkey -M vicmd '^I' _wm_smart_tab 2>/dev/null || true
 bindkey '^F' _wm_jump_widget
 bindkey -M viins '^F' _wm_jump_widget 2>/dev/null || true
+bindkey -M vicmd '^F' _wm_jump_widget 2>/dev/null || true
+
+# Compatibility with zsh-vi-mode (if present)
+if (( $+functions[zvm_bindkey] )); then
+    zvm_bindkey viins '^I' _wm_smart_tab 2>/dev/null || true
+    zvm_bindkey vicmd '^I' _wm_smart_tab 2>/dev/null || true
+    zvm_bindkey viins '^F' _wm_jump_widget 2>/dev/null || true
+    zvm_bindkey vicmd '^F' _wm_jump_widget 2>/dev/null || true
+fi
+if [[ -n "$ZVM_MODE" ]] || (( $+functions[zvm_init] )) || (( $+widgets[zvm_init] )); then
+    _wm_zvm_setup() {
+        zvm_bindkey viins '^I' _wm_smart_tab 2>/dev/null || true
+        zvm_bindkey vicmd '^I' _wm_smart_tab 2>/dev/null || true
+        zvm_bindkey viins '^F' _wm_jump_widget 2>/dev/null || true
+        zvm_bindkey vicmd '^F' _wm_jump_widget 2>/dev/null || true
+    }
+    zvm_after_init_commands+=('_wm_zvm_setup')
+fi
 
