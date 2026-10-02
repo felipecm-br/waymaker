@@ -74,7 +74,8 @@ test-docker-interactive:
 	docker run --rm -it -v "{{justfile_directory()}}:/workspace:ro" debian:sid-slim bash -c '\
 		apt-get update -qq && apt-get install -y -qq zsh sudo >/dev/null && \
 		useradd -m -s /bin/zsh testuser && \
-		su - testuser -c "sh /workspace/install.sh -s && exec zsh -l" \
+		sudo -u testuser sh /workspace/install.sh -s && \
+		exec sudo -u testuser -i zsh \
 	'
 
 

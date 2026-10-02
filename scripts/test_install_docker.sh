@@ -13,7 +13,7 @@ docker run --rm \
 
     useradd -m -s /bin/zsh testuser
 
-    su - testuser << "EOF"
+    sudo -u testuser -i bash << "EOF"
       set -euo pipefail
       sh /workspace/install.sh -s
 
