@@ -3,25 +3,25 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "⚡ Starting Waymaker isolated Docker installation test..."
+echo "⚡ Starting Waymaker isolated Docker installation test (local build)..."
 
 docker run --rm \
-  -v "${SCRIPT_DIR}/install.sh:/tmp/install.sh:ro" \
-  ubuntu:24.04 bash -c '
+  -v "${SCRIPT_DIR}:/workspace:ro" \
+  debian:sid-slim bash -c '
     set -euo pipefail
-    apt-get update -qq && apt-get install -y -qq curl zsh sudo >/dev/null
+    apt-get update -qq && apt-get install -y -qq zsh sudo >/dev/null
 
     useradd -m -s /bin/zsh testuser
 
     su - testuser << "EOF"
       set -euo pipefail
-      sh /tmp/install.sh -s
+      sh /workspace/install.sh -s
 
-      # Verify that ~/.zshrc now contains PATH export and eval wm init zsh
+      # Verify that ~/.zshrc contains PATH export and eval wm init zsh
       grep -F ".local/bin" "$HOME/.zshrc" >/dev/null
       grep -F "wm init zsh" "$HOME/.zshrc" >/dev/null
 
-      # Test Zsh shell invocation WITHOUT manual export: ~/.zshrc must handle it
+      # Test Zsh shell invocation: ~/.zshrc must automatically load PATH and Smart Tab
       zsh -i -c "
         which wm >/dev/null
         echo -n \"Installed binary version: \"

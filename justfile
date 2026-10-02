@@ -65,8 +65,16 @@ dist version:
 	@echo "Artifacts generated in dist/:"
 	@ls -lh dist/
 
-# Test install.sh in an isolated clean Docker container (Ubuntu non-root user)
+# Test install.sh in an isolated clean Docker container
 test-install-docker:
 	./scripts/test_install_docker.sh
+
+# Interactive Docker sandbox: opens an interactive Zsh session where you can press Tab directly
+test-docker-interactive:
+	docker run --rm -it -v "{{justfile_directory()}}:/workspace:ro" debian:sid-slim bash -c '\
+		apt-get update -qq && apt-get install -y -qq zsh sudo >/dev/null && \
+		useradd -m -s /bin/zsh testuser && \
+		su - testuser -c "sh /workspace/install.sh -s && exec zsh -l" \
+	'
 
 
