@@ -46,7 +46,7 @@ prompt = " "
 prompt_style.fg = "yellow"
 
 [footer]
-content = " {cyan,bold:[Enter]} {darkgray:Connect}  •  {magenta,bold:[s]} {darkgray:Windows}  •  {yellow,bold:[Tab]} {darkgray:Cycle}  •  {red,bold:[d]} {darkgray:Kill}  •  {blue,bold:[Esc]} {darkgray:Cancel}"
+content = " {cyan,bold:[Enter]} {darkgray:Connect}  •  {magenta,bold:[Ctrl+S]} {darkgray:Windows}  •  {yellow,bold:[Tab]} {darkgray:Cycle}  •  {red,bold:[Ctrl+D]} {darkgray:Kill}  •  {blue,bold:[Esc]} {darkgray:Cancel}"
 row_connection = "Full"
 match_indent = false
 
@@ -83,8 +83,10 @@ percentage = 55
 "shift-backtab" = "@reloadprev"
 "s"             = ["Print(__SWITCH_WINDOW__)", "Quit"]
 "S"             = ["Print(__SWITCH_WINDOW__)", "Quit"]
+"ctrl-s"        = ["Print(__SWITCH_WINDOW__)", "Quit"]
 "d"             = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
 "D"             = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
+"ctrl-d"        = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
 ","             = []
 
 [binds]
@@ -95,4 +97,3 @@ percentage = 55
 "ctrl-s"        = ["Print(__SWITCH_WINDOW__)", "Quit"]
 "ctrl-d"        = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
 ","             = []
-
