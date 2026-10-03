@@ -1,19 +1,15 @@
-# Matchmaker Jump Mode Preset (`mm -o jump`)
-# Interactive directory navigation, frecency ranking, and TUI traversal.
-
 [tui]
-percentage = 43               # Altura do TUI em % da tela (descomente para modo inline)
+percentage = 43
 
 [query]
-status_inline = true          # true (contador de resultados na barra de busca) / false
+status_inline = true
 
 [query.filter]
-prompt_style.fg = "blue"          # Muda a cor (ex: Yellow, Cyan, #fab387, etc.)
-prompt_style.modifier = "BOLD"      # Aplica Negrito ("BOLD", "ITALIC", "DIM", etc.)
-underline = true       # Underline aparece quando o filtro está focado e desaparece no modo de navegação
-underline_style.fg = "#8999f1" # Cor do underline no foco ("blue", "gray", "cyan", etc.)
+prompt_style.fg = "blue"
+prompt_style.modifier = "BOLD"
+underline = true
+underline_style.fg = "#8999f1"
 
-# Prompts e cores por modo:
 [query.local]
 prompt = "> "
 prompt_style.fg = "cyan"
@@ -30,64 +26,59 @@ prompt_style.fg = "#f9e2af"
 underline_style.fg = "#f9e2af"
 
 [ui.nav]
-active = true               # true (modo navegação habilitado) / false
-profile = "fm"              # Perfil de File Manager completo (atalhos de criação/edição/remoção de arquivos e traversal h/l)
-focus_on_start = "picker" # Inicia na lista de resultados (NavBar) para navegação VIM instantânea na Home Row
-bar = "Plain"             # Estilo da barra na lista: "Plain" (│), "Thick" (█), "Double" (║), "Rounded" (│), "QuadrantOutside" (▌), "QuadrantInside" (▐)
-color = "Darkgray"        # Cor da barra: nomes ("black", "gray", "cyan", "lightblue", etc.) ou hex ("#000000", "#1e1e2e")
-# bold = false            # true / false (barra em negrito)
-# blink = false           # true / false (barra piscando)
-# blink_rate = "Slow"     # "Slow", "Medium", "Fast"
-hints = true              # Dicas de atalhos em modo navegação
-hints_columns = 4         # Grid de atalhos alinhado em 4 colunas no rodapé (estilo sort menu)
+active = true
+profile = "fm"
+focus_on_start = "picker"
+bar = "Plain"
+color = "Darkgray"
+hints = true
+hints_columns = 4
 
 [ui.parent_peek]
-enabled = false               # true (mostra painel com pasta pai à esquerda) / false
+enabled = false
 
 [ui.parent_peek.border]
-show = false                  # true / false (borda do painel pai)
+show = false
 
 [footer]
 separator = "light"
-# content = "  h/l: Nav  •  Ctrl+F: Cycle Mode  •  Ctrl+P: Toggle Preview  •  Ctrl+U: Ancestors  •  Enter: Select"
-style.fg = "gray"             # Cor do texto do rodapé ("gray", "cyan", "#RRGGBB", etc.)
-style.modifier = "DIM"        # "DIM", "BOLD", "ITALIC", "UNDERLINED", "REVERSED"
-match_indent = false          # true / false
+style.fg = "gray"
+style.modifier = "DIM"
+match_indent = false
 
 [matcher]
-engine = "frizbee"                # "nucleo" ou "frizbee" (motor de fuzzy matching)
-depth_penalty = 15            # Penalidade por profundidade de pasta
-typo_tolerance = true         # true / false (tolerância a erros de digitação)
-dir_first = true              # true / false (prioriza pastas no topo da lista)
+engine = "frizbee"
+depth_penalty = 15
+typo_tolerance = true
+dir_first = true
 
 [matcher.sort]
-threshold = "smart"                # Algoritmo de ordenação: "smart", "score", "exact", "alphabetical", "frecency", "none"
-cap = 2000               # Limite máximo de itens a ordenar
+threshold = "smart"
+cap = 2000
 
 [matcher.frecency]
-active = true               # true / false (histórico de relevância/frecência)
-weight = 2           # Peso do score de frecência
+active = true
+weight = 2
 
 [results]
-scroll_wrap = true             # true (navegação circular: volta ao início no último item e vice-versa)
-# Grossura / tipo de borda do navbar exclusivo para o item focado:
-current_nav_bar = "Plain" # "Plain" (│), "Thick" (█), "Double" (║), "Rounded" (│), "QuadrantOutside" (▌), "QuadrantInside" (▐)
-max = 15                      # Quantidade máxima de linhas visíveis
-reverse = false               # true (ordem de baixo para cima) / false (cima para baixo)
-icons = true                  # true (ativa ícones Nerd Font por tipo de arquivo) / false
-uncolor_current_icon = true   # true (ícone focado herda cor do foco - estilo Yazi) / false
-invert_current_icon = false   # true (inverte cor do ícone no foco: Azul<->Amarelo, Vermelho<->Ciano) / false
-row_connection = "Full"       # Destaque da linha: "Full" (barra sólida contínua), "Capped" (somente coluna ativa), "Disjoint" (colunas separadas)
+scroll_wrap = true
+current_nav_bar = "Plain"
+max = 15
+reverse = false
+icons = true
+uncolor_current_icon = true
+invert_current_icon = false
+row_connection = "Full"
 
 [results.tier]
 separator = "Underline"
 
 [results.tier.style]
-fg = "#555555"   # ou "Cyan", "Blue", "Gray", "#555555", etc.
+fg = "#555555"
 
 [results.symlink]
-active = true         # true (mostra '-> destino' em links simbólicos) / false
-style.fg = "cyan" # Cor do texto de destino do symlink
+active = true
+style.fg = "cyan"
 
 [results.bookmark]
 folder_icon = "󰮟"
@@ -100,29 +91,21 @@ folder_icon_style.fg = "#8999f1"
 icon = "󱋢"
 icon_style.fg = "#8999f1"
 
-# Estilo independente para a célula da barra do navbar no item focado:
 [results.current_nav_bar_style]
-fg = "white"                 # Cor do glifo da barra focada ("yellow", "cyan", "black", "#89b4fa", etc.)
-# bg = "lightblue"            # Cor de fundo da barra focada (se omitido, herda current_style.bg)
-# modifier = "BOLD"           # "BOLD", "DIM", "ITALIC", "UNDERLINED"
+fg = "white"
 
-# Estilo da linha em foco (cursor):
 [results.current_style]
-fg = "black"                  # Cor do texto no foco: "black", "#000000", "white", "reset", etc.
-bg = "Darkgray"              # Cor de fundo do destaque: "lightblue", "gray", "#1e1e2e", "reset" (transparente), etc.
-modifier = "BOLD"             # "BOLD", "DIM", "ITALIC", "UNDERLINED", "REVERSED"
-
-# (Opcional) Cor e estilo exclusivos para o glifo do ícone no foco:
-# [results.current_icon_style]
-# fg = "black"                # Força uma cor de primeiro plano específica apenas para o ícone
+fg = "black"
+bg = "Darkgray"
+modifier = "BOLD"
 
 [results.autoscroll]
-indicator = ""               # Caractere indicador de scroll automático
-indicator_style.fg = "blue"   # Cor do indicador de autoscroll
+indicator = ""
+indicator_style.fg = "blue"
 
 [previewer]
-debounce_ms = 200              # Delay em ms para atualizar o preview ao mover o cursor (evita floods em scroll rápido)
-delay_clear = true            # true (evita flicker retendo preview anterior até o novo estar pronto)
+debounce_ms = 200
+delay_clear = true
 
 [preview]
 show = true
@@ -131,149 +114,114 @@ scrollbar = true
 [preview.media]
 active = true
 fit = "fit"
-size = 0             # Resolução máxima do downscaling em pixels (ex: 512, 800, 1280, 1920; 0 = original/sem downscale)
+size = 0
 
 [preview.border]
 sides = "LEFT"
 color = "Darkgray"
 
 [[preview.layout]]
-side = "right"                # Posição do preview: "right", "left", "top", "bottom"
-percentage = 60               # Tamanho balanceado do painel em % (Proporção Áurea 60/40)
+side = "right"
+percentage = 60
 
 [binds]
-# Modos de dados (ciclar fontes e favoritos)
-"tab"           = "@reloadnext"
+"tab" = "@reloadnext"
 "shift-backtab" = "@reloadprev"
-"backtab"       = "@reloadprev"
-"ctrl-f"        = "@dirs"
-"ctrl-b"        = "@bookmarks"
-"*"             = "@bookmark"
-
-# Foco e modos
-"esc"           = "ToggleFocus"
-
-# Navegação do cursor e preview no modo filtro
-"ctrl-j"        = "Down"
-"ctrl-k"        = "Up"
-"alt-j"         = "Down"
-"alt-k"         = "Up"
-"ctrl-shift-j"  = "PreviewDown(5)"
-"ctrl-shift-k"  = "PreviewUp(5)"
-"ctrl-shift-J"  = "PreviewDown(5)"
-"ctrl-shift-K"  = "PreviewUp(5)"
-
-# Navegação de diretórios (entrar / descer)
-"ctrl-l"        = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
-"ctrl-right"    = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
-"alt-l"         = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
-
-# Navegação de diretórios (subir / parent)
-"ctrl-h"        = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"ctrl-left"     = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"alt-h"         = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-
-# Histórico de ancestrais (subir múltiplos níveis)
-"ctrl-u"        = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
-
-# Editor, visualização e clipboard
-"ctrl-e"        = "Execute(nvim {+})"
-"ctrl-p"        = "SwitchPreview"
-"ctrl-v"        = "@paste_into"
+"backtab" = "@reloadprev"
+"ctrl-f" = "@dirs"
+"ctrl-b" = "@bookmarks"
+"*" = "@bookmark"
+"esc" = "ToggleFocus"
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"alt-j" = "Down"
+"alt-k" = "Up"
+"ctrl-shift-j" = "PreviewDown(5)"
+"ctrl-shift-k" = "PreviewUp(5)"
+"ctrl-shift-J" = "PreviewDown(5)"
+"ctrl-shift-K" = "PreviewUp(5)"
+"ctrl-l" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"ctrl-right" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"alt-l" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"ctrl-h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-left" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"alt-h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-u" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"ctrl-e" = "Execute(nvim {+})"
+"ctrl-p" = "SwitchPreview"
+"ctrl-v" = "@paste_into"
 
 [ui.nav.binds]
-# Modos de dados (ciclar fontes e favoritos)
-"tab"           = "@reloadnext"
+"tab" = "@reloadnext"
 "shift-backtab" = "@reloadprev"
-"backtab"       = "@reloadprev"
-"f"             = "@dirs"
-"b"             = "@bookmarks"
-"*"             = "@bookmark"
-
-# Foco, seleção e saída
-"/"             = "FocusFilter"
-" "             = "Toggle"
-"esc"           = "Quit"
-"q"             = "Quit"
-
-# Navegação do cursor e preview
-"j"             = "Down"
-"k"             = "Up"
-"ctrl-j"        = "Down"
-"ctrl-k"        = "Up"
-"alt-j"         = "Down"
-"alt-k"         = "Up"
-"J"             = "PreviewDown(5)"
-"K"             = "PreviewUp(5)"
-"shift-j"       = "PreviewDown(5)"
-"shift-k"       = "PreviewUp(5)"
-"ctrl-shift-j"  = "PreviewDown(5)"
-"ctrl-shift-k"  = "PreviewUp(5)"
-"ctrl-shift-J"  = "PreviewDown(5)"
-"ctrl-shift-K"  = "PreviewUp(5)"
-"ctrl-d"        = "PreviewHalfPageDown"
-
-# Navegação de diretórios (entrar / descer)
-"l"             = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
-"right"         = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
-"ctrl-l"        = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
-"ctrl-right"    = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
-"alt-l"         = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
-
-# Navegação de diretórios (subir / parent)
-"h"             = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"left"          = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"backspace"     = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"ctrl-h"        = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"ctrl-left"     = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"alt-h"         = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-
-# Histórico de ancestrais (subir múltiplos níveis)
-"ctrl-u"        = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
-
-# Editor de texto
-"e"             = "Execute(nvim {+})"
-"ctrl-e"        = "Execute(nvim {+})"
-
-# Operações de arquivo (FM / Clipboard)
-"y"             = "@yank"
-"x"             = "@cut"
-"p"             = "@paste"
-"P"             = "@paste_into"
-"ctrl-v"        = "@paste_into"
-"u"             = "@undo"
-"ctrl-r"        = "@redo"
-
-# Menus e painéis
-"ctrl-p"        = "SwitchPreview"
-","             = "SortMenu"
-"\\"            = "ToggleParentPeek"
+"backtab" = "@reloadprev"
+"f" = "@dirs"
+"b" = "@bookmarks"
+"*" = "@bookmark"
+"/" = "FocusFilter"
+" " = "Toggle"
+"esc" = "Quit"
+"q" = "Quit"
+"j" = "Down"
+"k" = "Up"
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+"alt-j" = "Down"
+"alt-k" = "Up"
+"J" = "PreviewDown(5)"
+"K" = "PreviewUp(5)"
+"shift-j" = "PreviewDown(5)"
+"shift-k" = "PreviewUp(5)"
+"ctrl-shift-j" = "PreviewDown(5)"
+"ctrl-shift-k" = "PreviewUp(5)"
+"ctrl-shift-J" = "PreviewDown(5)"
+"ctrl-shift-K" = "PreviewUp(5)"
+"ctrl-d" = "PreviewHalfPageDown"
+"l" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"right" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"ctrl-l" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"ctrl-right" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"alt-l" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"left" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"backspace" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-left" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"alt-h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-u" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"e" = "Execute(nvim {+})"
+"ctrl-e" = "Execute(nvim {+})"
+"y" = "@yank"
+"x" = "@cut"
+"p" = "@paste"
+"P" = "@paste_into"
+"ctrl-v" = "@paste_into"
+"u" = "@undo"
+"ctrl-r" = "@redo"
+"ctrl-p" = "SwitchPreview"
+"," = "SortMenu"
+"\\" = "ToggleParentPeek"
 
 [breadcrumb]
-show = true                   # true (exibe caminho atual como breadcrumb no topo) / false
-separator = "/"               # Caractere separador de diretório (ex: "/", " › ", " > ")
-style.fg = "Cyan"             # Cor do texto do caminho
-style.modifier = "BOLD"       # "BOLD", "DIM", "ITALIC", "UNDERLINED"
-separator_style.fg = "Cyan"   # Cor do separador
+show = true
+separator = "/"
+style.fg = "Cyan"
+style.modifier = "BOLD"
+separator_style.fg = "Cyan"
 
 [start]
 
 [start.command]
 command = ""
-# Fontes de dados cicláveis via @reloadnext (ctrl-f / f / b):
-# Índice 0: "" -> Usa AsyncWalker nativo para pasta/arquivos locais.
-# Índice 1: Lista global de pastas por frecência via wm list --dirs.
-# Índice 2: Lista exclusiva de pastas favoritadas via wm list --bookmarks.
 additional = [
     "",
     "wm list --dirs 2>/dev/null",
     "wm list --bookmarks 2>/dev/null"
 ]
 
-# Regras automáticas de ordenação por pasta (avaliadas em ordem top-to-bottom)
 [[folder_rules]]
 path = "~/Downloads"
-sort = "ModifiedReverse" # arquivos modificados recentemente primeiro
+sort = "ModifiedReverse"
 
 [[folder_rules]]
 path = "*/Downloads"
@@ -281,7 +229,7 @@ sort = "ModifiedReverse"
 
 [[folder_rules]]
 path = "*/screenshots"
-sort = "CreatedReverse"  # capturas de tela criadas recentemente primeiro
+sort = "CreatedReverse"
 
 [[folder_rules]]
 path = "*/Screenshots"

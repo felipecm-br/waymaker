@@ -132,10 +132,6 @@ abort_empty = true
 
 [start.command]
 command = ""
-# Fontes de dados cicláveis via @reloadnext (Tab / Shift+Tab):
-# Índice 0: "" -> Usa AsyncWalker nativo para pasta/arquivos locais.
-# Índice 1: Lista global por frecência via wm list.
-# Índice 2: Lista exclusiva de favoritos via wm list --bookmarks.
 additional = [
     "",
     "wm list 2>/dev/null",

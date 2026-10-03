@@ -1,807 +1,1042 @@
 # ==============================================================================
-# MATCHMAKER — ARQUIVO DE CONFIGURAÇÃO COMPLETO DE REFERÊNCIA
+# WAYMAKER — COMPLETE REFERENCE CONFIGURATION FILE
 # ==============================================================================
-# Este arquivo contém TODAS as propriedades disponíveis no Matchmaker,
-# com seus tipos, valores possíveis e valores padrão (default) comentados.
+# This file documents EVERY configuration section, table, key, and possibility
+# available in Waymaker, with descriptions, supported types, allowed enum variants,
+# and default values in English.
+#
+# Reference preset: `waymaker-cli/assets/presets/jump.toml`
 # ==============================================================================
 
 # ==============================================================================
 # 1. TUI & TERMINAL ([tui])
 # ==============================================================================
 [tui]
-# Altura do TUI em % da tela quando em modo inline (não-fullscreen).
-# Valores: 1 a 100 | Default: (fullscreen se layout não for especificado)
+# Height of the TUI as a percentage of the terminal window (1 to 100).
+# When set, runs in inline/overlay mode. Omit or comment out for fullscreen mode.
+# Values: 1 to 100 | Default: fullscreen (None)
 # percentage = 60
 
-# Limites mínimo e máximo de linhas para o modo inline.
-# Valores: inteiros >= 1 | Default: min = 10, max = 120
+# Minimum row height for inline mode.
+# Values: integers >= 1 | Default: 10
 # min = 10
+
+# Maximum row height for inline mode.
+# Values: integers >= 1 | Default: 120
 # max = 120
 
-# Restaura a tela original ao sair do Matchmaker.
-# Valores: true, false | Default: true
+# Restores the original terminal screen buffer upon exiting.
+# Values: true, false | Default: true
 restore_fullscreen = true
 
-# Redesenha a interface automaticamente quando o terminal é redimensionado.
-# Valores: true, false | Default: false
+# Automatically redraws the interface when the terminal window is resized.
+# Values: true, false | Default: false
 redraw_on_resize = false
 
-# Habilita protocolo avançado de teclado Kitty Keyboard Protocol (shift-space, etc.).
-# Valores: true, false | Default: true
+# Enables Kitty Keyboard Protocol (disambiguates Escape, Shift-Space, chords, etc.).
+# Values: true, false | Default: true
 extended_keys = true
 
-# Delay em milissegundos antes de redimensionar ao entrar/sair da tela.
-# Valores: inteiros (ms) | Default: 100
+# Delay in milliseconds before redrawing after screen transitions.
+# Values: integer (ms) | Default: 100
 sleep_ms = 100
 
-# Limpa a tela do TUI após fazer uma seleção.
-# Valores: true, false | Default: true
+# Clears the TUI screen after a selection is made.
+# Values: true, false | Default: true
 clear_on_exit = true
 
-# Limpa a tela após a execução de um comando externo (Execute).
-# Valores: true, false | Default: true
+# Clears the screen after executing external terminal commands.
+# Values: true, false | Default: true
 clear_after_execute = true
 
-# Usa o protocolo OSC 52 para copiar para a área de transferência do sistema.
-# Se false, usa o comando CLIPcmd definido em [envs].
-# Valores: true, false | Default: true
+# Uses the ANSI OSC 52 escape sequence for clipboard copy operations.
+# When false, falls back to CLIPcmd defined under [envs].
+# Values: true, false | Default: true
 osc52 = true
 
-# Habilita captura de eventos do mouse (clique, scroll, drag).
-# Valores: true, false | Default: true
+# Enables terminal mouse event capture (clicks, scroll wheel, drag resizing).
+# Values: true, false | Default: true
 mouse = true
 
-# Remove quebra de linha (\n) do final ao copiar texto.
-# Valores: true, false | Default: false
+# Strips trailing newline (\n) from copied text when copying items.
+# Values: true, false | Default: false
 copy_trailing_newline = false
 
-# Canal de saída do TUI.
-# Valores: "Stdout", "BufferedStderr" | Default: "Stdout"
+# Terminal output stream used by the renderer.
+# Values: "Stdout", "BufferedStderr" | Default: "Stdout"
 stream = "Stdout"
 
 
 # ==============================================================================
-# 2. INTERFACE GLOBAL ([ui])
+# 2. GLOBAL UI & NAVIGATION ([ui])
 # ==============================================================================
 [ui]
-# Taxa de atualização do TUI em frames por segundo (FPS/ticks).
-# Valores: inteiros (ex: 30, 60, 120) | Default: 60
+# Refresh rate of the event loop and UI renderer in frames per second (FPS / ticks).
+# Values: integers >= 1 | Default: 15
 tick_rate = 60
 
-# Layout de 3 painéis (Parent Peek / Navegação estilo Miller Columns).
+# Optional global default sort order for lists when no specific folder rule applies.
+# Values: "Natural", "Alphabetical", "AlphabeticalReverse", "Modified",
+#         "ModifiedReverse", "Created", "CreatedReverse", "Size", "SizeReverse", "Extension"
+# Default: None (natural input order)
+# default_sort = "Natural"
+
+# Outer border styling for the entire container.
+[ui.border]
+# Border style: "Rounded", "Plain", "Double", "Thick", "None" | Default: "None"
+# type = "Rounded"
+# Border color: "Black", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan", "Gray",
+#               "Darkgray", "Lightred", "Lightgreen", "Lightyellow", "Lightblue",
+#               "Lightmagenta", "Lightcyan", "White", or hex "#RRGGBB"
+# color = "Darkgray"
+
+# Interactive sort menu grid displayed in the footer.
+[ui.sort_menu]
+# Number of columns for the sort options grid. Set to 0 or 1 for single-line display.
+# Values: integers >= 0 | Default: 4
+columns = 4
+# Whether to display the "Sort:" title prefix.
+# Values: true, false | Default: true
+show_title = true
+
+# 3-Pane Miller Columns / Parent Directory Peek layout.
 [ui.parent_peek]
-# Habilita o painel esquerdo mostrando o diretório pai | Default: false
+# Enables the left pane displaying the parent directory contents.
+# Values: true, false | Default: false
 enabled = false
-# Largura do painel pai em % da tela | Default: 15
+
+# Width percentage of the parent peek pane relative to total terminal width.
+# Values: 1 to 100 | Default: 15
 pct = 15
-# Altura máxima em linhas | Default: None
+
+# Maximum row height for the parent peek pane.
+# Values: integer or None | Default: None
 # max = 20
-# Cor do título da pasta pai | Default: "Cyan"
+
+# Title color for the parent folder header.
+# Values: color name or hex "#RRGGBB" | Default: "Cyan"
 parent_color = "Cyan"
-# Destaca o diretório atual dentro da lista do pai | Default: true
+
+# Highlights the current working directory inside the parent directory list.
+# Values: true, false | Default: true
 highlight = true
-# Cor do destaque da pasta atual | Default: "Yellow"
+
+# Color for highlighting the current directory inside the parent list.
+# Values: color name or hex "#RRGGBB" | Default: "Yellow"
 highlight_color = "Yellow"
 
+# Border configuration for the Parent Peek left pane.
 [ui.parent_peek.border]
+# Shows the vertical border line separating parent peek from results.
+# Values: true, false | Default: true
 show = true
+# Border line color.
+# Values: color name or hex "#RRGGBB" | Default: "DarkGray"
 color = "DarkGray"
+# Border line type: "Plain", "Rounded", "Double", "Thick" | Default: "Plain"
 type = "Plain"
 
-# Modo Navegação (estilo gerenciador de arquivos/ranger/yazi).
+# Navigation Mode (Vim modal navigation / file manager traversal).
 [ui.nav]
-# Habilita o Modo Navegação.
-# Permite alternar o foco entre o input de busca e a lista de resultados.
-# Valores: true, false | Default: false
-active = false
+# Enables navigation mode: allows switching focus between search filter and results list.
+# Values: true, false | Default: false
+active = true
 
-# Onde o foco do teclado inicia ao abrir o Matchmaker quando nav.active = true.
-# Valores: "Filter" (na barra de busca), "Picker" (na lista de resultados) | Default: "Filter"
-focus_on_start = "Filter"
+# Navigation profile:
+# - "list": Safe picker navigation (cursor movement, paging, selection, filter toggle).
+# - "basic": Minimal vertical navigation (j/k, gg/G, J/K, esc, q). Hopping disabled.
+# - "fm": Full file manager (directory hopping h/l, frecency, bookmarks, file ops).
+# - "none": Zero injected defaults; strictly uses bindings defined in [ui.nav.binds].
+# Values: "list", "basic", "fm", "none" | Default: "list"
+profile = "fm"
 
-# Cor do indicador quando o painel de resultados está em foco.
-# Valores: "Yellow", "Cyan", "Green", "Red", "Blue", "Magenta", "White", "Black", "#RRGGBB" | Default: "Yellow"
-color = "Yellow"
+# Initial keyboard focus when launching Waymaker:
+# - "filter": Focus starts in the search query bar for immediate typing.
+# - "picker": Focus starts on the results list (NavBar) for instant Vim home-row movement.
+# Values: "filter", "picker" | Default: "filter"
+focus_on_start = "picker"
 
-# Faz o indicador de foco piscar.
-# Valores: true, false | Default: false
-blink = false
+# Visual indicator bar style on the focused item:
+# Values: "Plain" (│), "Thick" (█), "Double" (║), "Rounded" (│),
+#         "QuadrantOutside" (▌), "QuadrantInside" (▐), "None"
+# Default: "Plain"
+bar = "Plain"
 
-# Velocidade do piscar quando nav.blink = true.
-# Valores: "Slow", "Normal", "Rapid" | Default: "Normal"
-blink_rate = "Normal"
+# Color of the navigation indicator bar.
+# Values: color name or hex "#RRGGBB" | Default: "Darkgray"
+color = "Darkgray"
 
-# Aplica estilo negrito ao indicador de foco.
-# Valores: true, false | Default: false
-bold = false
+# Enables bold text for the navigation indicator.
+# Values: true, false | Default: false
+# bold = false
 
-# Estilo da barra lateral de foco na linha selecionada.
-# Valores: "Plain", "Rounded", "Double", "Thick", "QuadrantOutside", "QuadrantInside", "None" | Default: "None"
-# bar = "Thick"
+# Enables blinking for the navigation indicator bar.
+# Values: true, false | Default: false
+# blink = false
 
-# Marcador em texto exibido na linha selecionada em modo navegação.
-# Valores: texto livre (ex: ">> ", "▶ ") | Default: ""
-marker = ""
+# Blink speed when blink = true.
+# Values: "Slow", "Normal", "Rapid" | Default: "Normal"
+# blink_rate = "Normal"
 
-# Texto de prompt exibido enquanto a lista de resultados está em foco.
-# Valores: texto livre (ex: "[NAV] > ") | Default: ""
-prompt = ""
+# Text marker prepended to the focused row when results have focus.
+# Values: string (e.g. ">> ", "▶ ") | Default: ""
+# marker = ""
 
-# Exibe notificações flutuantes ao executar ações de clipboard (yank/cut).
-# Valores: true, false | Default: false
+# Prompt prefix text displayed when results have focus.
+# Values: string | Default: ""
+# prompt = ""
+
+# Shows desktop/TUI notifications for file-manager clipboard actions (yank/cut/paste).
+# Values: true, false | Default: false
 notify = false
 
-# Quando true, teclas digitadas enquanto os resultados estão em foco vão para a busca.
-# Valores: true, false | Default: false
+# When true, typing while results are focused falls through to the query input.
+# Values: true, false | Default: false
 passthrough = false
 
-# Ativa apenas binds básicos (j/k/J/K) no modo navegação sem atalhos de gerenciador de arquivos.
-# Valores: true, false | Default: false
-basic = false
-
-# Exibe dicas de atalhos no rodapé/status ao focar nos resultados.
-# Valores: true, false | Default: true
+# Displays shortcut hints in the footer when the results pane is focused.
+# Values: true, false | Default: true
 hints = true
 
-# Número de colunas para as dicas de atalhos no rodapé (se <= 1, exibe em linha única).
-# Valores: número inteiro | Default: 4
+# Number of columns for the navigation hints grid in the footer.
+# Values: integer >= 1 | Default: 4
 hints_columns = 4
 
-# Binds customizados para o modo navegação quando a lista está focada.
+# Keybindings active when Navigation mode is enabled and the Results pane has focus.
 [ui.nav.binds]
-"j" = "Down"
-"k" = "Up"
-"l" = ["ChDir({=})", "Reload", "Pos(0)"]
-"h" = ["ChDir(..)", "Reload", "Pos(0)"]
-"J" = "PreviewDown(1)"
-"K" = "PreviewUp(1)"
-"gg" = "Pos(0)"
-"G" = "Pos(-1)"
-"P" = "ToggleParentPeek"
+"tab"           = "@reloadnext"
+"shift-backtab" = "@reloadprev"
+"backtab"       = "@reloadprev"
+"f"             = "@dirs"
+"b"             = "@bookmarks"
+"*"             = "@bookmark"
+"/"             = "FocusFilter"
+" "             = "Toggle"
+"esc"           = "Quit"
+"q"             = "Quit"
+"j"             = "Down"
+"k"             = "Up"
+"ctrl-j"        = "Down"
+"ctrl-k"        = "Up"
+"alt-j"         = "Down"
+"alt-k"         = "Up"
+"J"             = "PreviewDown(5)"
+"K"             = "PreviewUp(5)"
+"shift-j"       = "PreviewDown(5)"
+"shift-k"       = "PreviewUp(5)"
+"ctrl-shift-j"  = "PreviewDown(5)"
+"ctrl-shift-k"  = "PreviewUp(5)"
+"ctrl-shift-J"  = "PreviewDown(5)"
+"ctrl-shift-K"  = "PreviewUp(5)"
+"ctrl-d"        = "PreviewHalfPageDown"
+"l"             = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"right"         = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"ctrl-l"        = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"ctrl-right"    = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"alt-l"         = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"h"             = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"left"          = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"backspace"     = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-h"        = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-left"     = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"alt-h"         = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-u"        = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"e"             = "Execute(nvim {+})"
+"ctrl-e"        = "Execute(nvim {+})"
+"y"             = "@yank"
+"x"             = "@cut"
+"p"             = "@paste"
+"P"             = "@paste_into"
+"ctrl-v"        = "@paste_into"
+"u"             = "@undo"
+"ctrl-r"        = "@redo"
+"ctrl-p"        = "SwitchPreview"
+","             = "SortMenu"
+"\\"            = "ToggleParentPeek"
 
 
 # ==============================================================================
-# 3. BARRA DE BUSCA / QUERY ([query])
+# 3. QUERY / SEARCH INPUT BAR ([query])
 # ==============================================================================
 [query]
-# Exibe a barra de busca.
-# Valores: true, false | Default: true
+# Controls visibility of the search input bar.
+# Values: true, false | Default: true
 show = true
 
-# Prefixo da barra de busca.
-# Prefixo da barra de busca padrão (ou quando a lista está em foco no modo navegação).
-# Valores: string (ex: "> ", " ", "🔍 ") | Default: "> "
+# Default search prompt symbol.
+# Values: string (e.g. "> ", " ", "🔍 ") | Default: "> "
 prompt = "> "
 
-# Texto inicial preenchido na barra de busca.
-# Valores: string | Default: ""
+# Initial text populated in the query input bar on startup.
+# Values: string | Default: ""
 initial = ""
 
-# Estilo do cursor na barra de busca.
-# Valores: "default", "none" | Default: "default"
+# Hardware cursor style in the query input bar:
+# - "default": Standard terminal cursor.
+# - "none": Hides hardware cursor to avoid shader flicker in GPU terminals (Ghostty/Kitty).
+# Values: "default", "none" | Default: "default"
 cursor = "default"
 
-# Mantém espaçamento de rolagem ao navegar horizontalmente pelo texto digitado.
-# Valores: true, false | Default: true
+# Maintains horizontal scroll padding when navigating query text.
+# Values: true, false | Default: true
 scroll_padding = true
 
-# Exibe o contador de resultados (ex: 3/42) alinhado à direita dentro da barra de busca.
-# Valores: true, false | Default: false
-status_inline = false
+# Displays match count status (e.g. "12/150") right-aligned inside the search bar.
+# Values: true, false | Default: false
+status_inline = true
 
-# Estilo do texto padrão digitado pelo usuário.
-[query.style]
-# fg = "White"
-# bg = "Reset"
-# modifier = "None"
+# Underline separator drawn directly underneath the query row (zero extra line overhead).
+# Values: true, false | Default: false
+underline = true
 
-# Configurações específicas quando focado no modo filtro (digitando).
-[query.filter]
-# Prefixo customizado da barra de busca quando estiver focado no modo filtro.
-# prompt = " "
-
-# Estilo do texto digitado especificamente quando focado no modo filtro.
-[query.filter.style]
-# fg = "White"
-# modifier = "BOLD"
-
-# Estilo do símbolo de prompt especificamente quando focado no modo filtro.
-[query.filter.prompt_style]
-# fg = "Yellow"
-# modifier = "BOLD"
-
-# Estilo do símbolo de prompt padrão ("> ").
+# Styling for the standard prompt symbol.
 [query.prompt_style]
-fg = "Gray"
-# modifier = "BOLD"
+fg = "cyan"
+modifier = "BOLD"
 
-# Borda ao redor da barra de busca.
+# Styling for the typed search query text.
+[query.style]
+# fg = "white"
+# bg = "reset"
+# modifier = "none"
+
+# Styling for the query underline separator.
+[query.underline_style]
+fg = "#8999f1"
+
+# Border around the search bar.
 [query.border]
-type = "None"
+# type = "Rounded"
 # color = "Cyan"
 
+# Mode-specific styling when search filter is active and focused.
+[query.filter]
+prompt = "> "
+prompt_style.fg = "blue"
+prompt_style.modifier = "BOLD"
+underline = true
+underline_style.fg = "#8999f1"
+
+# Data source index 0 (local files) prompt and styling.
+[query.local]
+prompt = "> "
+prompt_style.fg = "cyan"
+underline_style.fg = "cyan"
+
+# Data source index 1 (frecency history) prompt and styling.
+[query.frecency]
+prompt = "󱅤 "
+prompt_style.fg = "#8999f1"
+underline_style.fg = "#8999f1"
+
+# Data source index 2 (bookmarks / pinned) prompt and styling.
+[query.bookmarks]
+prompt = " "
+prompt_style.fg = "#f9e2af"
+underline_style.fg = "#f9e2af"
+
 
 # ==============================================================================
-# 4. TABELA DE RESULTADOS ([results])
+# 4. RESULTS TABLE ([results])
 # ==============================================================================
 [results]
-# Posição inicial do cursor na lista (índice 0-based ou negativo para contar do final, ex: -1 para o último item).
-# Valores: inteiros (positivo ou negativo) | Default: None (inicia em 0)
+# Maximum visible rows in the results list.
+# Values: integers >= 1, or None (fills available space) | Default: None
+max = 15
+
+# Displays results in reverse order (bottom-to-top).
+# Values: true, false | Default: false
+reverse = false
+
+# Enables circular wrap-around navigation when scrolling past top/bottom bounds.
+# Values: true, false | Default: false
+scroll_wrap = true
+
+# Number of rows maintained as padding above and below the cursor when scrolling.
+# Values: integers >= 0 | Default: 2
+scroll_padding = 2
+
+# Initial cursor row position (0-indexed, or negative for from-the-end, e.g. -1).
+# Values: integer | Default: None (starts at 0)
 # pos = 0
 
-# Permite seleção múltipla de itens (com Tab / multi-select).
-# Valores: true, false | Default: true
+# Enables multi-item selection with Tab / Toggle.
+# Values: true, false | Default: true
 multi = true
 
-# Marcador para itens selecionados via multi-select.
-# Valores: string | Default: "▌ "
+# Prefix marker rendered on multi-selected rows.
+# Values: string | Default: "▌ "
 multi_prefix = "▌ "
 
-# Marcador para itens não-selecionados.
-# Valores: string | Default: "  "
+# Prefix rendered on unselected rows.
+# Values: string | Default: "  "
 unselected_prefix = "  "
 
-# Prefixo padrão para todos os itens.
-# Valores: string | Default: ""
+# Default prefix for normal rows.
+# Values: string | Default: ""
 default_prefix = ""
 
-# Prefixo para a linha atualmente destacada/sob o cursor.
-# Valores: string | Default: ""
+# Prefix marker for the row currently under the cursor.
+# Values: string | Default: ""
 current_prefix = ""
 
-# Prefixo de caractere que ativa o spinner animado na linha (ex: "?", "@").
-# Valores: string | Default: ""
+# Prefix character that activates the animated spinner on an item.
+# Values: string | Default: ""
 spinner_prefix = ""
 
-# Nome da animação do spinner.
-# Valores: "dot", "line", "jump", "pulse", "points", "meter", "hamburger",
-#          "ellipsis", "globe", "moon", "monkey", "arc", "nerd", "nerdarc", "minidot"
+# Animated spinner style:
+# Values: "dot", "line", "jump", "pulse", "points", "meter", "hamburger",
+#         "ellipsis", "globe", "moon", "monkey", "arc", "nerd", "nerdarc", "minidot"
 # Default: "dot"
 spinner = "dot"
 
-# Exibe o spinner inline no texto.
-# Valores: true, false | Default: false
+# Inlines the spinner inside text rather than placing it in the prefix column.
+# Values: true, false | Default: false
 spinner_inline = false
 
-# Volta ao início da lista ao rolar além do último item (e vice-versa).
-# Valores: true, false | Default: false
-scroll_wrap = false
-
-# Número de linhas mantidas visíveis acima/abaixo do cursor ao rolar.
-# Valores: inteiros >= 0 | Default: 2
-scroll_padding = 2
-
-# Inverte a ordem de exibição da lista (itens de baixo para cima).
-# Valores: true, false, None | Default: None
-# reverse = false
-
-# Quebra linhas longas de resultados em múltiplas linhas.
-# Valores: true, false | Default: false
+# Wraps long result text onto multiple lines.
+# Values: true, false | Default: false
 wrap = false
 
-# Largura mínima de cada coluna.
-# Valores: inteiros >= 1 | Default: 2
+# Minimum width in characters for each column.
+# Values: integers >= 1 | Default: 2
 min_width = 2
 
-# Espaçamento em caracteres entre as colunas.
-# Valores: inteiros >= 0 | Default: 1
+# Character spacing between columns.
+# Values: integers >= 0 | Default: 1
 column_spacing = 1
 
-# Alinha a última coluna à direita da janela.
-# Valores: true, false | Default: false
+# Right-aligns the final column to the edge of the window.
+# Values: true, false | Default: false
 right_align_last = false
 
-# Empilha colunas verticalmente em vez de lado a lado.
-# Valores: true, false | Default: false
+# Stacks columns vertically rather than side-by-side.
+# Values: true, false | Default: false
 stacked_columns = false
 
-# Separador horizontal entre as linhas.
-# Valores: "None", "Empty", "Light", "Normal", "Heavy", "Dashed" | Default: "None"
-separator = "None"
+# Horizontal row connection style for the selection highlight across columns:
+# - "Full": Selection highlight covers the entire row uniformly.
+# - "Capped": Inactive style across row, active style on active column.
+# - "Disjoint": Styles applied independently per column.
+# Values: "Full", "Capped", "Disjoint" | Default: "Capped"
+row_connection = "Full"
 
+# Prepend file-type Nerd Font icons before filenames.
+# Requires a Nerd Font installed in your terminal.
+# Values: true, false | Default: false
+icons = true
 
-# Como o estilo da linha selecionada se conecta pelas colunas:
-# - "Disjoint": Estilos aplicados por coluna individual.
-# - "Capped": Estilo inativo na linha toda, estilo ativo na coluna ativa.
-# - "Full": Estilo de seleção cobre a linha inteira uniformemente.
-# Valores: "Disjoint", "Capped", "Full" | Default: "Capped"
-row_connection = "Capped"
+# When true, the icon on the cursor row inherits the cursor text color (Yazi-style).
+# Values: true, false | Default: false
+uncolor_current_icon = true
 
-# Exibe ícones de tipo de arquivo Nerd Font antes do nome do arquivo.
-# Requer Nerd Font instalada no terminal.
-# Valores: true, false | Default: false
-icons = false
-
-# Remove a cor individual do ícone na linha selecionada para harmonizar com a seleção.
-# Valores: true, false | Default: false
-uncolor_current_icon = false
-
-# Inverte a cor do ícone na linha selecionada (ex: azul <-> amarelo).
-# Valores: true, false | Default: false
+# When true, inverts the icon color on the cursor row (Blue<->Yellow, Red<->Cyan).
+# Values: true, false | Default: false
 invert_current_icon = false
 
+# Border thickness / glyph style for the navigation bar on the cursor row:
+# Values: "Plain" (│), "Thick" (█), "Double" (║), "Rounded" (│),
+#         "QuadrantOutside" (▌), "QuadrantInside" (▐), "None"
+# Default: None (inherits ui.nav.bar)
+current_nav_bar = "Plain"
 
-# Estilo do texto padrão dos itens.
-[results.style]
-# fg = "White"
+# Style for the navigation bar glyph cell on the cursor row.
+[results.current_nav_bar_style]
+fg = "white"
+# bg = "Darkgray"
+# modifier = "BOLD"
 
-# Estilo dos caracteres que deram match com a busca.
-[results.match_style]
-fg = "Green"
-modifier = "ITALIC"
-
-# Estilo da linha atualmente selecionada/focada.
+# Highlight styling for the cursor row.
 [results.current_style]
-bg = "Black"
+fg = "black"
+bg = "Darkgray"
 modifier = "BOLD"
 
-# Estilo de colunas inativas.
-[results.inactive_style]
-# fg = "DarkGray"
+# Styling for characters matching the search query.
+[results.match_style]
+fg = "green"
+modifier = "ITALIC"
 
-# Estilo do marcador de prefixo ativo.
-[results.prefix_style]
-# fg = "Cyan"
+# Default styling for items.
+[results.style]
+# fg = "white"
 
-# Estilo para itens marcados com multi-select.
+# Styling for multi-selected rows.
 [results.selected_style]
 modifier = "BOLD"
 
-# Estilo do prefixo de itens multi-selecionados.
+# Styling for the prefix marker of multi-selected rows.
 [results.selected_prefix_style]
-fg = "Cyan"
+fg = "cyan"
 modifier = "BOLD"
 
-# Estilo do prefixo de itens copiados (yank) no modo FM.
+# Styling for the prefix marker of yanked rows (FM mode).
 [results.yank_prefix_style]
-fg = "Yellow"
+fg = "yellow"
 modifier = "BOLD"
 
-# Estilo do prefixo de itens recortados (cut) no modo FM.
+# Styling for the prefix marker of cut rows (FM mode).
 [results.cut_prefix_style]
-fg = "Red"
+fg = "red"
 modifier = "BOLD"
 
-# Exibe o destino de links simbólicos ("-> /caminho/destino").
+# Symlink destination display ("-> /path/target").
 [results.symlink]
-active = false
+# Appends symlink targets to item text.
+# Values: true, false | Default: false
+active = true
+# Symlink text styling.
+style.fg = "cyan"
 
-[results.symlink.style]
-fg = "DarkGray"
-
-# Separador horizontal entre as 3 camadas ordenadas (diretórios diretos, arquivos diretos, itens profundos).
+# 3-Tiered sort separator line (separates direct dirs, direct files, deep items when dir_first = true).
 [results.tier]
-separator = "Top"
+# Separator style: "Top" (▔), "Underline" ( ), "Bottom" ( ), "Light" (─), "Heavy" (━), "Dashed" (╌), "None"
+separator = "Underline"
+# Style for the tier separator line.
+style.fg = "#555555"
 
-[results.tier.style]
-fg = "DarkGray"
+# Pinned / bookmarked item icon and styling.
+[results.bookmark]
+folder_icon = "󰮟"
+file_icon = "󱀻"
+icon_style.fg = "#f9e2af"
 
-# Configuração de rolagem horizontal automática (autoscroll).
+# Frecency-scored item icon and styling.
+[results.frecency]
+folder_icon = "󰪻"
+folder_icon_style.fg = "#8999f1"
+icon = "󱋢"
+icon_style.fg = "#8999f1"
+
+# Horizontal autoscroll configuration (keeps matches visible on long lines).
 [results.autoscroll]
-# Habilita rolagem horizontal automática para manter o match visível | Default: true
+# Enables horizontal autoscroll.
+# Values: true, false | Default: true
 enabled = true
-# Número de caracteres no início da linha sempre preservados visíveis | Default: 0
+# Number of leading characters preserved on the left.
+# Values: integers >= 0 | Default: 0
 initial_preserved = 0
-# Caracteres de contexto exibidos ao redor do termo encontrado | Default: 4
+# Number of context characters shown around the match.
+# Values: integers >= 0 | Default: 4
 context = 4
-# Rola automaticamente até o final da linha | Default: false
+# Autoscrolls all the way to the end of the line.
+# Values: true, false | Default: false
 end = false
-# Indicador visual de texto cortado | Default: ".."
-indicator = ".."
-[results.autoscroll.indicator_style]
-fg = "DarkGray"
+# Indicator symbol displayed when text is truncated / scrolled.
+# Values: string (e.g. "..", "") | Default: ".."
+indicator = ""
+# Indicator styling.
+indicator_style.fg = "blue"
 
 [results.border]
-type = "None"
+# type = "Rounded"
 
 
 # ==============================================================================
-# 5. LINHA DE STATUS ([status])
+# 5. STATUS LINE ([status])
 # ==============================================================================
 [status]
-# Exibe a linha de status.
-# Valores: true, false | Default: true
+# Controls visibility of the status bar.
+# Values: true, false | Default: true
 show = true
 
-# Alinha a indentação do status com a tabela de resultados.
-# Valores: true, false | Default: true
+# Indents the status bar to align with results columns.
+# Values: true, false | Default: true
 match_indent = true
 
-# Template customizado da linha de status.
-# Placeholders suportados:
-#   \r -> índice do cursor atual
-#   \m -> total de matches filtrados
-#   \t -> total de itens carregados
-#   \c -> coluna atual
-#   \s -> espaço em branco disponível
-#   \S -> incrementa o denominador de contagem
-# Valores: string (ex: " \m/\t (\r)") | Default: "" (automático)
+# Custom status template format string.
+# Available placeholders:
+#   \r -> current cursor index (1-based)
+#   \m -> total matched items count
+#   \t -> total items loaded
+#   \s -> available whitespace
+#   \S -> increment counter appearance
+# Values: string (e.g. " \m/\t") | Default: "" (automatic)
 template = ""
 
-# Estilo do texto de status.
+# Status text styling.
 [status.style]
-fg = "Green"
+fg = "green"
 modifier = "ITALIC"
 
 
 # ==============================================================================
-# 6. PAINEL DE PREVIEW ([preview])
+# 6. PREVIEW PANEL ([preview])
 # ==============================================================================
 [preview]
-# Exibe o painel de preview.
-# Valores: true, false, ou número (largura mínima da tela para exibir) | Default: false
+# Controls visibility of the preview pane.
+# Can be a boolean or a minimum terminal column threshold number.
+# Values: true, false, integers >= 0 | Default: true
 show = true
 
-# Quebra de linha automática no preview de texto.
-# Valores: true, false | Default: false
-wrap = false
+# Automatically wraps long lines in text preview.
+# Values: true, false | Default: false
+wrap = true
 
-# Volta ao topo ao rolar além do final do preview (e vice-versa).
-# Valores: true, false | Default: false
-scroll_wrap = false
+# Wraps scroll to top when reaching bottom of preview and vice versa.
+# Values: true, false | Default: false
+scroll_wrap = true
 
+# Displays a vertical scrollbar in the preview pane.
+# Values: true, false | Default: false
+scrollbar = true
+
+# Enables native markdown rendering with embedded Mermaid diagrams.
+# Values: true, false | Default: true
+markdown = true
+
+# Native terminal image/media preview configuration (Kitty, Sixel, iTerm2).
 [preview.media]
-# Habilita visualização nativa de imagens, PDFs e vídeos via hardware/Kitty graphics.
-# Valores: true, false | Default: false
+# Enables hardware-accelerated media preview.
+# Values: true, false | Default: false
 active = true
 
-# Força protocolo gráfico específico para imagens.
-# Valores: "kitty", "sixel", "halfblocks", "iterm2", None (auto-detectar) | Default: None
+# Overrides terminal graphics protocol:
+# Values: "kitty", "sixel", "halfblocks", "iterm2", or None (auto-detect) | Default: None
 # protocol = "kitty"
 
-# Resolução em pixels para geração de thumbnails de mídia/vídeo/PDF.
-# Valores: inteiros (px) (ex: 512, 800, 1200, 1600) | Default: 512
-size = 1200
+# Pixel resolution for media downscaling (0 = native resolution / no downscale).
+# Values: integers >= 0 (e.g. 512, 800, 1280, 1920; 0 = original) | Default: 1280
+size = 0
 
-# Nível de zoom inicial para imagens e PDFs.
-# Valores: ponto flutuante (ex: 1.0, 1.2, 1.5) | Default: 1.0
-zoom = 1.0
-
-# Modo de ajuste/enquadramento de imagem/PDF no painel:
-# - "fit": Redimensiona mantendo a proporção inteira sem cortar nada.
-# - "crop": Preenche a área toda ampliando a imagem/PDF e cortando excessos.
-# - "scale": Estica para preencher a área exata.
-# Valores: "fit", "crop", "scale" | Default: "crop"
+# Image scaling and aspect ratio fit mode:
+# - "fit": Scales image to fit completely inside preview pane preserving aspect ratio.
+# - "crop": Fills entire preview area by cropping excess edges.
+# - "scale": Stretches image to exact dimensions.
+# Values: "fit", "crop", "scale" | Default: "crop"
 fit = "fit"
 
-# Largura da área de arrasto com o mouse para redimensionar o preview (0 = desativa).
-# Valores: inteiros >= 0, None (usa largura da borda) | Default: None
-# drag_width = 1
+# Initial zoom level multiplier for images.
+# Values: float (e.g. 1.0, 1.5) | Default: 1.0
+zoom = 1.0
 
-# Exibe a barra de rolagem (scrollbar) no painel de preview.
-# Valores: true, false | Default: false
-# scrollbar = true
+# Embedded Mermaid diagram rendering inside markdown files.
+[preview.diagrams]
+# Enables embedded diagram rendering.
+# Values: true, false | Default: true
+active = true
 
-# Borda do painel de preview.
+# Renders diagrams inline using Kitty Unicode Placeholders.
+# Values: true, false | Default: true
+inline = true
+
+# Diagram color theme: "auto" (detects terminal theme), "dark", "light".
+# Values: "auto", "dark", "light" | Default: "auto"
+theme = "auto"
+
+# Diagram background mode: "transparent" (matches terminal background) or "solid".
+# Values: "transparent", "solid" | Default: "transparent"
+background = "transparent"
+
+# Border configuration for the preview panel.
 [preview.border]
-type = "Rounded"
-color = "Cyan"
-padding = 0
+# Border sides: "ALL", "LEFT", "RIGHT", "TOP", "BOTTOM", or combinations like "TOP | BOTTOM".
+# Values: string | Default: "LEFT"
+sides = "LEFT"
+# Border line color.
+color = "Darkgray"
+# Title foreground color (dynamic current item name in preview border).
+title_fg = "Cyan"
 
-# Posição inicial da rolagem no preview.
-[preview.initial]
-# offset = -1
-# percentage = 0
-# header_lines = 0
-# tail = false
-
-# Lista de layouts e posições do preview (cicláveis com SwitchPreview / ctrl-p).
+# Draggable preview panel layouts (cycle with SwitchPreview / Ctrl+P).
 [[preview.layout]]
-# Posição do preview na tela: "right", "left", "top", "bottom" | Default: "right"
+# Panel placement side: "right", "left", "top", "bottom".
 side = "right"
-# Porcentagem da tela ocupada pelo preview: 1 a 100 | Default: 50
-percentage = 80
-# Restrições de tamanho mínimo e máximo em colunas/linhas | Default: 0 (sem limite)
+# Size of the preview panel in % of available space (Golden Ratio 60/40).
+percentage = 60
+# Minimum columns/rows for the preview panel.
 min = 20
+# Maximum columns/rows for the preview panel (0 = unlimited).
 max = 0
+# Draggable gap width between list and preview in cells.
+gap = 1
 
-# Comando executado para gerar o preview de itens (quando não for imagem/mídia).
-# Se vazio (""), usa o leitor nativo em Rust do Matchmaker.
-# Placeholders: {1} item atual, {} linha completa, {+} todos selecionados.
+# Optional command executed to generate preview content.
+# Empty string ("") activates Waymaker's high-performance native Rust reader.
+# Placeholders: {1} first column/path, {} full line, {+} all selected items.
 command = ""
 
 
 # ==============================================================================
-# 7. EXECUTOR DE PREVIEW ([previewer])
+# 7. PREVIEW ENGINE / RUNNER ([previewer])
 # ==============================================================================
 [previewer]
-# Delay em milissegundos para disparar o preview ao mover o cursor (debounce).
-# Valores: inteiros (ms) (ex: 0, 15, 25, 50) | Default: 0
-debounce_ms = 25
+# Delay in milliseconds before triggering preview after cursor movement (debounce).
+# Prevents spawning processes during rapid arrow key scrolling.
+# Values: integers >= 0 (ms) | Default: 25
+debounce_ms = 200
 
-# Evita tela preta limpando o preview anterior somente quando o novo carregar.
-# Valores: true, false | Default: true
-delay_clear = false
+# Retains previous preview content until the new preview is fully loaded (zero flicker).
+# Values: true, false | Default: true
+delay_clear = true
 
-# Número máximo de processos de preview paralelos concorrentes.
-# Valores: inteiros >= 1 | Default: 4
+# Maximum number of concurrent preview child processes.
+# Values: integers >= 1 | Default: 4
 max_procs = 4
 
-# Se false, não reexecuta o preview se o comando for idêntico ao anterior.
-# Valores: true, false | Default: true
+# When true, always re-triggers preview command even if arguments match previous item.
+# Values: true, false | Default: true
 always_trigger = true
 
-# Permite conversão UTF-8 com perda de caracteres em saídas binárias de preview.
-# Valores: true, false | Default: false
+# Enables lossy UTF-8 conversion for preview outputs containing binary data.
+# Values: true, false | Default: false
 try_lossy = false
 
-# Remove espaços em branco do início/fim dos comandos de preview.
-# Valores: true, false | Default: false
+# Strips whitespace from preview commands.
+# Values: true, false | Default: false
 trim_commands = false
 
-# Oculta ajuda semântica no painel de preview.
-# Valores: true, false | Default: true
+# Hides semantic action key help in preview window.
+# Values: true, false | Default: true
 hide_semantic_help = true
 
 
 # ==============================================================================
-# 8. CABEÇALHO, RODAPÉ E BREADCRUMB
+# 8. HEADER, FOOTER & BREADCRUMB
 # ==============================================================================
-# Cabeçalho estático no topo da lista ([header])
+# Static or dynamic header displayed at the top of the list ([header])
 [header]
-# content = "Pressione Ctrl-F para alternar fontes"
-# header_lines = 0  # Número de linhas lidas da entrada stdin para o cabeçalho
+# content = "Press Tab to cycle sources"
 match_indent = true
 wrap = false
+# header_lines = 0
 
 [header.style]
 fg = "Cyan"
 
-# Rodapé estático na base da lista ([footer])
+# Static or dynamic footer displayed at the bottom of the list ([footer])
 [footer]
-# content = "Matchmaker v0.0.42"
-match_indent = true
+# content = "  h/l: Nav  •  Tab: Cycle  •  Enter: Select"
+match_indent = false
 wrap = false
+# Horizontal divider line drawn above footer: "light", "heavy", "dashed", "top", "bottom", "none"
+separator = "light"
+style.fg = "gray"
+style.modifier = "DIM"
 
-[footer.style]
-fg = "DarkGray"
-
-# Breadcrumb exibindo o caminho da pasta atual no topo ([breadcrumb])
+# Directory path breadcrumb displayed at the top ([breadcrumb])
 [breadcrumb]
-# Habilita o breadcrumb | Default: false
+# Shows the current directory breadcrumb.
+# Values: true, false | Default: false
 show = true
-# Caractere separador de pastas | Default: "  " (ou "/")
+
+# Directory separator symbol (e.g. "/", "  ", " > ").
 separator = "/"
-# Trunca nomes longos de pastas intermediárias (0 = não trunca) | Default: 0
+
+# Maximum character length for intermediate folder names (0 = no truncation).
 truncate_length = 0
-# Exibe apenas a pasta atual em vez do caminho completo | Default: false
+
+# Shows only the current folder name instead of full path.
 current_folder_only = false
 
+# Breadcrumb path text styling.
 [breadcrumb.style]
 fg = "Cyan"
 modifier = "BOLD"
 
+# Breadcrumb separator symbol styling.
 [breadcrumb.separator_style]
-fg = "DarkGray"
+fg = "Cyan"
 
 
 # ==============================================================================
-# 9. MOTOR DE BUSCA, ORDENAÇÃO E FRECÊNCIA ([matcher])
+# 9. MATCHER, SORTING & FRECENCY ([matcher])
 # ==============================================================================
 [matcher]
-# Normalização de caracteres com acentos (ex: 'e' dá match em 'é').
-# Valores: true, false | Default: true
-normalize = true
+# Fuzzy matching engine:
+# - "frizbee": Ultra-low latency, SIMD-accelerated, optimized for fast typing.
+# - "nucleo": Comprehensive fuzzy matching engine.
+# Values: "frizbee", "nucleo" | Default: "nucleo"
+engine = "frizbee"
 
-# Busca insensível a maiúsculas/minúsculas.
-# Valores: true, false | Default: true
-ignore_case = true
+# Score penalty subtracted per directory slash ('/' or '\').
+# Values: integers >= 0 | Default: 0
+depth_penalty = 15
 
-# Prioriza matches que começam com o prefixo digitado.
-# Valores: true, false | Default: false
-prefer_prefix = false
+# Tolerates typos and transpositions in queries >= 3 characters.
+# Values: true, false | Default: false
+typo_tolerance = true
 
-# Otimização especializada para caminhos de arquivo.
-# Valores: true, false | Default: false
-match_paths = false
+# Prioritizes direct subdirectories at the top of the list before regular files.
+# Values: true, false | Default: false
+dir_first = true
 
-# Bônus percentual de pontuação para itens dentro do diretório atual (CWD).
-# Valores: inteiros (%) (ex: 30 = +30%, 0 = desativado) | Default: 30
-location_bias = 30
-
-# Penalidade de pontos por nível de profundidade de pasta ('/' ou '\').
-# Ajuda a priorizar arquivos na raiz da pasta em vez de subpastas profundas.
-# Valores: inteiros >= 0 (ex: 15) | Default: 0
-depth_penalty = 0
-
-# Tolerância a erros de digitação (typos) para buscas com >= 3 caracteres.
-# Valores: true, false | Default: false
-typo_tolerance = false
-
-# Prioriza subpastas diretas no topo da lista antes de arquivos normais.
-# Valores: true, false | Default: false
-dir_first = false
-
+# Sorter settings.
 [matcher.sort]
-# Ordenação dos resultados:
-# - "smart" / "auto": Mantém ordem natural quando a busca está vazia e ordena por relevância ao digitar.
-# - true / 0: Sempre ordena por pontuação.
-# - false: Nunca ordena (mantém ordem de inserção da stream).
-# Valores: "smart", "auto", true, false, inteiros >= 0 | Default: "smart"
+# Result sorting strategy:
+# - "smart": Preserves natural stream order on empty query; sorts by relevance when typing.
+# - "score": Always sorts by match score.
+# - "alphabetical": Sorts alphabetically.
+# - "frecency": Sorts by frecency score.
+# - "none": Never sorts (preserves insertion order).
+# Values: "smart", "score", "alphabetical", "frecency", "none" | Default: "smart"
 threshold = "smart"
 
-# Limite máximo de itens recalculados para ordenação de frecência/depth (0 = sem limite).
-# Valores: inteiros >= 0 | Default: 1000
-cap = 1000
+# Maximum number of top matched items to re-sort by frecency / depth penalty (0 = unlimited).
+# Values: integers >= 0 | Default: 1000
+cap = 2000
 
+# Frecency scoring settings (Frequency + Recency).
 [matcher.frecency]
-# Habilita pontuação baseada em Frecência (frequência + recência de acesso).
-# Valores: true, false | Default: false
+# Enables frecency score boosting for matched items.
+# Values: true, false | Default: false
 active = true
 
-# Multiplicador de pontos extras para frecência.
-# Valores: inteiros >= 1 | Default: 1
-weight = 1
+# Multiplier weight for frecency bonus score.
+# Values: integers >= 1 | Default: 1
+weight = 2
 
-# Meia-vida em dias para decaimento exponencial contínuo da frecência (0 = legado).
-# Valores: inteiros (dias) | Default: 7
+# Half-life in days for continuous exponential frecency decay.
+# Values: integers >= 1 (0 = discrete legacy buckets) | Default: 7
 half_life_days = 7
 
 
 # ==============================================================================
-# 10. ENTRADA E COMANDOS DE INICIALIZAÇÃO ([start])
+# 10. STARTUP, STREAMING & DIRECTORY WALKER ([start], [walker])
 # ==============================================================================
 [start]
-# Separador de itens de entrada.
-# Valores: "\n", "\0", "\\0", etc. | Default: "\n"
+# Item delimiter for input stream.
+# Values: "\n", "\0", "\\0" | Default: "\n"
 input_separator = "\n"
 
-# Separador de itens na saída final.
-# Valores: "\n", " ", etc. | Default: "\n"
+# Delimiter used when writing accepted items to stdout.
+# Values: "\n", " ", "\0" | Default: "\n"
 output_separator = "\n"
 
-# Template de formatação para os itens impressos ao aceitar (Enter).
-# Valores: "{}" (linha toda), "{1}" (coluna 1), etc. | Default: None
-# output_template = "{1}"
+# Output format template for accepted items.
+# Values: "{}" (full line), "{1}" (first column), "{=}" (resolved path) | Default: None
+# output_template = "{}"
 
-# Aguarda o comando terminar antes de abrir o TUI.
-# Valores: true, false | Default: false
+# Working directory on startup. Supports environment variables and tilde.
+# directory = "~/dev"
+
+# Waits for startup command to complete before displaying the TUI.
+# Values: true, false | Default: false
 sync = false
 
-# Processa e renderiza códigos de cores ANSI da entrada.
-# Valores: true, false | Default: false
+# Parses ANSI color escape sequences from input lines.
+# Values: true, false | Default: false
 ansi = false
 
-# Remove espaços em branco do início e fim das linhas de entrada.
-# Valores: true, false | Default: false
+# Trims whitespace from input lines.
+# Values: true, false | Default: false
 trim = false
 
-# Configuração de comandos de inicialização.
-[start.command]
-command = ""
-
-# Lista de comandos alternativos cicláveis via ReloadNext (ex: ctrl-f).
-additional = [
-    "",
-    "wm list --dirs 2>/dev/null"
-]
-
-# Intervalo em milissegundos para recarregar periodicamente a lista.
-# Valores: inteiros (ms), None | Default: None
+# Periodic reload interval in milliseconds (None = disabled).
 # reload_interval = 5000
 
+# Startup command and cyclable data sources.
+[start.command]
+# Primary command executed on startup. Empty string ("") uses the native directory walker.
+command = ""
+
+# Cyclable alternative data sources via @reloadnext (Tab / Ctrl+F):
+# Index 0: "" -> Native AsyncWalker for local directory and files.
+# Index 1: Global frecency history via `wm list --dirs`.
+# Index 2: Pinned bookmarks via `wm list --bookmarks`.
+additional = [
+    "",
+    "wm list --dirs 2>/dev/null",
+    "wm list --bookmarks 2>/dev/null"
+]
+
+# Native directory walker configuration ([walker]).
+[walker]
+# Directory and file names ignored during traversal.
+ignore = [
+    ".git",
+    "node_modules",
+    "target",
+    ".cache",
+    ".rustup",
+    ".cargo"
+]
+
+# Additional directories to ignore on top of default ignore list.
+extra_ignore = [
+    ".venv",
+    "dist",
+    "build"
+]
+
+# Traverses hidden files and directories (except ignored names).
+# Values: true, false | Default: true
+hidden = true
+
+# Honors .gitignore rules.
+# Values: true, false | Default: true
+git_ignore = true
+
+# Honors .git/info/exclude rules.
+# Values: true, false | Default: true
+git_exclude = true
+
+# Honors global ~/.gitignore rules.
+# Values: true, false | Default: true
+git_global = true
+
+# Maximum directory traversal depth (None = unlimited).
+# Values: integers >= 1, or None | Default: None
+# max_depth = 5
+
 
 # ==============================================================================
-# 11. COLUNAS ([columns])
+# 11. COLUMNS PARSING ([columns])
 # ==============================================================================
 [columns]
-# Estratégia para dividir linhas de entrada em colunas.
-# Exemplos:
-#   split = "\\s+"               (divide por espaços)
-#   split = "(\\d+)\\s+(.*)"     (grupos de captura regex)
-#   split = ["re1", "re2"]       (múltiplas regexes)
-# Valores: "None", regex string, array de regexes | Default: "None"
+# Strategy used to parse input lines into columns:
+# - "None": Line is treated as a single column.
+# - Regex string (e.g. "\\s+" splits by whitespace).
+# - Array of regex strings for multi-pass splitting.
+# Values: "None", regex string, array of regex strings | Default: "None"
 # split = "\\s+"
 
-# Número máximo de colunas geradas automaticamente (1 a 16).
-# Valores: 1 a 16 | Default: 6
+# Maximum number of auto-generated columns (1 to 16).
+# Values: 1 to 16 | Default: 6
 max_columns = 6
 
-# Começa a numeração de colunas automáticas em 0 em vez de 1.
-# Valores: true, false | Default: false
+# When auto-generating column names, starts indexing at 0 instead of 1.
+# Values: true, false | Default: false
 names_from_zero = false
 
-# Nome da coluna padrão usada para busca e preview.
-# default = "nome_da_coluna"
+# Default column used for matching and preview.
+# default = "1"
 
 
 # ==============================================================================
-# 12. CONDIÇÕES DE SAÍDA ([exit])
+# 12. EXIT CONDITIONS ([exit])
 # ==============================================================================
 [exit]
-# Sai automaticamente selecionando o item se houver apenas 1 resultado correspondente.
-# Valores: true, false | Default: false
+# Automatically selects the item and exits if there is only one match.
+# Values: true, false | Default: false
 select_1 = false
 
-# Permite sair pressionando Enter sem nenhum item selecionado (retorna vazio).
-# Valores: true, false | Default: false
+# Allows returning without any item selected when Enter is pressed on empty list.
+# Values: true, false | Default: false
 allow_empty = false
 
-# Aborta e fecha se a entrada não tiver nenhum item.
-# Valores: true, false | Default: true
+# Aborts and exits immediately if the input stream contains zero items.
+# Values: true, false | Default: true
 abort_empty = true
 
-# Caminho de arquivo onde a última tecla pressionada será gravada ao sair.
-# last_key_path = "/tmp/mm_last_key"
+# File path where the last pressed key is recorded upon exit.
+# last_key_path = "/tmp/wm_last_key"
 
 
 # ==============================================================================
-# 13. VARIÁVEIS DE AMBIENTE ([envs])
+# 13. ENVIRONMENT VARIABLES ([envs])
 # ==============================================================================
 [envs]
-# Utilitário de clipboard para cópia quando osc52 = false (ex: "xclip -selection clipboard", "wl-copy")
-# CLIPcmd = ""
-# Utilitário de colagem (ex: "xclip -o", "wl-paste")
-# PASTEcmd = ""
-# Paginador de texto (ex: "less", "bat")
-# PAGER = ""
-# Editor de texto (ex: "nvim", "hx", "vim", "nano")
-# EDITOR = ""
+# Custom clipboard copy command when osc52 = false (e.g. "wl-copy", "xclip -selection clipboard").
+# CLIPcmd = "wl-copy"
+
+# Custom clipboard paste command (e.g. "wl-paste", "xclip -o").
+# PASTEcmd = "wl-paste"
+
+# Pager executable.
+# PAGER = "bat"
+
+# Editor executable.
+# EDITOR = "nvim"
 
 
 # ==============================================================================
-# 14. REGRAS CONDICIONAIS POR PASTA ([[rule]] / [[rules]])
+# 14. CONDITIONAL FOLDER & PATH RULES ([[folder_rules]], [[rule]])
 # ==============================================================================
-# Permite aplicar configurações ou presets automaticamente dependendo da pasta atual.
+# Folder-specific sort rules automatically applied on startup and directory navigation.
+[[folder_rules]]
+path = "~/Downloads"
+sort = "ModifiedReverse"
+
+[[folder_rules]]
+path = "*/Downloads"
+sort = "ModifiedReverse"
+
+[[folder_rules]]
+path = "*/screenshots"
+sort = "CreatedReverse"
+
+[[folder_rules]]
+path = "*/Screenshots"
+sort = "CreatedReverse"
+
+# Conditional path rules to apply presets or config overrides based on active directory.
 [[rule]]
-paths = ["~/Downloads", "~/downloads"]
-preset = "downloads"
+path = ["$HOME", "~"]
+preset = "jump"
 
 # [[rule]]
-# path = "~/projects/*"
-# [rule.preview]
-# show = true
+# path = "~/dev/**"
+# matcher.sort.threshold = "smart"
+# matcher.frecency.active = true
 
 
 # ==============================================================================
-# 15. ATALHOS DE TECLADO ([binds])
+# 15. KEYBINDINGS & MACROS ([binds])
 # ==============================================================================
-# Sintaxe: "tecla" = "Ação" ou "tecla" = ["Ação1", "Ação2", ...]
-# Suporta macros com @nome e execução de comandos via Execute(...) ou Become(...)
+# Syntax: "key" = "Action" or "key" = ["Action1", "Action2", ...]
+# Available actions:
+#   Quit(code)                 - Exit with return code (e.g. Quit(130))
+#   Accept                     - Accept current selection and print to output
+#   Toggle                     - Toggle multi-selection on current item
+#   Up(n) / Down(n)            - Move cursor up/down by n rows
+#   Pos(n)                     - Jump to position (0 = top, -1 = bottom)
+#   PreviewUp(n) / Down(n)     - Scroll preview pane up/down by n lines
+#   PreviewHalfPageUp / Down   - Scroll preview pane by half page
+#   VScroll(n)                 - Scroll results view by n lines
+#   SwitchPreview              - Cycle through configured preview layouts
+#   CyclePreview               - Toggle preview panel visibility
+#   ExpandPreview(n)           - Expand preview panel size by n percentage
+#   ShrinkPreview(n)           - Shrink preview panel size by n percentage
+#   ToggleFocus                - Switch focus between filter input and picker list
+#   FocusFilter                - Focus query search input bar
+#   FocusNav                   - Focus results list (NavBar)
+#   ToggleParentPeek           - Toggle 3-pane parent directory peek pane
+#   SortMenu                   - Open interactive sorting menu in footer
+#   ChDir(path)                - Change working directory ({=} current item, .. parent)
+#   Reload(cmd)                - Reload item stream with command
+#   ReloadNext(idx)            - Switch to data source at index
+#   Cancel                     - Clear query or cancel current selection
+#   Execute(cmd)               - Run external shell command in foreground
+#   ExecuteSilent(cmd)         - Run external shell command silently in background
+#   Become(cmd)                - Replace Waymaker process with command
+#
+# Available semantic macros:
+#   @reloadnext                - Cycle forward through data sources
+#   @reloadprev                - Cycle backward through data sources
+#   @dirs                      - Switch to global directory frecency list
+#   @bookmarks                 - Switch to pinned bookmarks list
+#   @bookmark                  - Toggle bookmark status on focused item
+#   @yank                      - Copy item path to clipboard buffer (FM mode)
+#   @cut                       - Cut item path to clipboard buffer (FM mode)
+#   @paste                     - Paste items into current directory
+#   @paste_into                - Paste items directly into highlighted directory
+#   @undo                      - Undo last file-manager mutation
+#   @redo                      - Redo last undone file-manager mutation
+#
 [binds]
-# Essenciais e Saída
-"ctrl-c" = "Quit"
-"esc" = "Quit"
-"enter" = "Accept"
-"ctrl-enter" = "Accept"
-"ctrl-a" = "CycleAll"
-"tab" = ["Toggle", "Down"]
-"shift-backtab" = ["Toggle", "Up"]
-
-# Edição da Busca
-"right" = "ForwardChar"
-"left" = "BackwardChar"
-"ctrl-right" = "ForwardWord"
-"ctrl-left" = "BackwardWord"
-"backspace" = "DeleteChar"
-"ctrl-h" = "DeleteWord"
-"ctrl-u" = "Cancel"
-"alt-a" = "QueryPos(0)"
-
-# Navegação
-"up" = "Up"
-"ctrl-k" = "Up"
-"down" = "Down"
-"ctrl-j" = "Down"
-"pagedown" = "HalfPageDown"
-"pageup" = "HalfPageUp"
-"alt-1" = "Pos(0)"
-"alt-0" = "Pos(-1)"
-
-# Controle do Preview
-"shift-up" = "PreviewHalfPageUp"
-"shift-down" = "PreviewHalfPageDown"
-"ctrl-shift-up" = "VScroll(1)"
-"ctrl-shift-down" = "VScroll(-1)"
-"ctrl-p" = "SwitchPreview"
-"ctrl-/" = "CyclePreview"
-"alt-=" = "ExpandPreview(2)"
-"alt-hyphen" = "ShrinkPreview(2)"
-
-# Fontes e Recarregamento
-"ctrl-f" = "ReloadNext"
-"ctrl-r" = "Reload"
-
-# Ajuda
-"?" = "Help"
-"F1" = "Help"
+"tab"           = "@reloadnext"
+"shift-backtab" = "@reloadprev"
+"backtab"       = "@reloadprev"
+"ctrl-f"        = "@dirs"
+"ctrl-b"        = "@bookmarks"
+"*"             = "@bookmark"
+"esc"           = "ToggleFocus"
+"ctrl-j"        = "Down"
+"ctrl-k"        = "Up"
+"alt-j"         = "Down"
+"alt-k"         = "Up"
+"ctrl-shift-j"  = "PreviewDown(5)"
+"ctrl-shift-k"  = "PreviewUp(5)"
+"ctrl-shift-J"  = "PreviewDown(5)"
+"ctrl-shift-K"  = "PreviewUp(5)"
+"ctrl-l"        = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"ctrl-right"    = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"alt-l"         = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
+"ctrl-h"        = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-left"     = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"alt-h"         = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
+"ctrl-u"        = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"ctrl-e"        = "Execute(nvim {+})"
+"ctrl-p"        = "SwitchPreview"
+"ctrl-v"        = "@paste_into"

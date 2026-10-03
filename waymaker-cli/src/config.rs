@@ -266,6 +266,19 @@ mod tests {
     }
 
     #[test]
+    fn test_reference_config_deserialization() {
+        let toml_str = include_str!("../assets/reference.config.toml");
+        let res: Result<PartialConfig, _> = toml::from_str(toml_str);
+        if let Err(e) = &res {
+            eprintln!(
+                "=== TOML ERROR ON REFERENCE CONFIG ===\n{}\n================",
+                e
+            );
+            panic!("Error parsing reference.config.toml: {e}");
+        }
+    }
+
+    #[test]
     fn test_worker_and_matcher_table_equivalence() {
         use waymaker_partial::Apply;
 
