@@ -10,3 +10,4 @@ emojis.json
 UnicodeData.txt
 # APM dependencies
 apm_modules/
+/tapes/

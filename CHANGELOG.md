@@ -1,5 +1,32 @@
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-03
+
+### 🚀 Features
+
+- Add dynamic `inactive_group_header_style` for muted group header styling
+- Support cyclic `Tab` / `Shift+Tab` multi-source reloading in session-picker
+- Curate generic production presets and add `_smart_tab` shell integration
+- Add `zsh-vi-mode` vicmd mode hooks to shell integration
+- Mount local build in Docker and add `test-docker-interactive` recipe
+
+### 🐛 Bug Fixes
+
+- Remove extraneous leading space in inline spinner replacement
+- Properly initialize bottom offset and allow scrolling in preview tail mode
+- Clarify `Ctrl+S` and `Ctrl+D` footer action bindings in session-picker
+- Sync nucleo match ticks on reload and configure nav binds for session picker
+- Update session picker on first kill and reset child directory cursor to top
+- Preserve controlling terminal for `/dev/tty` using `sudo` in docker runner
+- Automatically export `INSTALL_DIR` to `PATH` in shell rc installer
+- Align release asset naming and add docker isolation test
+
+### 🚜 Refactor
+
+- Standardize presets and rewrite `reference.config.toml` in canonical English
+- Remove obsolete documentation, plan, and Portuguese draft docs
+- Rewrite README as state-of-the-art TUI documentation decoupled from dotfiles
+
 ## [0.1.1] - 2026-09-25
 
 ### 🐛 Bug Fixes
