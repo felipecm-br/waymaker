@@ -167,7 +167,7 @@ impl ResultsUI {
                         crate::utils::text::replace_string_in_text(
                             &mut $row[spinner_col_idx],
                             &self.config.spinner_prefix,
-                            &format!(" {frame}"),
+                            &format!("{frame}"),
                         );
                     } else {
                         crate::utils::text::strip_string_from_text(
