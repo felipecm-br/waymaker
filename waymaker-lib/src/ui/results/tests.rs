@@ -476,3 +476,124 @@ fn test_results_ui_cut_and_yanked_navbar_and_flash_icons() {
     let row2_icon_cell = &buf_post_flash[(row2_icon_x, 2)];
     assert_eq!(row2_icon_cell.fg, Color::Yellow);
 }
+
+#[test]
+fn test_results_ui_active_and_inactive_group_header_styling() {
+    use std::sync::Arc;
+    use ratatui::widgets::Widget;
+
+    #[derive(Clone)]
+    struct ItemWithGroup {
+        name: String,
+        group: Arc<str>,
+    }
+
+    impl AsRef<str> for ItemWithGroup {
+        fn as_ref(&self) -> &str {
+            &self.name
+        }
+    }
+
+    let mut results_config = ResultsConfig::default();
+    results_config.group_header_style = StyleSetting {
+        fg: Some(Color::Cyan),
+        modifier: Modifier::BOLD,
+        ..Default::default()
+    };
+    results_config.inactive_group_header_style = StyleSetting {
+        fg: Some(Color::Blue),
+        modifier: Modifier::DIM,
+        ..Default::default()
+    };
+
+    let status_config = StatusConfig::default();
+    let mut results_ui = ResultsUI::new(results_config, status_config);
+    let area = ratatui::layout::Rect::new(0, 0, 40, 10);
+    results_ui.update_dimensions(&area);
+
+    let mut worker = Worker::<ItemWithGroup>::new_single_column();
+    worker.group_header = Some(Box::new(|item: &ItemWithGroup| Some(item.group.clone())));
+    let injector = worker.nucleo.injector();
+
+    // Group 1: row 0
+    injector.push(
+        ItemWithGroup {
+            name: "item1".to_string(),
+            group: Arc::from("group1"),
+        },
+        |item, cols| {
+            cols[0] = item.name.clone().into();
+        },
+    );
+    // Group 2: row 1
+    injector.push(
+        ItemWithGroup {
+            name: "item2".to_string(),
+            group: Arc::from("group2"),
+        },
+        |item, cols| {
+            cols[0] = item.name.clone().into();
+        },
+    );
+    worker.nucleo.tick(10);
+
+    let mut selector = crate::selector::Selector::new(|_s: &ItemWithGroup| (0u32, ())).disabled();
+    let mut matcher = nucleo::Matcher::default();
+    let mut click = Click::None;
+    let render_area = ratatui::layout::Rect::new(0, 0, 40, 8);
+
+    // 1. Cursor is at row 0 (in group1)
+    results_ui.cursor = 0;
+    let table = results_ui.make_table(
+        0,
+        &mut worker,
+        &mut selector,
+        &mut matcher,
+        &mut click,
+        None,
+        false,
+    );
+    let mut buf = ratatui::buffer::Buffer::empty(render_area);
+    table.render(render_area, &mut buf);
+
+    // Group 1 header should be BOLD Cyan (active group)
+    let g1_x = (0..40).find(|&x| buf[(x, 0)].symbol() == "g").unwrap();
+    let cell_g1 = &buf[(g1_x, 0)];
+    assert_eq!(cell_g1.fg, Color::Cyan);
+    assert!(cell_g1.modifier.contains(Modifier::BOLD));
+    assert!(!cell_g1.modifier.contains(Modifier::DIM));
+
+    // Group 2 header should be DIM Blue (inactive group)
+    let g2_x = (0..40).find(|&x| buf[(x, 2)].symbol() == "g").unwrap();
+    let cell_g2 = &buf[(g2_x, 2)];
+    assert_eq!(cell_g2.fg, Color::Blue);
+    assert!(cell_g2.modifier.contains(Modifier::DIM));
+    assert!(!cell_g2.modifier.contains(Modifier::BOLD));
+
+    // 2. Move cursor to row 1 (in group2)
+    results_ui.cursor = 1;
+    let table = results_ui.make_table(
+        0,
+        &mut worker,
+        &mut selector,
+        &mut matcher,
+        &mut click,
+        None,
+        false,
+    );
+    let mut buf2 = ratatui::buffer::Buffer::empty(render_area);
+    table.render(render_area, &mut buf2);
+
+    // Group 1 header should now be DIM Blue (inactive group)
+    let cell_g1_inactive = &buf2[(g1_x, 0)];
+    assert_eq!(cell_g1_inactive.fg, Color::Blue);
+    assert!(cell_g1_inactive.modifier.contains(Modifier::DIM));
+    assert!(!cell_g1_inactive.modifier.contains(Modifier::BOLD));
+
+    // Group 2 header should now be BOLD Cyan (active group)
+    let cell_g2_active = &buf2[(g2_x, 2)];
+    assert_eq!(cell_g2_active.fg, Color::Cyan);
+    assert!(cell_g2_active.modifier.contains(Modifier::BOLD));
+    assert!(!cell_g2_active.modifier.contains(Modifier::DIM));
+}
+

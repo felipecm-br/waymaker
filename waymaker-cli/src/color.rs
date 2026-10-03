@@ -24,7 +24,8 @@
 /// | `header-border`  | `render.header.border.color`                  |
 /// | `header-label`   | `render.header.border.title_fg`               |
 /// | `header-title`   | `render.header.border.title_fg`               |
-/// | `group-header`   | `render.results.group_header_style.fg`        |
+/// | `group-header`          | `render.results.group_header_style.fg`          |
+/// | `inactive-group-header` | `render.results.inactive_group_header_style.fg` |
 /// | `nav`            | `render.ui.nav.color`                         |
 /// | `selected-fg`    | `render.results.selected_style.fg`            |
 /// | `selected-bg`    | `render.results.selected_style.bg`            |
@@ -76,6 +77,9 @@ pub fn apply_color_spec(config: &mut Config, spec: &str) {
             "header-border" => config.render.header.border.color = color,
             "header-label" | "header-title" => config.render.header.border.title_fg = color,
             "group-header" => config.render.results.group_header_style.fg = Some(color),
+            "inactive-group-header" => {
+                config.render.results.inactive_group_header_style.fg = Some(color)
+            }
             "nav" => config.render.ui.nav.color = color,
             "selected-fg" => config.render.results.selected_style.fg = Some(color),
             "selected-bg" => config.render.results.selected_style.bg = Some(color),
@@ -114,6 +118,7 @@ mod tests {
             "header-border:lightblue",
             "header-label:lightmagenta",
             "group-header:lightcyan",
+            "inactive-group-header:darkgray",
             "nav:red",
             "selected-fg:blue",
             "selected-bg:yellow",
@@ -144,6 +149,7 @@ mod tests {
         assert_eq!(config.render.header.border.color, Color::LightBlue);
         assert_eq!(config.render.header.border.title_fg, Color::LightMagenta);
         assert_eq!(config.render.results.group_header_style.fg, Some(Color::LightCyan));
+        assert_eq!(config.render.results.inactive_group_header_style.fg, Some(Color::DarkGray));
         assert_eq!(config.render.ui.nav.color, Color::Red);
         assert_eq!(config.render.results.selected_style.fg, Some(Color::Blue));
         assert_eq!(config.render.results.selected_style.bg, Some(Color::Yellow));

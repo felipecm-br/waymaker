@@ -461,6 +461,16 @@ modifier = "ITALIC"
 [results.style]
 # fg = "white"
 
+# Style for group header rows when cursor is within this group.
+[results.group_header_style]
+fg = "cyan"
+modifier = "BOLD"
+
+# Style for group header rows when cursor is in another group.
+[results.inactive_group_header_style]
+fg = "cyan"
+modifier = "DIM"
+
 # Styling for multi-selected rows.
 [results.selected_style]
 modifier = "BOLD"

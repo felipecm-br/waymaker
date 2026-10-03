@@ -184,6 +184,8 @@ All colors and modifiers come from ratatui:
 - `inactive_current_style`, `inactive_current`: [Style Settings](#style-settings) for the current item in inactive columns.
 - `match_style`, `match`: [Style Settings](#style-settings) for matching characters.
 - `current_style`, `current`: [Style Settings](#style-settings) for the highlighted item.
+- `group_header_style`, `group_header`: [Style Settings](#style-settings) for group header rows when the cursor is within this group (set via `--color group-header:…`).
+- `inactive_group_header_style`, `inactive_group_header`: [Style Settings](#style-settings) for group header rows when the cursor is in another group (set via `--color inactive-group-header:…`).
 - `prefix_style`, `prefix`: [Style Settings](#style-settings) for the prefix of the active.
 - `inactive_prefix_style`, `inactive_prefix`: [Style Settings](#style-settings) for the prefix of inactive items.
 - `unselected_prefix_style`, `unselected_prefix`: [Style Settings](#style-settings) for the unselected prefix marker.

@@ -1691,8 +1691,14 @@ pub struct ResultsConfig {
     pub cut_prefix_style: StyleSetting,
 
     /// Style for group header rows (set via --color group-header:…)
+    #[serde(alias = "group_header")]
     #[partial(recurse)]
     pub group_header_style: StyleSetting,
+
+    /// Style for inactive group header rows (when the cursor is not in this group)
+    #[serde(alias = "inactive_group_header")]
+    #[partial(recurse)]
+    pub inactive_group_header_style: StyleSetting,
 
     /// Tier separator settings.
     #[partial(recurse)]
@@ -1799,6 +1805,11 @@ impl Default for ResultsConfig {
             group_header_style: StyleSetting {
                 fg: Some(Color::Cyan),
                 modifier: Modifier::BOLD,
+                ..Default::default()
+            },
+            inactive_group_header_style: StyleSetting {
+                fg: Some(Color::Cyan),
+                modifier: Modifier::DIM,
                 ..Default::default()
             },
             tier: ResultsTierConfig::default(),

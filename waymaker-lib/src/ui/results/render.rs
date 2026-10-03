@@ -897,6 +897,24 @@ impl ResultsUI {
 
         let mut i = self.bottom_clip.is_some() as usize;
 
+        let active_group_name: Option<std::sync::Arc<str>> = if !self.cursor_disabled {
+            let mut curr = None;
+            let base_i = self.bottom_clip.is_some() as usize;
+            let cursor_offset = (self.cursor as usize).saturating_sub(base_i);
+            let target_idx = (start_index as usize).saturating_add(cursor_offset);
+            for (k, (g, _, _)) in results.iter().enumerate() {
+                if let Some(crate::nucleo::GroupHeader::Named(name)) = g {
+                    curr = Some(name.clone());
+                }
+                if k == target_idx {
+                    break;
+                }
+            }
+            curr
+        } else {
+            None
+        };
+
         let mut drain_iter = results.drain(start_index as usize..).peekable();
         while let Some((group, mut row, item)) = drain_iter.next() {
             // note that the index changes *next* frame
@@ -924,7 +942,13 @@ impl ResultsUI {
 
                     let row_opt = match group {
                         crate::nucleo::GroupHeader::Named(group_name) => {
-                            let group_style: Style = self.config.group_header_style.into();
+                            let is_active = active_group_name.as_ref().map(|s| s.as_ref())
+                                == Some(group_name.as_ref());
+                            let group_style: Style = if is_active {
+                                self.config.group_header_style.into()
+                            } else {
+                                self.config.inactive_group_header_style.into()
+                            };
                             let mut line_spans = vec![];
                             if let Some(nav_span) = nav_bar_span {
                                 line_spans.push(nav_span);
