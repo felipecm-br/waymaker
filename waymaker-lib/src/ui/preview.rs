@@ -640,6 +640,8 @@ impl PreviewUI {
 
     pub fn set_target(&mut self, target: Option<isize>) {
         if self.initial().tail {
+            self.offset = 0;
+            self.attained_target = false;
             return;
         }
 
@@ -1367,21 +1369,13 @@ impl PreviewUI {
 
             // get current offset
             offset = remaining_lines.saturating_sub(remaining_space);
-            // apply initial offset
-            if self.initial().offset < 0 {
-                offset = offset.saturating_sub((self.initial().offset).unsigned_abs());
+            // apply initial offset only if index is set
+            if self.initial().index.is_some() && self.initial().offset < 0 {
+                offset = offset.saturating_sub(self.initial().offset.unsigned_abs());
             }
 
-            // stop scrolling
-            if self.offset != 0 {
-                if self.offset > offset || self.offset + offset > rl {
-                    self.offset = self.offset.saturating_sub(rl.saturating_sub(offset));
-                } else {
-                    self.offset += offset;
-                }
-                self.attained_target = true;
-            }
-            // log::trace!("{} {} {}", offset, self.offset, self.attained_target);
+            self.offset = offset;
+            self.attained_target = true;
         } else if let Some(target) = self.target
             && !self.attained_target
             && target < rl
@@ -2228,5 +2222,42 @@ mod tests {
             .expect("Counter spans when zoomed");
         let zoomed_text: String = spans_zoomed.iter().map(|s| s.content.as_ref()).collect();
         assert_eq!(zoomed_text, " [2/3 · 150%] ");
+    }
+
+    #[test]
+    fn test_preview_tail() {
+        use crate::preview::previewer::Previewer;
+        let (previewer, _tx) = Previewer::new(Default::default());
+        let text: ratatui::text::Text<'static> = (1..=30)
+            .map(|i| format!("line {}", i))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into();
+        previewer.set_string(text);
+
+        let mut config = PreviewConfig::default();
+        config.initial.tail = true;
+        let mut ui = PreviewUI::new(previewer.view(), config, [40, 10]);
+        ui.update_dimensions(&Rect::new(0, 0, 40, 10));
+
+        let _ = ui.make_preview();
+        assert_eq!(ui.offset, 20, "Initial tail offset should position at bottom (30 - 10 = 20)");
+        assert!(ui.attained_target);
+
+        // Scrolling up moves reading position backwards
+        ui.up(1);
+        assert_eq!(ui.offset, 19, "Scrolling up by 1 line decreases offset to 19");
+
+        // Scrolling down moves back towards tail
+        ui.down(1);
+        assert_eq!(ui.offset, 20, "Scrolling down returns to tail offset 20");
+
+        // Switching item resets target and returns to tail on next preview render
+        ui.set_target(None);
+        assert_eq!(ui.offset, 0);
+        assert!(!ui.attained_target);
+        let _ = ui.make_preview();
+        assert_eq!(ui.offset, 20);
+        assert!(ui.attained_target);
     }
 }
