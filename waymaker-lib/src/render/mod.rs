@@ -507,7 +507,7 @@ fn process_results_nav_key<A: ActionExt>(
             }
         }
         _ => {
-            if key == "g" {
+            if key == "g" && !focus_binds.contains_key("g") {
                 *pending_nav_key = Some('g');
             } else if let Some(actions) = get_nav_bind(focus_binds, key) {
                 for action in actions.iter().cloned() {
@@ -3943,6 +3943,24 @@ mod test {
         assert_eq!(buffer.len(), 1);
         assert!(matches!(buffer[0], RenderCommand::Action(Action::Pos(-1))));
         assert_eq!(pending, None);
+
+        // Test single 'g' when 'g' is explicitly bound in focus_binds
+        let mut custom_binds = HashMap::new();
+        custom_binds.insert("g".to_string(), Actions::from([Action::Quit(0)]));
+        let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char('g'))];
+        let mut custom_pending = None;
+        apply_focus_binds(
+            &mut buffer,
+            Focus::Results,
+            &custom_binds,
+            false,
+            &mut custom_pending,
+            &mut sort_menu_active,
+            false,
+        );
+        assert_eq!(buffer.len(), 1);
+        assert!(matches!(buffer[0], RenderCommand::Action(Action::Quit(0))));
+        assert_eq!(custom_pending, None);
 
         // Test ',' opens sort menu
         let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char(','))];
