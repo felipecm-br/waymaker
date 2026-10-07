@@ -355,7 +355,7 @@ pub fn action_handler(
             if state.ui.config.nav.active {
                 let focus_to_set = if let Some(saved) = mode_history.get(&index) {
                     saved.focus
-                } else if index == 1 {
+                } else if index == 1 && state.ui.config.nav.focus_on_start != waymaker::config::NavFocus::Picker {
                     waymaker::render::Focus::Input
                 } else {
                     waymaker::render::Focus::Results
@@ -459,7 +459,7 @@ pub fn action_handler(
             if state.ui.config.nav.active {
                 let focus_to_set = if let Some(saved) = mode_history.get(&index) {
                     saved.focus
-                } else if index == 1 {
+                } else if index == 1 && state.ui.config.nav.focus_on_start != waymaker::config::NavFocus::Picker {
                     waymaker::render::Focus::Input
                 } else {
                     waymaker::render::Focus::Results

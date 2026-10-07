@@ -1396,14 +1396,15 @@ pub async fn start(
             get_active_cmd(&current_dir)
         };
 
-        let is_bookmarks = state.picker_ui.results.mode_index == 2
+        let is_walker = is_default_file_walker_command(&cmd);
+        let is_bookmarks = (is_walker && state.picker_ui.results.mode_index == 2)
             || cmd.contains("--bookmarks")
-            || cmd.contains("--pins")
-            || cmd.contains("bookmarks");
+            || cmd.contains("--pins");
         let is_dirs = !is_bookmarks
-            && (state.picker_ui.results.mode_index == 1
+            && ((is_walker && state.picker_ui.results.mode_index == 1)
                 || cmd.contains("--dirs")
                 || cmd.starts_with("mm list -d")
+                || cmd.starts_with("wm list -d")
                 || cmd.contains("frecency"));
 
         if is_bookmarks {
