@@ -234,6 +234,14 @@ fn get_nav_bind<'a>(
         {
             return Some(actions);
         }
+    } else if key == "?" {
+        if let Some(actions) = focus_binds.get("shift-?") {
+            return Some(actions);
+        }
+    } else if key == "shift-?" {
+        if let Some(actions) = focus_binds.get("?") {
+            return Some(actions);
+        }
     }
     // For multi-character keys (e.g. "Esc", "Backspace", "Tab", "Ctrl-l", "Left", "Right"),
     // check case-insensitively since crokey capitalizes key names while config/users often use lowercase.
@@ -1656,7 +1664,11 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                     state.focus = Focus::Results;
                                     state.preview_fullscreen = true;
                                 } else {
-                                    state.focus = Focus::Input;
+                                    state.focus = if ui.config.nav.active {
+                                        Focus::Results
+                                    } else {
+                                        Focus::Input
+                                    };
                                     state.preview_fullscreen = false;
                                 }
                                 tui.redraw();
@@ -1685,7 +1697,31 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         Action::SetPreview(idx) => {
                             if let Some(p) = preview_ui.as_mut() {
                                 if let Some(idx) = idx {
+                                    p.show(true);
                                     p.set_layout(idx);
+                                    p.current_dimension = None;
+                                    p.view
+                                        .image_id
+                                        .fetch_add(1, std::sync::atomic::Ordering::Release);
+                                    p.view
+                                        .changed
+                                        .store(true, std::sync::atomic::Ordering::Release);
+                                    state.insert(crate::message::Event::PreviewChange);
+                                    if !p.command().is_empty() {
+                                        state.update_preview_payload(p.command());
+                                    }
+                                    if p.is_fullscreen() {
+                                        state.focus = Focus::Results;
+                                        state.preview_fullscreen = true;
+                                    } else {
+                                        state.focus = if ui.config.nav.active {
+                                            Focus::Results
+                                        } else {
+                                            Focus::Input
+                                        };
+                                        state.preview_fullscreen = false;
+                                    }
+                                    tui.redraw();
                                 } else {
                                     state.update_preview_payload(p.command());
                                 }
@@ -1694,13 +1730,48 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         Action::SwitchPreview(idx) => {
                             if let Some(p) = preview_ui.as_mut() {
                                 if let Some(idx) = idx {
-                                    if !p.set_layout(idx)
-                                        && !state.update_preview_payload(p.command())
-                                    {
-                                        p.toggle_show();
+                                    let target_idx = idx as usize;
+                                    let new_idx = if p.layout_idx() == target_idx {
+                                        if target_idx != 0 {
+                                            Some(0)
+                                        } else {
+                                            p.toggle_show();
+                                            tui.redraw();
+                                            None
+                                        }
+                                    } else {
+                                        Some(target_idx as u8)
+                                    };
+                                    if let Some(new_idx) = new_idx {
+                                        p.show(true);
+                                        p.set_layout(new_idx);
+                                        p.current_dimension = None;
+                                        p.view
+                                            .image_id
+                                            .fetch_add(1, std::sync::atomic::Ordering::Release);
+                                        p.view
+                                            .changed
+                                            .store(true, std::sync::atomic::Ordering::Release);
+                                        state.insert(crate::message::Event::PreviewChange);
+                                        if !p.command().is_empty() {
+                                            state.update_preview_payload(p.command());
+                                        }
+                                        if p.is_fullscreen() {
+                                            state.focus = Focus::Results;
+                                            state.preview_fullscreen = true;
+                                        } else {
+                                            state.focus = if ui.config.nav.active {
+                                                Focus::Results
+                                            } else {
+                                                Focus::Input
+                                            };
+                                            state.preview_fullscreen = false;
+                                        }
+                                        tui.redraw();
                                     }
                                 } else {
-                                    p.toggle_show()
+                                    p.toggle_show();
+                                    tui.redraw();
                                 }
                             }
                         }
@@ -5073,6 +5144,29 @@ mod test {
             buffer[0],
             RenderCommand::Action(Action::PreviewUp(5))
         ));
+    }
+
+    #[test]
+    fn test_get_nav_bind_question_mark() {
+        let mut focus_binds = std::collections::HashMap::new();
+        focus_binds.insert("?".to_string(), crate::action::Actions::from(vec![Action::SwitchPreview(Some(1))]));
+
+        // Key "?" matches directly
+        let res = get_nav_bind(&focus_binds, "?");
+        assert!(res.is_some());
+        assert_eq!(res.unwrap()[0], Action::SwitchPreview(Some(1)));
+
+        // Key "shift-?" cross-matches to "?"
+        let res_shift = get_nav_bind(&focus_binds, "shift-?");
+        assert!(res_shift.is_some());
+        assert_eq!(res_shift.unwrap()[0], Action::SwitchPreview(Some(1)));
+
+        // And vice-versa: binding "shift-?" matches when key is "?"
+        let mut focus_binds_shift = std::collections::HashMap::new();
+        focus_binds_shift.insert("shift-?".to_string(), crate::action::Actions::from(vec![Action::Help("".into())]));
+        let res_rev = get_nav_bind(&focus_binds_shift, "?");
+        assert!(res_rev.is_some());
+        assert_eq!(res_rev.unwrap()[0], Action::Help("".into()));
     }
 }
 

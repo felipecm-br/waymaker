@@ -348,6 +348,9 @@ impl PreviewUI {
             }
         }
     }
+    pub fn layout_idx(&self) -> usize {
+        self.layout_idx
+    }
     pub fn set_layout(&mut self, idx: u8) -> bool {
         let idx = idx as usize;
         if idx < self.config.layout.len() {

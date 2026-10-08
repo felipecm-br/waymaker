@@ -122,7 +122,7 @@ impl<A: ActionExt> EventLoop<A> {
 
     fn get_bind(&self, kind: TriggerKind) -> Option<Actions<A>> {
         let mode = crate::MODE.lock().ok()?.clone();
-        self.binds
+        let direct = self.binds
             .get(&Trigger {
                 kind: kind.clone(),
                 mode: mode.clone(),
@@ -130,12 +130,44 @@ impl<A: ActionExt> EventLoop<A> {
             .or_else(|| {
                 (!mode.is_empty()).then(|| {
                     self.binds.get(&Trigger {
-                        kind,
+                        kind: kind.clone(),
                         mode: String::new(),
                     })
                 })?
-            })
-            .cloned()
+            });
+        if direct.is_some() {
+            return direct.cloned();
+        }
+
+        // Cross-match '?' and 'shift-?' so both terminal variants trigger identically
+        if let TriggerKind::Key(kc) = &kind {
+            if kc.codes == crokey::OneToThree::One(crossterm::event::KeyCode::Char('?')) {
+                let alt_kc = if kc.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
+                    let mut alt = *kc;
+                    alt.modifiers.remove(crossterm::event::KeyModifiers::SHIFT);
+                    alt
+                } else {
+                    let mut alt = *kc;
+                    alt.modifiers.insert(crossterm::event::KeyModifiers::SHIFT);
+                    alt
+                };
+                return self.binds
+                    .get(&Trigger {
+                        kind: TriggerKind::Key(alt_kc),
+                        mode: mode.clone(),
+                    })
+                    .or_else(|| {
+                        (!mode.is_empty()).then(|| {
+                            self.binds.get(&Trigger {
+                                kind: TriggerKind::Key(alt_kc),
+                                mode: String::new(),
+                            })
+                        })?
+                    })
+                    .cloned();
+            }
+        }
+        None
     }
 
     fn dispatch_fallback_key(&mut self, key: KeyCombination) {
