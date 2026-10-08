@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-08
+
+### 🐛 Bug Fixes
+
+- Resolve `SwitchPreview` short-circuit, preview layout toggle, and shift-? key cross-matching
+- Allow custom `additional_commands` on mode index 1 without intercepting frecency redb
+- Dispatch single 'g' focus binding without buffering pending vim sequence
+
 ## [0.2.0] - 2026-10-03
 
 ### 🚀 Features
