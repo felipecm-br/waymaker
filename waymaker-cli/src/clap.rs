@@ -32,6 +32,10 @@ pub struct Cli {
     #[arg(short = 'f', long, value_name = "QUERY")]
     pub filter: Option<String>,
 
+    /// Benchmark continuous streaming frametime on Ratatui test backend.
+    #[arg(long, value_name = "QUERY")]
+    pub benchmark_input: Option<String>,
+
     /// args passed to the start command
     #[arg(last = true)]
     pub args: Vec<OsString>,
@@ -229,6 +233,7 @@ impl Cli {
             try_parse!("media-size", "--");
             try_parse!("filter", "--");
             try_parse!("f", "-");
+            try_parse!("benchmark-input", "--");
 
             // Flags
             if [
@@ -300,12 +305,38 @@ mod tests {
     fn test_partition_filter_args() {
         let args = vec!["-f".into(), "test_query".into(), "other=val".into()];
         let (clap_args, rest) = Cli::partition_clap_args(args);
-        assert_eq!(clap_args, vec![OsString::from("-f"), OsString::from("test_query")]);
+        assert_eq!(
+            clap_args,
+            vec![OsString::from("-f"), OsString::from("test_query")]
+        );
         assert_eq!(rest, vec![OsString::from("other=val")]);
 
         let args_long = vec!["--filter=long_query".into()];
         let (clap_args2, rest2) = Cli::partition_clap_args(args_long);
         assert_eq!(clap_args2, vec![OsString::from("--filter=long_query")]);
+        assert!(rest2.is_empty());
+    }
+
+    #[test]
+    fn test_partition_benchmark_input_args() {
+        let args = vec![
+            "--benchmark-input".into(),
+            "test_bench_query".into(),
+            "other=val".into(),
+        ];
+        let (clap_args, rest) = Cli::partition_clap_args(args);
+        assert_eq!(
+            clap_args,
+            vec![
+                OsString::from("--benchmark-input"),
+                OsString::from("test_bench_query")
+            ]
+        );
+        assert_eq!(rest, vec![OsString::from("other=val")]);
+
+        let args_long = vec!["--benchmark-input=fast".into()];
+        let (clap_args2, rest2) = Cli::partition_clap_args(args_long);
+        assert_eq!(clap_args2, vec![OsString::from("--benchmark-input=fast")]);
         assert!(rest2.is_empty());
     }
 

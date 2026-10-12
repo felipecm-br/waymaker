@@ -10,7 +10,7 @@ use std::{
 };
 
 use super::worker::{Column, Worker, WorkerError};
-use super::{Indexed, Segmented};
+use super::{ColumnRanges, Indexed, Segmented};
 use crate::{SSS, nucleo::SegmentableItem};
 
 pub trait Injector {
@@ -160,6 +160,26 @@ impl<T, I: Injector<InputItem = Indexed<T>>> Injector for IndexedInjector<T, I> 
     fn inner(&self) -> &Self::Inner {
         &self.injector
     }
+
+    fn extend(
+        &self,
+        items: impl IntoIterator<Item = Self::InputItem> + ExactSizeIterator,
+    ) -> Result<(), WorkerError> {
+        let count = items.len();
+        if count == 0 {
+            return Ok(());
+        }
+        let start_index = self.counter.fetch_add(count as u32, Ordering::SeqCst);
+        let wrapped: Vec<Indexed<T>> = items
+            .into_iter()
+            .enumerate()
+            .map(|(offset, item)| Indexed {
+                index: start_index + offset as u32,
+                inner: item,
+            })
+            .collect();
+        self.injector.extend(wrapped.into_iter())
+    }
 }
 
 static GLOBAL_COUNTER: AtomicU32 = AtomicU32::new(0);
@@ -179,7 +199,7 @@ where
 }
 
 // ------------------------------------------------------------------------------------------------
-pub type SplitterFn<T> = std::sync::Arc<dyn for<'a> Fn(&'a T) -> Box<[(u32, u32)]> + Send + Sync>;
+pub type SplitterFn<T> = std::sync::Arc<dyn for<'a> Fn(&'a T) -> ColumnRanges + Send + Sync>;
 
 pub struct SegmentedInjector<T, I: Injector<InputItem = Segmented<T>>> {
     injector: I,
@@ -211,6 +231,20 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
     fn inner(&self) -> &Self::Inner {
         &self.injector
     }
+
+    fn extend(
+        &self,
+        items: impl IntoIterator<Item = Self::InputItem> + ExactSizeIterator,
+    ) -> Result<(), WorkerError> {
+        let wrapped: Vec<Segmented<T>> = items
+            .into_iter()
+            .map(|(group, item)| {
+                let ranges = (self.splitter)(&item);
+                Segmented::new(item, ranges, group)
+            })
+            .collect();
+        self.injector.extend(wrapped.into_iter())
+    }
 }
 
 mod ansi {
@@ -226,10 +260,12 @@ mod ansi {
 
     pub use super::*;
     pub use crate::utils::Either;
+
+    #[derive(Clone)]
     pub struct AnsiInjector<I> {
         pub injector: I,
-        parse: bool,
-        trim: bool,
+        pub parse: bool,
+        pub trim: bool,
     }
 
     impl<I: Injector<InputItem = (Option<std::sync::Arc<str>>, Either<Box<str>, Text<'static>>)>>
@@ -266,6 +302,40 @@ mod ansi {
 
         fn inner(&self) -> &Self::Inner {
             &self.injector
+        }
+
+        fn extend(
+            &self,
+            items: impl IntoIterator<Item = Self::InputItem> + ExactSizeIterator,
+        ) -> Result<(), WorkerError> {
+            let parse = self.parse;
+            let trim = self.trim;
+
+            let wrapped: Vec<<Self::Inner as Injector>::InputItem> = if !parse && !trim {
+                items
+                    .into_iter()
+                    .map(|(group, item)| (group, Either::Left(item.into_boxed_str())))
+                    .collect()
+            } else {
+                items
+                    .into_iter()
+                    .map(|(group, mut item)| {
+                        if trim {
+                            item = item.trim().to_string();
+                        }
+                        let ret = if !parse {
+                            Either::Left(item.into_boxed_str())
+                        } else {
+                            let mut parsed =
+                                item.as_bytes().into_text().unwrap_or(Text::from(item));
+                            scrub_text_styles(&mut parsed);
+                            Either::Right(parsed)
+                        };
+                        (group, ret)
+                    })
+                    .collect()
+            };
+            self.injector.extend(wrapped.into_iter())
         }
     }
 

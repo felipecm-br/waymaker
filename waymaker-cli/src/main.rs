@@ -9,10 +9,10 @@ mod logger;
 mod parse;
 mod paths;
 mod register;
+pub mod session;
 mod start;
 mod utils;
 pub mod watch;
-pub mod session;
 
 use clap::*;
 use config::PartialConfig;
@@ -56,7 +56,10 @@ async fn main() {
     // Fast-path: Check if invoked with native session subcommands (`wm session`, `wm connect`, `wm last`)
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     if let Some(first_arg) = raw_args.first() {
-        if matches!(first_arg.as_str(), "session" | "sessions" | "connect" | "last") {
+        if matches!(
+            first_arg.as_str(),
+            "session" | "sessions" | "connect" | "last"
+        ) {
             if let Some(code) = session::handle_session_cli(&raw_args).await {
                 exit(code);
             }
@@ -90,11 +93,17 @@ async fn main() {
     let no_read = cli.no_read;
     let group_prefix = cli.group_prefix.clone();
     let filter_query = cli.filter.clone();
+    let benchmark_input = cli.benchmark_input.clone();
     // get config
     let config = enter(cli, partial).__ebog();
 
     if let Some(query) = filter_query {
         let code = start_filter(config, &query, no_read, group_prefix).await;
+        exit(code);
+    }
+
+    if let Some(query) = benchmark_input {
+        let code = start_benchmark_input(config, &query, no_read, group_prefix).await;
         exit(code);
     }
 
@@ -322,7 +331,9 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
             let watch = args.iter().any(|a| a == "-w" || a == "--watch");
             let text_only = args.iter().any(|a| a == "--text");
             let ascii = args.iter().any(|a| a == "--ascii");
-            let no_mermaid = args.iter().any(|a| a == "--no-mermaid" || a == "--no-diagrams");
+            let no_mermaid = args
+                .iter()
+                .any(|a| a == "--no-mermaid" || a == "--no-diagrams");
             let no_images = args.iter().any(|a| a == "--no-images");
             let width = parse_preview_width_from_args(args);
             let theme = parse_theme_from_args(args);
@@ -331,7 +342,9 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
 
             if watch {
                 if path_arg.is_none() || path_arg == Some("-") {
-                    eprintln!("Error: --watch requires a file path on disk, stdin cannot be watched");
+                    eprintln!(
+                        "Error: --watch requires a file path on disk, stdin cannot be watched"
+                    );
                     return Some(1);
                 }
                 let p = path_arg.unwrap();
@@ -364,7 +377,8 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
                     diagram_theme: theme,
                     diagram_background: bg,
                 };
-                if let Err(e) = crate::watch::watch_markdown(target_path, opts, dynamic_width).await {
+                if let Err(e) = crate::watch::watch_markdown(target_path, opts, dynamic_width).await
+                {
                     eprintln!("Error during watch: {e}");
                     return Some(1);
                 }
@@ -395,7 +409,9 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
                     let _ = std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf);
                     buf
                 } else {
-                    eprintln!("Usage: wm md <file.md> [-w|--watch] [--width <N>] [--text] [--ascii] [--no-mermaid] [--no-images] [--theme <auto|dark|light>] [--bg <transparent|solid>]");
+                    eprintln!(
+                        "Usage: wm md <file.md> [-w|--watch] [--width <N>] [--text] [--ascii] [--no-mermaid] [--no-images] [--theme <auto|dark|light>] [--bg <transparent|solid>]"
+                    );
                     return Some(1);
                 }
             };
@@ -464,7 +480,9 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
                     let _ = std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf);
                     buf
                 } else {
-                    eprintln!("Usage: wm mermaid <file.mmd> [--width <N>] [--text] [--ascii] [--theme <auto|dark|light>] [--bg <transparent|solid>]");
+                    eprintln!(
+                        "Usage: wm mermaid <file.mmd> [--width <N>] [--text] [--ascii] [--theme <auto|dark|light>] [--bg <transparent|solid>]"
+                    );
                     return Some(1);
                 }
             };
@@ -998,11 +1016,7 @@ mod tests {
         let temp_dir = std::env::temp_dir().join("mm_test_md_no_img");
         let _ = std::fs::create_dir_all(&temp_dir);
         let md_path = temp_dir.join("doc.md");
-        std::fs::write(
-            &md_path,
-            "# Hello\n\n![My Image](non_existent.png)\n",
-        )
-        .unwrap();
+        std::fs::write(&md_path, "# Hello\n\n![My Image](non_existent.png)\n").unwrap();
 
         let args = vec![
             "md".to_string(),

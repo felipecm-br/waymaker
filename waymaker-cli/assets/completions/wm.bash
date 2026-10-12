@@ -23,7 +23,7 @@ _wm() {
 
     case "${cmd}" in
         wm)
-            opts="-o -F -f -q -v -d -h -V --config --override --dump-config --test-keys --last-key --no-read --group-prefix --filter --download --doc --sort --pos --frecency --icons --symlink-target --media --media-size --color --nav --nav-bind --nav-hints --parent-peek --status-inline --help --version [ARGS]..."
+            opts="-o -F -f -q -v -d -h -V --config --override --dump-config --test-keys --last-key --no-read --group-prefix --filter --benchmark-input --download --doc --sort --pos --frecency --icons --symlink-target --media --media-size --color --nav --nav-bind --nav-hints --parent-peek --status-inline --help --version [ARGS]..."
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -50,6 +50,10 @@ _wm() {
                     return 0
                     ;;
                 -f)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --benchmark-input)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

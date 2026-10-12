@@ -27,6 +27,7 @@ Register-ArgumentCompleter -Native -CommandName 'wm' -ScriptBlock {
             [CompletionResult]::new('--group-prefix', '--group-prefix', [CompletionResultType]::ParameterName, 'Specify a prefix that indicates a line is a group header')
             [CompletionResult]::new('-f', '-f', [CompletionResultType]::ParameterName, 'Filter input headlessly matching query, print results to stdout, and exit without entering the TUI')
             [CompletionResult]::new('--filter', '--filter', [CompletionResultType]::ParameterName, 'Filter input headlessly matching query, print results to stdout, and exit without entering the TUI')
+            [CompletionResult]::new('--benchmark-input', '--benchmark-input', [CompletionResultType]::ParameterName, 'Benchmark continuous streaming frametime on Ratatui test backend')
             [CompletionResult]::new('--download', '--download', [CompletionResultType]::ParameterName, 'Download presets from GitHub. Optionally specify a subfolder')
             [CompletionResult]::new('-d', '-d', [CompletionResultType]::ParameterName, 'Display documentation')
             [CompletionResult]::new('--doc', '--doc', [CompletionResultType]::ParameterName, 'Display documentation')

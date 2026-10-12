@@ -35,11 +35,103 @@ impl SegmentableItem for String {
     }
 }
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum ColumnRanges {
+    Inline(arrayvec::ArrayVec<(u32, u32), 2>),
+    Multi(Box<[(u32, u32)]>),
+}
+
+impl ColumnRanges {
+    #[inline]
+    pub fn single(start: u32, end: u32) -> Self {
+        let mut arr = arrayvec::ArrayVec::new();
+        arr.push((start, end));
+        Self::Inline(arr)
+    }
+
+    #[inline]
+    pub fn pair(first: (u32, u32), second: (u32, u32)) -> Self {
+        let mut arr = arrayvec::ArrayVec::new();
+        arr.push(first);
+        arr.push(second);
+        Self::Inline(arr)
+    }
+
+    #[inline]
+    pub fn from_array_vec(arr: arrayvec::ArrayVec<(u32, u32), 2>) -> Self {
+        Self::Inline(arr)
+    }
+
+    #[inline]
+    pub fn multi(ranges: Box<[(u32, u32)]>) -> Self {
+        Self::Multi(ranges)
+    }
+}
+
+impl std::ops::Deref for ColumnRanges {
+    type Target = [(u32, u32)];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Inline(arr) => arr.as_slice(),
+            Self::Multi(b) => b,
+        }
+    }
+}
+
+impl AsRef<[(u32, u32)]> for ColumnRanges {
+    #[inline]
+    fn as_ref(&self) -> &[(u32, u32)] {
+        match self {
+            Self::Inline(arr) => arr.as_slice(),
+            Self::Multi(b) => b,
+        }
+    }
+}
+
+impl From<arrayvec::ArrayVec<(u32, u32), 2>> for ColumnRanges {
+    #[inline]
+    fn from(arr: arrayvec::ArrayVec<(u32, u32), 2>) -> Self {
+        Self::Inline(arr)
+    }
+}
+
+impl From<Box<[(u32, u32)]>> for ColumnRanges {
+    #[inline]
+    fn from(b: Box<[(u32, u32)]>) -> Self {
+        if b.len() <= 2 {
+            let mut arr = arrayvec::ArrayVec::new();
+            for &r in b.iter() {
+                arr.push(r);
+            }
+            Self::Inline(arr)
+        } else {
+            Self::Multi(b)
+        }
+    }
+}
+
+impl From<Vec<(u32, u32)>> for ColumnRanges {
+    #[inline]
+    fn from(v: Vec<(u32, u32)>) -> Self {
+        if v.len() <= 2 {
+            let mut arr = arrayvec::ArrayVec::new();
+            for &r in &v {
+                arr.push(r);
+            }
+            Self::Inline(arr)
+        } else {
+            Self::Multi(v.into_boxed_slice())
+        }
+    }
+}
+
 /// This struct implements ColumnIndexable, and can instantiate a worker with columns.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Segmented<T> {
     pub inner: T,
-    ranges: Box<[(u32, u32)]>,
+    pub ranges: ColumnRanges,
     pub group: Option<Arc<str>>,
 }
 
@@ -62,22 +154,22 @@ impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
 }
 
 impl<T: SegmentableItem> Segmented<T> {
-    pub fn new(inner: T, ranges: Box<[(u32, u32)]>, group: Option<Arc<str>>) -> Self {
+    pub fn new(inner: T, ranges: impl Into<ColumnRanges>, group: Option<Arc<str>>) -> Self {
         Self {
             inner,
-            ranges,
+            ranges: ranges.into(),
             group,
         }
     }
 
     pub fn from_ranges(inner: T, ranges: impl IntoIterator<Item = (usize, usize)>) -> Self {
-        let ranges: Box<[(u32, u32)]> = ranges
+        let ranges: Vec<(u32, u32)> = ranges
             .into_iter()
             .map(|(s, e)| (s as u32, e as u32))
             .collect();
         Self {
             inner,
-            ranges,
+            ranges: ranges.into(),
             group: None,
         }
     }
@@ -187,5 +279,47 @@ impl<T> Eq for Indexed<T> {}
 impl<T> Hash for Indexed<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.index.hash(state)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_column_ranges_single() {
+        let cr = ColumnRanges::single(0, 10);
+        assert_eq!(cr.len(), 1);
+        assert_eq!(cr[0], (0, 10));
+        assert!(matches!(cr, ColumnRanges::Inline(_)));
+        assert_eq!(cr.as_ref(), &[(0, 10)]);
+    }
+
+    #[test]
+    fn test_column_ranges_pair() {
+        let cr = ColumnRanges::pair((0, 5), (6, 12));
+        assert_eq!(cr.len(), 2);
+        assert_eq!(cr[0], (0, 5));
+        assert_eq!(cr[1], (6, 12));
+        assert!(matches!(cr, ColumnRanges::Inline(_)));
+    }
+
+    #[test]
+    fn test_column_ranges_multi_fallback() {
+        let cr = ColumnRanges::from(vec![(0, 2), (3, 5), (6, 9)]);
+        assert_eq!(cr.len(), 3);
+        assert!(matches!(cr, ColumnRanges::Multi(_)));
+        assert_eq!(cr[0], (0, 2));
+        assert_eq!(cr[1], (3, 5));
+        assert_eq!(cr[2], (6, 9));
+    }
+
+    #[test]
+    fn test_segmented_with_column_ranges() {
+        let seg = Segmented::new("hello world".to_string(), ColumnRanges::single(0, 5), None);
+        assert_eq!(seg.get_str(0), "hello");
+        assert_eq!(seg.get_str(1), "");
+        assert_eq!(seg.len(), 1);
+        assert!(!seg.is_empty());
     }
 }

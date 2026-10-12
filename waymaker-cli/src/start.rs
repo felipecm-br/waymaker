@@ -29,9 +29,7 @@ use log::debug;
 use waymaker::{
     Action, ConfigInjector, MatchError, Matchmaker, OddEnds, PickOptions, SSS, acs,
     binds::{BindMap, BindMapExt},
-    config::{
-        BlinkRate, CommandSetting, EnvValue, MatcherConfig, StartCommandConfig, StartConfig,
-    },
+    config::{BlinkRate, CommandSetting, EnvValue, MatcherConfig, StartCommandConfig, StartConfig},
     event::{EventLoop, RenderSender},
     make_previewer,
     message::{Event, Interrupt},
@@ -130,7 +128,8 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     }
 
     if config.start.command.default.base_command.is_none() {
-        config.start.command.default.base_command = Some(config.start.command.default.command.clone());
+        config.start.command.default.base_command =
+            Some(config.start.command.default.command.clone());
     }
 
     // Apply matching directory / path rules (from config.toml and loaded presets)
@@ -276,8 +275,7 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
             let mut actions = waymaker::action::Actions::default();
             let mut parse_ok = true;
             for part in &parts {
-                match part.parse::<waymaker::action::Action<waymaker::action::NullActionExt>>()
-                {
+                match part.parse::<waymaker::action::Action<waymaker::action::NullActionExt>>() {
                     Ok(action) => actions.push(action),
                     Err(e) => {
                         eprintln!("warning: invalid --nav-bind action '{}': {}", part, e);
@@ -351,14 +349,8 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
             waymaker::acs![Action::Semantic("fm_paste_into".into())],
         );
         nb("u", waymaker::acs![Action::Semantic("fm_undo".into())]);
-        nb(
-            "ctrl-r",
-            waymaker::acs![Action::Semantic("fm_redo".into())],
-        );
-        nb(
-            "D",
-            waymaker::acs![Action::Semantic("fm_dragdrop".into())],
-        );
+        nb("ctrl-r", waymaker::acs![Action::Semantic("fm_redo".into())]);
+        nb("D", waymaker::acs![Action::Semantic("fm_dragdrop".into())]);
         nb(",", waymaker::acs![Action::SortMenu]);
         nb("/", waymaker::acs![Action::FocusFilter]);
         nb("\\", waymaker::acs![Action::ToggleParentPeek]);
@@ -394,10 +386,9 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     config.binds = BindMap::default_binds().modify(|x| x.extend(config.binds));
     if config.render.ui.nav.active {
         if !user_has_slash && !user_has_focus_action {
-            config.binds.insert(
-                slash_trigger,
-                waymaker::acs![waymaker::Action::FocusFilter],
-            );
+            config
+                .binds
+                .insert(slash_trigger, waymaker::acs![waymaker::Action::FocusFilter]);
         }
         config.binds.insert(
             "shift-enter".parse().expect("shift-enter should parse"),
@@ -467,6 +458,104 @@ pub fn map_reader<E: SSS + std::fmt::Display>(
         }
         log::trace!("All items pushed");
         ret
+    })
+}
+
+/// Spawns a tokio task reading segments with a 64KB BufReader and batching 512 items into `injector.extend()`.
+pub fn map_reader_batched(
+    reader: impl Read + Send + 'static,
+    injector: ConfigInjector,
+    group_prefix: Option<String>,
+    input_separator: Option<char>,
+    abort_empty: Option<RenderSender<MMAction>>,
+) -> tokio::task::JoinHandle<Result<usize, anyhow::Error>> {
+    tokio::task::spawn_blocking(move || {
+        use std::io::BufRead;
+        let mut reader = std::io::BufReader::with_capacity(64 * 1024, reader);
+        let mut total = 0;
+        let mut batch: Vec<(Option<std::sync::Arc<str>>, String)> = Vec::with_capacity(512);
+        let mut current_group: Option<std::sync::Arc<str>> = None;
+
+        if let Some(delim) = input_separator {
+            let delim_byte = delim as u8;
+            let mut byte_buf = Vec::new();
+            loop {
+                byte_buf.clear();
+                let bytes_read = reader.read_until(delim_byte, &mut byte_buf)?;
+                if bytes_read == 0 {
+                    break;
+                }
+                if byte_buf.last() == Some(&delim_byte) {
+                    byte_buf.pop();
+                }
+                let mut line = String::from_utf8_lossy(&byte_buf).into_owned();
+                if delim == '\n' && line.ends_with('\r') {
+                    line.pop();
+                }
+
+                if let Some(prefix) = &group_prefix {
+                    if line.starts_with(prefix) {
+                        current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
+                        continue;
+                    }
+                }
+
+                total += 1;
+                batch.push((current_group.clone(), line));
+                if batch.len() >= 512 {
+                    let chunk: Vec<_> = batch.drain(..).collect();
+                    if injector.extend(chunk.into_iter()).is_err() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            let mut line = String::with_capacity(256);
+            loop {
+                line.clear();
+                let bytes_read = reader.read_line(&mut line)?;
+                if bytes_read == 0 {
+                    break;
+                }
+                if line.ends_with('\n') {
+                    line.pop();
+                    if line.ends_with('\r') {
+                        line.pop();
+                    }
+                }
+
+                if let Some(prefix) = &group_prefix {
+                    if line.starts_with(prefix) {
+                        current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
+                        continue;
+                    }
+                }
+
+                total += 1;
+                let item = line.clone();
+                batch.push((current_group.clone(), item));
+                if batch.len() >= 512 {
+                    let chunk: Vec<_> = batch.drain(..).collect();
+                    if injector.extend(chunk.into_iter()).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if !batch.is_empty() {
+            let chunk: Vec<_> = batch.drain(..).collect();
+            let _ = injector.extend(chunk.into_iter());
+        }
+
+        if let Some(render_tx) = abort_empty
+            && total == 0
+        {
+            let _ = render_tx.send(waymaker::message::RenderCommand::NoMatch);
+        }
+
+        log::trace!("All {total} batched items pushed");
+        Ok(total)
     })
 }
 
@@ -1034,9 +1123,7 @@ pub async fn start(
     let render_tx = options.render_tx();
     if initial_index > 0 {
         let _ = render_tx.send(waymaker::message::RenderCommand::Action(
-            waymaker::action::Action::Custom(crate::action::MMAction::SetModeIndex(
-                initial_index,
-            )),
+            waymaker::action::Action::Custom(crate::action::MMAction::SetModeIndex(initial_index)),
         ));
     }
     let push_fn = inject_line(
@@ -1129,11 +1216,11 @@ pub async fn start(
             target_path.to_path_buf()
         };
 
-        let mut target_to_select = TARGET_ITEM
-            .lock()
-            .unwrap()
-            .clone()
-            .or_else(|| std::env::var("WM_TARGET_ITEM").or_else(|_| std::env::var("MM_TARGET_ITEM")).ok());
+        let mut target_to_select = TARGET_ITEM.lock().unwrap().clone().or_else(|| {
+            std::env::var("WM_TARGET_ITEM")
+                .or_else(|_| std::env::var("MM_TARGET_ITEM"))
+                .ok()
+        });
         if target_to_select.is_none() {
             if target_path == Path::new("..") || path == ".." {
                 if let Ok(cwd) = std::env::current_dir() {
@@ -1205,9 +1292,9 @@ pub async fn start(
                     state.focus = waymaker::render::Focus::Results;
                     if state.picker_ui.query.mode_index() != 0 {
                         let _ = chdir_render_tx.send(waymaker::message::RenderCommand::Action(
-                            waymaker::action::Action::Custom(
-                                crate::action::MMAction::ReloadNext(Some(0)),
-                            ),
+                            waymaker::action::Action::Custom(crate::action::MMAction::ReloadNext(
+                                Some(0),
+                            )),
                         ));
                     }
                     let _ = chdir_render_tx.send(waymaker::message::RenderCommand::Action(
@@ -1232,11 +1319,11 @@ pub async fn start(
 
     let sync_render_tx = render_tx.clone();
     mm.register_event_handler(Event::Synced | Event::Resynced, move |state, _| {
-        let target_opt = TARGET_ITEM
-            .lock()
-            .unwrap()
-            .clone()
-            .or_else(|| std::env::var("WM_TARGET_ITEM").or_else(|_| std::env::var("MM_TARGET_ITEM")).ok());
+        let target_opt = TARGET_ITEM.lock().unwrap().clone().or_else(|| {
+            std::env::var("WM_TARGET_ITEM")
+                .or_else(|_| std::env::var("MM_TARGET_ITEM"))
+                .ok()
+        });
 
         if let Some(target) = target_opt {
             let count = state.picker_ui.worker.counts().0;
@@ -1294,7 +1381,8 @@ pub async fn start(
                     if let Ok(preset_config) =
                         load_type::<PartialConfig, _>(&preset_path, |s| toml::from_str(s))
                     {
-                        if let Some(ref cmd_setting) = preset_config.start.command.default.as_ref() {
+                        if let Some(ref cmd_setting) = preset_config.start.command.default.as_ref()
+                        {
                             if !cmd_setting.command.is_empty() {
                                 active_cmd = cmd_setting.command.clone();
                             }
@@ -1515,9 +1603,9 @@ pub async fn start(
                         }
 
                         let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                            waymaker::action::Action::Custom(
-                                crate::action::MMAction::ReloadReady(vec![]),
-                            ),
+                            waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(
+                                vec![],
+                            )),
                         ));
                         return;
                     }
@@ -1566,9 +1654,7 @@ pub async fn start(
                 }
 
                 let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                    waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(
-                        vec![],
-                    )),
+                    waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
                 ));
 
                 // Background async walk to refresh disk cache if needed
@@ -1628,13 +1714,12 @@ pub async fn start(
                     let res = push_fn(line);
                     if first {
                         first = false;
-                        let _ = reload_render_tx_ready.send(
-                            waymaker::message::RenderCommand::Action(
+                        let _ =
+                            reload_render_tx_ready.send(waymaker::message::RenderCommand::Action(
                                 waymaker::action::Action::Custom(
                                     crate::action::MMAction::ReloadReady(vec![]),
                                 ),
-                            ),
-                        );
+                            ));
                     }
                     res
                 });
@@ -1706,9 +1791,7 @@ pub async fn start(
                 }
 
                 let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                    waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(
-                        vec![],
-                    )),
+                    waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
                 ));
             });
         }
@@ -1945,10 +2028,8 @@ pub async fn start(
             .unwrap_or_default();
         let cache_store = waymaker::cache::DirCacheStore::open();
 
-        let ignored_set: std::collections::HashSet<String> = walker_config
-            .effective_ignore()
-            .into_iter()
-            .collect();
+        let ignored_set: std::collections::HashSet<String> =
+            walker_config.effective_ignore().into_iter().collect();
         let is_ignored_item = |item: &str| -> bool {
             let s = item.strip_prefix("./").unwrap_or(item);
             let s = s.strip_prefix('/').unwrap_or(s);
@@ -2182,21 +2263,14 @@ pub async fn start_filter(
     let Config {
         render,
         tui,
-        matcher: MatcherConfig {
-            worker,
-            ..
-        },
+        matcher: MatcherConfig { worker, .. },
         columns,
         start:
             StartConfig {
                 input_separator,
                 command:
                     StartCommandConfig {
-                        default:
-                            CommandSetting {
-                                command,
-                                ..
-                            },
+                        default: CommandSetting { command, .. },
                         ..
                     },
                 directory,
@@ -2225,17 +2299,17 @@ pub async fn start_filter(
         return 1;
     }
 
-    let (render_tx, _render_rx) = tokio::sync::mpsc::unbounded_channel();
-    let push_fn = inject_line(0, render_tx, injector, group_prefix);
+    mm.worker.find(query);
 
     if !std::io::stdin().is_terminal() && !no_read {
         let stdin = std::io::stdin();
-        let handle = map_reader(stdin, push_fn, input_separator, None);
+        let handle =
+            map_reader_batched(stdin, injector.clone(), group_prefix, input_separator, None);
         let _ = handle.await;
     } else if is_default_file_walker_command(&command) {
         let walker_opts = walker_config.to_options(".");
         let walker = waymaker::walker::AsyncWalker::new(walker_opts);
-        let handle = walker.spawn_walk(push_fn);
+        let handle = walker.spawn_walk_parallel(injector.clone());
         let _ = handle.await;
     } else if !command.is_empty() {
         let mut cmd_builder = Command::from_script(&command);
@@ -2245,36 +2319,29 @@ pub async fn start_filter(
             .spawn_piped()
             ._elog()
         {
-            let handle = map_reader(stdout, push_fn, input_separator, None);
+            let handle = map_reader_batched(
+                stdout,
+                injector.clone(),
+                group_prefix,
+                input_separator,
+                None,
+            );
             let _ = handle.await;
         }
     }
 
-    // Wait until background injection completes into nucleo
-    while mm.worker.nucleo.tick(10).running {
+    mm.worker.find(query);
+
+    // Wait until matching is complete
+    loop {
+        let status = mm.worker.nucleo.tick(1);
+        if !status.running {
+            break;
+        }
         tokio::task::yield_now().await;
     }
 
-    mm.worker.find(query);
-
-    let items = match mm.worker.engine {
-        #[cfg(feature = "frizbee")]
-        waymaker::config::MatcherEngineType::Frizbee => {
-            mm.worker.get_all_sorted()
-        }
-        _ => {
-            // Tick until matching is complete
-            loop {
-                let status = mm.worker.nucleo.tick(10);
-                if !status.running {
-                    break;
-                }
-                tokio::task::yield_now().await;
-            }
-
-            mm.worker.get_all_sorted()
-        }
-    };
+    let items = mm.worker.get_all_sorted();
 
     if items.is_empty() {
         return 1;
@@ -2298,6 +2365,204 @@ pub async fn start_filter(
     let _ = out.flush();
 
     0
+}
+
+/// Benchmark continuous streaming frametime on Ratatui test backend.
+pub async fn start_benchmark_input(
+    config: Config,
+    query: &str,
+    no_read: bool,
+    group_prefix: Option<String>,
+) -> i32 {
+    let Config {
+        render,
+        matcher: MatcherConfig { worker, .. },
+        columns,
+        start:
+            StartConfig {
+                input_separator,
+                command:
+                    StartCommandConfig {
+                        default: CommandSetting { command, .. },
+                        ..
+                    },
+                directory,
+                ansi,
+                trim,
+                ..
+            },
+        walker: walker_config,
+        exit,
+        envs,
+        ..
+    } = config;
+
+    let envs = process_envs(envs);
+
+    if !directory.value.is_empty() {
+        let path = expand_tilde(directory.value.into());
+        let _ = set_current_dir(&path);
+    }
+
+    let preprocess = (ansi, trim);
+    let (mut mm, injector, OddEnds { has_error, .. }) = Matchmaker::new_from_config(
+        render.clone(),
+        waymaker::config::TerminalConfig::default(),
+        worker,
+        columns,
+        exit,
+        preprocess,
+    );
+
+    if has_error {
+        return 1;
+    }
+
+    // Launch streaming ingestion
+    let ingestion_handle = if !std::io::stdin().is_terminal() && !no_read {
+        let stdin = std::io::stdin();
+        map_reader_batched(stdin, injector.clone(), group_prefix, input_separator, None)
+    } else if is_default_file_walker_command(&command) {
+        let walker_opts = walker_config.to_options(".");
+        let walker = waymaker::walker::AsyncWalker::new(walker_opts);
+        let h = walker.spawn_walk_parallel(injector.clone());
+        tokio::spawn(async move {
+            let _ = h.await;
+            Ok(0)
+        })
+    } else if !command.is_empty() {
+        let mut cmd_builder = Command::from_script(&command);
+        if let Some((_child, stdout)) = cmd_builder
+            .envs(envs)
+            .args(&*COMMAND_ARGS.lock().unwrap())
+            .spawn_piped()
+            ._elog()
+        {
+            map_reader_batched(
+                stdout,
+                injector.clone(),
+                group_prefix,
+                input_separator,
+                None,
+            )
+        } else {
+            tokio::spawn(async { Ok(0) })
+        }
+    } else {
+        tokio::spawn(async { Ok(0) })
+    };
+
+    let width = 120u16;
+    let height = 30u16;
+    let backend = ratatui::backend::TestBackend::new(width, height);
+    let mut terminal = ratatui::Terminal::new(backend).expect("Failed to initialize TestBackend");
+
+    mm.worker.find(query);
+
+    let mut matcher =
+        waymaker::nucleo::nucleo::Matcher::new(waymaker::nucleo::nucleo::Config::DEFAULT);
+    let mut picker = waymaker::ui::PickerUI::new(
+        render.results,
+        render.status,
+        render.query,
+        render.header,
+        render.action,
+        render.breadcrumb,
+        &mut matcher,
+        mm.worker,
+        mm.selector,
+    );
+    picker.query.push_str(query);
+
+    let mut frametimes_ms: Vec<f64> = Vec::new();
+    let mut click = waymaker::render::Click::None;
+    let frame_area = ratatui::layout::Rect::new(0, 0, width, height);
+
+    let target_frame_budget = std::time::Duration::from_micros(16_667); // 60 FPS
+    let mut finished_ingestion = false;
+    let mut consecutive_idle_ticks = 0;
+    let bench_start = std::time::Instant::now();
+
+    while consecutive_idle_ticks < 10 {
+        let frame_start = std::time::Instant::now();
+
+        // 1. Tick matching engine
+        let status = picker.worker.nucleo.tick(10);
+        picker.worker.find(query);
+        let (_, snap_status) = waymaker::nucleo::Worker::new_snapshot(&mut picker.worker.nucleo);
+        picker.results.status = snap_status;
+
+        // 2. Render frame to TestBackend and measure frametime
+        let render_start = std::time::Instant::now();
+        terminal
+            .draw(|frame| {
+                let [_breadcrumb, _action, _input, _status, _header, results_area] =
+                    picker.layout(frame_area);
+                let (widget, _) = picker.make_table(&mut click, None, false);
+                frame.render_widget(widget, results_area);
+            })
+            .expect("Terminal draw failed");
+        let render_elapsed = render_start.elapsed();
+
+        frametimes_ms.push(render_elapsed.as_secs_f64() * 1000.0);
+
+        if !finished_ingestion && ingestion_handle.is_finished() {
+            finished_ingestion = true;
+        }
+
+        if finished_ingestion && !status.running {
+            consecutive_idle_ticks += 1;
+        } else {
+            consecutive_idle_ticks = 0;
+        }
+
+        let total_frame = frame_start.elapsed();
+        if total_frame < target_frame_budget {
+            tokio::time::sleep(target_frame_budget - total_frame).await;
+        } else {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    frametimes_ms.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let count = frametimes_ms.len();
+    if count == 0 {
+        eprintln!("Error: no frames rendered.");
+        return 1;
+    }
+
+    let min_ms = frametimes_ms[0];
+    let max_ms = frametimes_ms[count - 1];
+    let p50_ms = frametimes_ms[(count as f64 * 0.50) as usize];
+    let p90_ms = frametimes_ms[(count as f64 * 0.90).min((count - 1) as f64) as usize];
+    let p95_ms = frametimes_ms[(count as f64 * 0.95).min((count - 1) as f64) as usize];
+    let p99_ms = frametimes_ms[(count as f64 * 0.99).min((count - 1) as f64) as usize];
+
+    let total_elapsed = bench_start.elapsed();
+    let matches = picker.results.status.matched_count;
+    let total_items = picker.results.status.item_count;
+
+    println!("=== Waymaker Continuous Streaming Frametime Benchmark ===");
+    println!("Query:                {query:?}");
+    println!("Corpus / Ingested:    {total_items} items ({matches} matched)");
+    println!(
+        "Total Frames:         {count} frames across {:.2?}",
+        total_elapsed
+    );
+    println!("Min Frametime:        {min_ms:.3} ms");
+    println!("p50 Frametime:        {p50_ms:.3} ms");
+    println!("p90 Frametime:        {p90_ms:.3} ms");
+    println!("p95 Frametime:        {p95_ms:.3} ms");
+    println!("p99 Frametime:        {p99_ms:.3} ms");
+    println!("Max Frametime:        {max_ms:.3} ms");
+
+    if p95_ms <= 16.67 {
+        println!("Status:               PASS (sub-16.67ms / 60 FPS continuous)");
+        0
+    } else {
+        println!("Status:               WARN (p95 frametime exceeded 16.67ms)");
+        0
+    }
 }
 
 #[cfg(test)]
@@ -2333,8 +2598,17 @@ mod tests {
         assert_eq!(code, 0);
 
         let mut config_nomatch = Config::default();
-        config_nomatch.start.command.default.command = "printf 'apple\\nbanana\\ncherry\\n'".to_string();
+        config_nomatch.start.command.default.command =
+            "printf 'apple\\nbanana\\ncherry\\n'".to_string();
         let code_nomatch = start_filter(config_nomatch, "xyz", false, None).await;
         assert_eq!(code_nomatch, 1);
+    }
+
+    #[tokio::test]
+    async fn test_start_benchmark_input() {
+        let mut config = Config::default();
+        config.start.command.default.command = "printf 'alpha\\nbeta\\ngamma\\n'".to_string();
+        let code = start_benchmark_input(config, "bet", false, None).await;
+        assert_eq!(code, 0);
     }
 }

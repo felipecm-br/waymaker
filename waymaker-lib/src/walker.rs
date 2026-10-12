@@ -196,6 +196,123 @@ impl AsyncWalker {
         })
     }
 
+    /// Spawns a multi-threaded parallel walk where worker threads of `WalkParallel` each clone `injector`
+    /// and push batches of 512 items via `injector.extend()`, eliminating the single-thread channel funnel.
+    pub fn spawn_walk_parallel<I>(&self, injector: I) -> tokio::task::JoinHandle<()>
+    where
+        I: crate::nucleo::injector::Injector<InputItem = (Option<std::sync::Arc<str>>, String)>
+            + Clone
+            + Send
+            + 'static,
+    {
+        let options = self.options.clone();
+        let builder = self.builder();
+
+        tokio::task::spawn_blocking(move || {
+            // Pass 1: Immediate shallow walk (max_depth = 1) to deliver top-level items on Frame 0
+            let shallow_walker = builder.clone().max_depth(Some(1)).build();
+            let mut shallow_batch = Vec::new();
+            for result in shallow_walker {
+                let Ok(entry) = result else { continue };
+                if entry.depth() == 0 {
+                    continue;
+                }
+                let ft = entry.file_type();
+                let is_dir = ft.map_or(false, |t| t.is_dir());
+                let is_file = ft.map_or(false, |t| t.is_file());
+                match options.entry_type {
+                    EntryType::Files if !is_file => continue,
+                    EntryType::Directories if !is_dir => continue,
+                    _ => {}
+                }
+                let formatted = format_path(
+                    entry.path(),
+                    &options.root,
+                    options.strip_cwd_prefix,
+                    is_dir,
+                );
+                shallow_batch.push((None, formatted));
+            }
+            if !shallow_batch.is_empty() {
+                if injector.extend(shallow_batch.into_iter()).is_err() {
+                    return;
+                }
+            }
+
+            // Pass 2: Deep parallel walk for rest of directory tree (depth > 1)
+            let walker = builder.build_parallel();
+            let entry_type = options.entry_type;
+            let strip_cwd = options.strip_cwd_prefix;
+            let root = options.root;
+
+            struct BatchWorker<
+                I: crate::nucleo::injector::Injector<
+                        InputItem = (Option<std::sync::Arc<str>>, String),
+                    >,
+            > {
+                injector: I,
+                batch: Vec<(Option<std::sync::Arc<str>>, String)>,
+            }
+
+            impl<
+                I: crate::nucleo::injector::Injector<
+                        InputItem = (Option<std::sync::Arc<str>>, String),
+                    >,
+            > Drop for BatchWorker<I>
+            {
+                fn drop(&mut self) {
+                    if !self.batch.is_empty() {
+                        let drained = std::mem::take(&mut self.batch);
+                        let _ = self.injector.extend(drained.into_iter());
+                    }
+                }
+            }
+
+            walker.run(move || {
+                let mut worker = BatchWorker {
+                    injector: injector.clone(),
+                    batch: Vec::with_capacity(512),
+                };
+                let entry_type = entry_type.clone();
+                let root = root.clone();
+
+                Box::new(move |result| {
+                    let Ok(entry) = result else {
+                        return WalkState::Continue;
+                    };
+
+                    // Skip root and depth 1 (already delivered in Pass 1 for instant frame 0)
+                    if entry.depth() <= 1 {
+                        return WalkState::Continue;
+                    }
+
+                    let ft = entry.file_type();
+                    let is_dir = ft.map_or(false, |t| t.is_dir());
+                    let is_file = ft.map_or(false, |t| t.is_file());
+
+                    match entry_type {
+                        EntryType::Files if !is_file => return WalkState::Continue,
+                        EntryType::Directories if !is_dir => return WalkState::Continue,
+                        _ => {}
+                    }
+
+                    let path = entry.path();
+                    let formatted = format_path(path, &root, strip_cwd, is_dir);
+
+                    worker.batch.push((None, formatted));
+                    if worker.batch.len() >= 512 {
+                        let drained = std::mem::take(&mut worker.batch);
+                        if worker.injector.extend(drained.into_iter()).is_err() {
+                            return WalkState::Quit;
+                        }
+                    }
+
+                    WalkState::Continue
+                })
+            });
+        })
+    }
+
     /// Collects all matching paths synchronously into a `Vec<String>`.
     pub fn collect_sync(&self) -> Vec<String> {
         let mut results = Vec::new();
@@ -241,22 +358,54 @@ impl AsyncWalker {
 }
 
 fn format_path(path: &Path, root: &Path, strip_cwd: bool, is_dir: bool) -> String {
-    let mut s = if strip_cwd {
-        if let Ok(rel) = path.strip_prefix(root) {
-            rel.to_string_lossy().to_string()
-        } else if let Ok(rel) = path.strip_prefix(".") {
-            rel.to_string_lossy().to_string()
-        } else {
-            path.to_string_lossy().to_string()
-        }
+    let rel = if strip_cwd {
+        path.strip_prefix(root)
+            .or_else(|_| path.strip_prefix("."))
+            .unwrap_or(path)
     } else {
-        path.to_string_lossy().to_string()
+        path
     };
 
-    if is_dir && !s.ends_with('/') && !s.ends_with('\\') {
-        s.push('/');
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let bytes = rel.as_os_str().as_bytes();
+        let needs_slash = is_dir && !bytes.ends_with(b"/") && !bytes.ends_with(b"\\");
+        let extra = if needs_slash { 1 } else { 0 };
+
+        match std::str::from_utf8(bytes) {
+            Ok(valid_str) => {
+                let mut s = String::with_capacity(valid_str.len() + extra);
+                s.push_str(valid_str);
+                if needs_slash {
+                    s.push('/');
+                }
+                s
+            }
+            Err(_) => {
+                let lossy = String::from_utf8_lossy(bytes);
+                let mut s = String::with_capacity(lossy.len() + extra);
+                s.push_str(&lossy);
+                if needs_slash {
+                    s.push('/');
+                }
+                s
+            }
+        }
     }
-    s
+
+    #[cfg(not(unix))]
+    {
+        let lossy = rel.to_string_lossy();
+        let needs_slash = is_dir && !lossy.ends_with('/') && !lossy.ends_with('\\');
+        let extra = if needs_slash { 1 } else { 0 };
+        let mut s = String::with_capacity(lossy.len() + extra);
+        s.push_str(&lossy);
+        if needs_slash {
+            s.push('/');
+        }
+        s
+    }
 }
 
 #[cfg(test)]
@@ -418,7 +567,13 @@ mod tests {
 
         // Normal files and directories that should be included
         fs::create_dir_all(temp_dir.join(".config").join("waymaker"))?;
-        fs::write(temp_dir.join(".config").join("waymaker").join("config.toml"), "a=1")?;
+        fs::write(
+            temp_dir
+                .join(".config")
+                .join("waymaker")
+                .join("config.toml"),
+            "a=1",
+        )?;
         fs::create_dir_all(temp_dir.join("src"))?;
         fs::write(temp_dir.join("src").join("main.rs"), "fn main() {}")?;
         fs::write(temp_dir.join(".bashrc"), "# bashrc")?;
@@ -440,13 +595,39 @@ mod tests {
         assert!(items.iter().any(|i| i == ".bashrc"));
 
         // Noise/cache directories MUST be pruned natively
-        assert!(!items.iter().any(|i| i == ".cache/" || i == ".cache" || i.starts_with(".cache/")));
-        assert!(!items.iter().any(|i| i == ".cargo/" || i == ".cargo" || i.starts_with(".cargo/")));
-        assert!(!items.iter().any(|i| i == ".local/" || i == ".local" || i.starts_with(".local/")));
-        assert!(!items.iter().any(|i| i == "node_modules/" || i == "node_modules" || i.starts_with("node_modules/")));
-        assert!(!items.iter().any(|i| i == "target/" || i == "target" || i.starts_with("target/")));
-        assert!(!items.iter().any(|i| i == ".venv/" || i == ".venv" || i.starts_with(".venv/")));
-        assert!(!items.iter().any(|i| i == ".git/" || i == ".git" || i.starts_with(".git/")));
+        assert!(
+            !items
+                .iter()
+                .any(|i| i == ".cache/" || i == ".cache" || i.starts_with(".cache/"))
+        );
+        assert!(
+            !items
+                .iter()
+                .any(|i| i == ".cargo/" || i == ".cargo" || i.starts_with(".cargo/"))
+        );
+        assert!(
+            !items
+                .iter()
+                .any(|i| i == ".local/" || i == ".local" || i.starts_with(".local/"))
+        );
+        assert!(!items.iter().any(|i| i == "node_modules/"
+            || i == "node_modules"
+            || i.starts_with("node_modules/")));
+        assert!(
+            !items
+                .iter()
+                .any(|i| i == "target/" || i == "target" || i.starts_with("target/"))
+        );
+        assert!(
+            !items
+                .iter()
+                .any(|i| i == ".venv/" || i == ".venv" || i.starts_with(".venv/"))
+        );
+        assert!(
+            !items
+                .iter()
+                .any(|i| i == ".git/" || i == ".git" || i.starts_with(".git/"))
+        );
 
         let _ = fs::remove_dir_all(&temp_dir);
         Ok(())
@@ -478,6 +659,79 @@ mod tests {
         // target should now be included because it's not in ignore_dirs
         assert!(items.iter().any(|i| i == "target/" || i == "target"));
         assert!(items.iter().any(|i| i == "target/build.txt"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_walker_spawn_walk_parallel() -> anyhow::Result<()> {
+        let temp_dir = std::env::temp_dir().join("mm_test_walker_spawn_walk_parallel");
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(temp_dir.join("src").join("sub"))?;
+        fs::write(temp_dir.join("src").join("main.rs"), "fn main() {}")?;
+        fs::write(
+            temp_dir.join("src").join("sub").join("lib.rs"),
+            "pub fn x() {}",
+        )?;
+        fs::write(temp_dir.join("README.md"), "# Test")?;
+
+        let options = WalkerOptions {
+            root: temp_dir.clone(),
+            strip_cwd_prefix: true,
+            ..Default::default()
+        };
+
+        #[derive(Clone)]
+        struct CollectInjector(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+
+        impl crate::nucleo::injector::Injector for CollectInjector {
+            type InputItem = (Option<std::sync::Arc<str>>, String);
+            type Inner = ();
+            type Context = ();
+            fn new(_: (), _: ()) -> Self {
+                unreachable!()
+            }
+            fn inner(&self) -> &() {
+                &()
+            }
+            fn wrap(&self, _: Self::InputItem) -> Result<(), crate::nucleo::WorkerError> {
+                Ok(())
+            }
+            fn push(&self, (_g, s): Self::InputItem) -> Result<(), crate::nucleo::WorkerError> {
+                self.0.lock().unwrap().push(s);
+                Ok(())
+            }
+            fn extend(
+                &self,
+                items: impl IntoIterator<Item = Self::InputItem> + ExactSizeIterator,
+            ) -> Result<(), crate::nucleo::WorkerError> {
+                let mut guard = self.0.lock().unwrap();
+                for (_g, s) in items {
+                    guard.push(s);
+                }
+                Ok(())
+            }
+        }
+
+        let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let injector = CollectInjector(collected.clone());
+
+        let walker = AsyncWalker::new(options);
+        let handle = walker.spawn_walk_parallel(injector);
+        handle.await?;
+
+        let items = collected.lock().unwrap().clone();
+        assert!(items.iter().any(|i| i == "src/" || i == "src"));
+        assert!(items.iter().any(|i| i == "README.md"));
+        assert!(items.iter().any(|i| i == "src/main.rs"));
+        assert!(items.iter().any(|i| i == "src/sub/" || i == "src/sub"));
+        assert!(items.iter().any(|i| i == "src/sub/lib.rs"));
+
+        let mut unique_items = items.clone();
+        unique_items.sort();
+        unique_items.dedup();
+        assert_eq!(items.len(), unique_items.len());
 
         let _ = fs::remove_dir_all(&temp_dir);
         Ok(())

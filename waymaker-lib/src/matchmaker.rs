@@ -24,7 +24,7 @@ use crate::{
     event::{EventLoop, RenderSender},
     message::{Event, Interrupt, RenderCommand},
     nucleo::{
-        Indexed, Segmented, Worker,
+        ColumnRanges, Indexed, Segmented, Worker,
         injector::{
             AnsiInjector, Either, IndexedInjector, Injector, PreprocessOptions, SegmentedInjector,
             SplitterFn, WorkerInjector,
@@ -220,7 +220,7 @@ impl ConfigMatchmaker {
                     // Named capture groups
                     Arc::new(move |s| {
                         let s = &s.to_cow();
-                        let mut ranges = vec![(0u32, 0u32); col_count].into_boxed_slice();
+                        let mut ranges = vec![(0u32, 0u32); col_count];
 
                         if let Some(caps) = rg.captures(s) {
                             for (group_idx, col_idx_opt) in
@@ -234,7 +234,7 @@ impl ConfigMatchmaker {
                             }
                         }
 
-                        ranges
+                        ColumnRanges::from(ranges)
                     })
                 } else if has_unnamed {
                     log::debug!(
@@ -245,7 +245,7 @@ impl ConfigMatchmaker {
                     // All unnamed capture groups → map in order
                     Arc::new(move |s| {
                         let s = &s.to_cow();
-                        let mut ranges = vec![(0u32, 0u32); col_count].into_boxed_slice();
+                        let mut ranges = vec![(0u32, 0u32); col_count];
                         if let Some(caps) = rg.captures(s) {
                             for (i, group) in caps.iter().skip(1).enumerate().take(col_count) {
                                 if let Some(m) = group {
@@ -254,25 +254,41 @@ impl ConfigMatchmaker {
                             }
                         }
 
-                        ranges
+                        ColumnRanges::from(ranges)
                     })
                 } else {
                     log::debug!("Delimiter regex: {rg}");
 
                     // No capture groups → normal delimiter split
-                    Arc::new(move |s| {
-                        let s = &s.to_cow();
-                        let mut ranges = Vec::with_capacity(col_count);
-                        let mut last_end = 0;
+                    if col_count <= 2 {
+                        Arc::new(move |s| {
+                            let s = &s.to_cow();
+                            let mut ranges = arrayvec::ArrayVec::<(u32, u32), 2>::new();
+                            let mut last_end = 0;
 
-                        for m in rg.find_iter(s).take(col_count - 1) {
-                            ranges.push((last_end as u32, m.start() as u32));
-                            last_end = m.end();
-                        }
+                            for m in rg.find_iter(s).take(col_count - 1) {
+                                ranges.push((last_end as u32, m.start() as u32));
+                                last_end = m.end();
+                            }
 
-                        ranges.push((last_end as u32, s.len() as u32));
-                        ranges.into_boxed_slice()
-                    })
+                            ranges.push((last_end as u32, s.len() as u32));
+                            ColumnRanges::Inline(ranges)
+                        })
+                    } else {
+                        Arc::new(move |s| {
+                            let s = &s.to_cow();
+                            let mut ranges = Vec::with_capacity(col_count);
+                            let mut last_end = 0;
+
+                            for m in rg.find_iter(s).take(col_count - 1) {
+                                ranges.push((last_end as u32, m.start() as u32));
+                                last_end = m.end();
+                            }
+
+                            ranges.push((last_end as u32, s.len() as u32));
+                            ColumnRanges::Multi(ranges.into_boxed_slice())
+                        })
+                    }
                 }
             }
             // not recommended but its supported ig
@@ -289,10 +305,10 @@ impl ConfigMatchmaker {
                             ranges.push((0, 0));
                         }
                     }
-                    ranges.into_boxed_slice()
+                    ColumnRanges::from(ranges)
                 })
             }
-            Split::None => Arc::new(|s| vec![(0u32, s.to_cow().len() as u32)].into_boxed_slice()),
+            Split::None => Arc::new(|s| ColumnRanges::single(0u32, s.to_cow().len() as u32)),
         };
         let injector = IndexedInjector::new_globally_indexed(injector);
         let injector = SegmentedInjector::new(injector, splitter.clone());
