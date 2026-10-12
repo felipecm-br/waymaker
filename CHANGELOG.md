@@ -1,7 +1,10 @@
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-12
+
 ### 🚀 Features
 
+- Add `Action::PromptInput(<template>)` interactive prompt input mode for modal prompt dispatch with `{input}` / `{=input}` templating and `WM_INPUT` / `MM_INPUT` environment variables
 - Add `--benchmark-input <QUERY>` CLI flag to measure and assert continuous streaming keystroke frametimes against the 60 FPS (< 16.67ms) SLA on Ratatui's test backend
 
 ### ⚡ Performance
