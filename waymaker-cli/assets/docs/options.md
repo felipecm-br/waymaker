@@ -41,6 +41,19 @@ The `-o` flag allows you to layer additional configuration files on top of your 
 - **Example**: `wm -o git/status` will attempt to load `presets/git/status.toml` from the installation directory.
 - **Source Field**: Overrides support a `source` field at the top level, allowing them to inherit from another preset (one level of recursion is supported).
 
+### Headless Filtering & Benchmarking Flags
+
+- `-f` / `--filter <QUERY>`: Filter input headlessly matching query, print results to stdout, and exit immediately without entering the TUI.
+  - Automatically bypasses interactive terminal setup and font database scanning.
+  - Ideal for shell pipelines, scripts, and zero-overhead fuzzy filtering.
+  - Example: `find . | wm -f "main.rs"`
+
+- `--benchmark-input <QUERY>`: Benchmark continuous streaming keystroke frametime on Ratatui's `TestBackend`.
+  - Ingests streaming items from stdin or the native directory walker into the Nucleo engine.
+  - Simulates rapid continuous keystrokes, measuring match computation, layout constraint resolution, and widget rendering times per frame.
+  - Reports detailed latency percentiles (`min`, `p50`, `p90`, `p95`, `p99`, `max`) and validates compliance with the 60 FPS sub-16.67ms SLA.
+  - Example: `find . | wm --benchmark-input "main"` or `wm --benchmark-input "config"`
+
 ### Values
 
 If a "leaf" value contains multiple settings (like a [border](#border-settings) or a bind with multiple actions), you can specify them within a single string joined by `|||` (which can be escaped like `\|||`).

@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+### 🚀 Features
+
+- Add `--benchmark-input <QUERY>` CLI flag to measure and assert continuous streaming keystroke frametimes against the 60 FPS (< 16.67ms) SLA on Ratatui's test backend
+
+### ⚡ Performance
+
+- Implement zero-copy `ColumnRanges` (`ArrayVec<[(u32, u32); 2]>`), completely eliminating 100,000 heap `Box<[(u32, u32)]>` allocations per search in 1-column and 2-column pickers
+- Implement parallel multi-injector directory walker (`spawn_walk_parallel`) streaming items directly from worker threads into Nucleo, bypassing the single-threaded `mpsc::channel` funnel
+- Stream data with zero intermediate heap allocations via lazy `ExactSizeIterator` batching in `IndexedInjector`, `SegmentedInjector`, and `AnsiInjector`
+- Accelerate large batch ANSI parsing and trimming using Rayon parallel chunks for batches $\ge 256$ items
+- Bypass background system font directory scanning (`warmup_font_db`) during headless filtering (`wm -f`) and benchmark runs (`wm --benchmark-input`), eliminating background disk I/O and CPU contention
+
 ## [0.2.1] - 2026-10-08
 
 ### 🐛 Bug Fixes
