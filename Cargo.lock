@@ -3641,6 +3641,7 @@ dependencies = [
  "pulldown-cmark",
  "ratatui",
  "ratatui-image",
+ "rayon",
  "redb",
  "regex",
  "resvg",

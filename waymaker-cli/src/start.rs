@@ -503,7 +503,8 @@ pub fn map_reader_batched(
                 total += 1;
                 batch.push((current_group.clone(), line));
                 if batch.len() >= 512 {
-                    let chunk: Vec<_> = batch.drain(..).collect();
+                    let mut chunk = Vec::with_capacity(512);
+                    std::mem::swap(&mut batch, &mut chunk);
                     if injector.extend(chunk.into_iter()).is_err() {
                         break;
                     }
@@ -535,7 +536,8 @@ pub fn map_reader_batched(
                 let item = line.clone();
                 batch.push((current_group.clone(), item));
                 if batch.len() >= 512 {
-                    let chunk: Vec<_> = batch.drain(..).collect();
+                    let mut chunk = Vec::with_capacity(512);
+                    std::mem::swap(&mut batch, &mut chunk);
                     if injector.extend(chunk.into_iter()).is_err() {
                         break;
                     }
@@ -544,8 +546,7 @@ pub fn map_reader_batched(
         }
 
         if !batch.is_empty() {
-            let chunk: Vec<_> = batch.drain(..).collect();
-            let _ = injector.extend(chunk.into_iter());
+            let _ = injector.extend(batch.into_iter());
         }
 
         if let Some(render_tx) = abort_empty
@@ -2301,16 +2302,17 @@ pub async fn start_filter(
 
     mm.worker.find(query);
 
-    if !std::io::stdin().is_terminal() && !no_read {
+    let handle = if !std::io::stdin().is_terminal() && !no_read {
         let stdin = std::io::stdin();
-        let handle =
-            map_reader_batched(stdin, injector.clone(), group_prefix, input_separator, None);
-        let _ = handle.await;
+        map_reader_batched(stdin, injector.clone(), group_prefix, input_separator, None)
     } else if is_default_file_walker_command(&command) {
         let walker_opts = walker_config.to_options(".");
         let walker = waymaker::walker::AsyncWalker::new(walker_opts);
-        let handle = walker.spawn_walk_parallel(injector.clone());
-        let _ = handle.await;
+        let h = walker.spawn_walk_parallel(injector.clone());
+        tokio::spawn(async move {
+            let _ = h.await;
+            Ok(0)
+        })
     } else if !command.is_empty() {
         let mut cmd_builder = Command::from_script(&command);
         if let Some((_child, stdout)) = cmd_builder
@@ -2319,27 +2321,26 @@ pub async fn start_filter(
             .spawn_piped()
             ._elog()
         {
-            let handle = map_reader_batched(
+            map_reader_batched(
                 stdout,
                 injector.clone(),
                 group_prefix,
                 input_separator,
                 None,
-            );
-            let _ = handle.await;
+            )
+        } else {
+            tokio::spawn(async { Ok(0) })
         }
-    }
+    } else {
+        tokio::spawn(async { Ok(0) })
+    };
+
+    let _ = handle.await;
 
     mm.worker.find(query);
 
-    // Wait until matching is complete
-    loop {
-        let status = mm.worker.nucleo.tick(1);
-        if !status.running {
-            break;
-        }
-        tokio::task::yield_now().await;
-    }
+    // Wait until matching is complete with 10ms timeout per tick
+    while mm.worker.nucleo.tick(10).running {}
 
     let items = mm.worker.get_all_sorted();
 

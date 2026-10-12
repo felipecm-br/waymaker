@@ -77,10 +77,11 @@ async fn main() {
     display_doc(&cli);
     handle_download(&cli);
 
-    // Warm up the SVG/Mermaid system font database asynchronously in the background.
-    // This moves the 50-650ms `load_system_fonts()` filesystem scan completely off the
-    // interactive path, preventing any cold-start latency freeze when previewing diagrams.
-    waymaker::utils::mermaid::warmup_font_db();
+    // Warm up the SVG/Mermaid system font database asynchronously in the background
+    // only when running in interactive mode.
+    if cli.filter.is_none() && cli.benchmark_input.is_none() {
+        waymaker::utils::mermaid::warmup_font_db();
+    }
 
     if let Some(code) = handle_frecency_cli(&config_args).await {
         exit(code);

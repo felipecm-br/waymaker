@@ -32,10 +32,11 @@ pub trait Injector {
 
     fn extend(
         &self,
-        items: impl IntoIterator<Item = Self::InputItem> + ExactSizeIterator,
+        items: impl ExactSizeIterator<Item = Self::InputItem>,
     ) -> Result<(), WorkerError> {
-        let items =
-        items.into_iter().map(|item| self.wrap(item)).collect::<Result<Vec<<<Self as Injector>::Inner as Injector>::InputItem>, WorkerError>>()?;
+        let items = items
+            .map(|item| self.wrap(item))
+            .collect::<Result<Vec<<<Self as Injector>::Inner as Injector>::InputItem>, WorkerError>>()?;
         self.inner().extend(items.into_iter())
     }
 }
@@ -96,7 +97,7 @@ impl<T: SSS> Injector for WorkerInjector<T> {
 
     fn extend(
         &self,
-        items: impl IntoIterator<Item = T> + ExactSizeIterator,
+        items: impl ExactSizeIterator<Item = T>,
     ) -> Result<(), WorkerError> {
         if self.version != self.picker_version.load(Ordering::Relaxed) {
             return Err(WorkerError::InjectorShutdown);
@@ -116,7 +117,7 @@ pub(super) fn push_impl<T>(injector: &nucleo::Injector<T>, columns: &[Column<T>]
 
 pub(super) fn extend_impl<T, I>(injector: &nucleo::Injector<T>, columns: &[Column<T>], items: I)
 where
-    I: IntoIterator<Item = T> + ExactSizeIterator,
+    I: ExactSizeIterator<Item = T>,
 {
     injector.extend(items, |item, dst| {
         for (column, text) in columns.iter().filter(|column| column.filter).zip(dst) {
@@ -163,22 +164,20 @@ impl<T, I: Injector<InputItem = Indexed<T>>> Injector for IndexedInjector<T, I> 
 
     fn extend(
         &self,
-        items: impl IntoIterator<Item = Self::InputItem> + ExactSizeIterator,
+        items: impl ExactSizeIterator<Item = Self::InputItem>,
     ) -> Result<(), WorkerError> {
         let count = items.len();
         if count == 0 {
             return Ok(());
         }
         let start_index = self.counter.fetch_add(count as u32, Ordering::SeqCst);
-        let wrapped: Vec<Indexed<T>> = items
-            .into_iter()
+        let wrapped = items
             .enumerate()
             .map(|(offset, item)| Indexed {
                 index: start_index + offset as u32,
                 inner: item,
-            })
-            .collect();
-        self.injector.extend(wrapped.into_iter())
+            });
+        self.injector.extend(wrapped)
     }
 }
 
@@ -234,16 +233,14 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
 
     fn extend(
         &self,
-        items: impl IntoIterator<Item = Self::InputItem> + ExactSizeIterator,
+        items: impl ExactSizeIterator<Item = Self::InputItem>,
     ) -> Result<(), WorkerError> {
-        let wrapped: Vec<Segmented<T>> = items
-            .into_iter()
-            .map(|(group, item)| {
-                let ranges = (self.splitter)(&item);
-                Segmented::new(item, ranges, group)
-            })
-            .collect();
-        self.injector.extend(wrapped.into_iter())
+        let splitter = &self.splitter;
+        let wrapped = items.map(|(group, item)| {
+            let ranges = (splitter)(&item);
+            Segmented::new(item, ranges, group)
+        });
+        self.injector.extend(wrapped)
     }
 }
 
@@ -306,19 +303,20 @@ mod ansi {
 
         fn extend(
             &self,
-            items: impl IntoIterator<Item = Self::InputItem> + ExactSizeIterator,
+            items: impl ExactSizeIterator<Item = Self::InputItem>,
         ) -> Result<(), WorkerError> {
             let parse = self.parse;
             let trim = self.trim;
 
-            let wrapped: Vec<<Self::Inner as Injector>::InputItem> = if !parse && !trim {
-                items
-                    .into_iter()
-                    .map(|(group, item)| (group, Either::Left(item.into_boxed_str())))
-                    .collect()
-            } else {
-                items
-                    .into_iter()
+            if !parse && !trim {
+                let wrapped = items
+                    .map(|(group, item)| (group, Either::Left(item.into_boxed_str())));
+                self.injector.extend(wrapped)
+            } else if items.len() >= 256 {
+                use rayon::prelude::*;
+                let items_vec: Vec<_> = items.collect();
+                let wrapped: Vec<<Self::Inner as Injector>::InputItem> = items_vec
+                    .into_par_iter()
                     .map(|(group, mut item)| {
                         if trim {
                             item = item.trim().to_string();
@@ -333,9 +331,25 @@ mod ansi {
                         };
                         (group, ret)
                     })
-                    .collect()
-            };
-            self.injector.extend(wrapped.into_iter())
+                    .collect();
+                self.injector.extend(wrapped.into_iter())
+            } else {
+                let wrapped = items.map(|(group, mut item)| {
+                    if trim {
+                        item = item.trim().to_string();
+                    }
+                    let ret = if !parse {
+                        Either::Left(item.into_boxed_str())
+                    } else {
+                        let mut parsed =
+                            item.as_bytes().into_text().unwrap_or(Text::from(item));
+                        scrub_text_styles(&mut parsed);
+                        Either::Right(parsed)
+                    };
+                    (group, ret)
+                });
+                self.injector.extend(wrapped)
+            }
         }
     }
 
