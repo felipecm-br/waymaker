@@ -584,6 +584,10 @@ pub struct NavConfig {
     #[serde(alias = "nav_prompt", alias = "focus_prompt")]
     pub prompt: String,
 
+    /// Optional prompt text shown during interactive prompt input mode (`Action::PromptInput`).
+    #[serde(alias = "prompt_input", alias = "nav_prompt_input")]
+    pub prompt_input: Option<String>,
+
     /// Key bindings active while navigation mode is enabled and results pane has focus.
     #[serde(alias = "nav_binds", alias = "focus_binds")]
     #[partial(no_recurse, unwrap)]
@@ -635,6 +639,7 @@ impl Default for NavConfig {
             bar: None,
             marker: "".to_string(),
             prompt: "".to_string(),
+            prompt_input: None,
             binds: Self::default_binds_for_profile(NavProfile::List),
             notify: false,
             passthrough: false,

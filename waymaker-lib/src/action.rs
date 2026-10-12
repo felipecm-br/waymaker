@@ -143,6 +143,8 @@ pub enum Action<A: ActionExt = NullActionExt> {
     // Programmable
     /// Execute command and continue
     Execute(String),
+    /// Interactive input mode that prompts for text and executes a template with `{input}`
+    PromptInput(String),
     /// non-blocking [`waymaker::Action::Execute`]: subsequent actions in the batch begin after its completion
     ExecuteAsync(String),
     /// non-blocking [`waymaker::Action::Execute`]: subsequent actions in the batch begin after its completion, only if successful
@@ -509,7 +511,7 @@ enum_from_str_display!(
     ForwardChar,BackwardChar, ForwardWord, BackwardWord, DeleteChar, DeleteWord, DeleteNextChar, DeleteNextWord, DeleteLineStart, DeleteLineEnd, Cancel, Redraw, NextColumn, PrevColumn, PrintKey, SortMenu;
 
     tuples:
-    Execute, ExecuteAsync, ExecuteThen, ExecuteSilent, Become, BecomeSilent, Preview,
+    Execute, PromptInput, ExecuteAsync, ExecuteThen, ExecuteSilent, Become, BecomeSilent, Preview,
     SetQuery, Pos, QueryPos, SwitchColumn, Store, SetMode,
     CopyAsync, Copy, ChDir;
 
@@ -863,6 +865,10 @@ mod tests {
         let exec: Action = Action::from_str("Execute(echo hi)").unwrap();
         assert_eq!(exec, Action::Execute("echo hi".into()));
         assert_eq!(exec.to_string(), "Execute(echo hi)");
+
+        let prompt_input: Action = Action::from_str("PromptInput(tmux send-keys -t '{=pid}' '{input}' Enter)").unwrap();
+        assert_eq!(prompt_input, Action::PromptInput("tmux send-keys -t '{=pid}' '{input}' Enter".into()));
+        assert_eq!(prompt_input.to_string(), "PromptInput(tmux send-keys -t '{=pid}' '{input}' Enter)");
 
         let exec_async: Action = Action::from_str("ExecuteAsync(cargo build)").unwrap();
         assert_eq!(exec_async, Action::ExecuteAsync("cargo build".into()));

@@ -81,6 +81,14 @@ pub struct State {
     pub pending_nav_key: Option<char>,
     /// Whether the sort shortcut menu is active in the footer.
     pub sort_menu_active: bool,
+    /// Whether interactive agent prompt input mode is active.
+    pub prompt_input_active: bool,
+    /// Template to execute when prompt input is confirmed.
+    pub prompt_input_template: Option<String>,
+    /// Stashed action ID for remainder actions when prompt input is confirmed.
+    pub prompt_input_stash_id: Option<u8>,
+    /// Last confirmed prompt input text (also exposed as WM_INPUT / MM_INPUT and {input}).
+    pub prompt_input_value: Option<String>,
 
     pub(crate) events: Event,
 
@@ -161,6 +169,10 @@ impl State {
             focus_tick: 0,
             pending_nav_key: None,
             sort_menu_active: false,
+            prompt_input_active: false,
+            prompt_input_template: None,
+            prompt_input_stash_id: None,
+            prompt_input_value: None,
 
             input: String::new(),
             iterations: 0,
@@ -572,6 +584,13 @@ impl<'a, 'b: 'a, T: SSS, S: Selection> MMState<'a, 'b, T, S> {
             ("MM_QUERY".to_string(), self.input.clone()),
             ("MM_MODE".to_string(), mode_str),
         ]);
+
+        if let Some(ref val) = self.prompt_input_value {
+            vars.extend([
+                ("WM_INPUT".to_string(), val.clone()),
+                ("MM_INPUT".to_string(), val.clone()),
+            ]);
+        }
 
         vars
     }

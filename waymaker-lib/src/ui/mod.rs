@@ -140,6 +140,8 @@ pub struct PickerUI<'a, T: SSS, S: Selection> {
     pub action: QueryUI,
     pub action_visible: bool,
     pub action_config: ActionBoxConfig,
+    pub prompt_input: QueryUI,
+    pub prompt_input_active: bool,
     pub breadcrumb_config: crate::config::BreadcrumbConfig,
     pub results: ResultsUI,
     pub query: QueryUI,
@@ -170,6 +172,18 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
             }),
             action_visible: false,
             action_config,
+            prompt_input: QueryUI::new(QueryConfig {
+                prompt: "󰆍 prompt: ".to_string(),
+                prompt_style: crate::config_types::StyleSetting {
+                    fg: Some(ratatui::style::Color::Magenta),
+                    modifier: ratatui::style::Modifier::BOLD,
+                    ..Default::default()
+                },
+                border: input_config.border.clone(),
+                status_inline: false,
+                ..input_config.clone()
+            }),
+            prompt_input_active: false,
             breadcrumb_config,
             results: ResultsUI::new(results_config, status_config),
             query: QueryUI::new(input_config),
@@ -189,6 +203,7 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
             action_visible,
             action_config,
             breadcrumb_config,
+            prompt_input_active,
             ..
         } = self;
 
@@ -203,7 +218,7 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
         let mut constraints = [
             Constraint::Length(if breadcrumb_config.show { 1 } else { 0 }), // breadcrumb
             Constraint::Length(action_height), // action (input + preview)
-            Constraint::Length(if query.config.show {
+            Constraint::Length(if query.config.show || *prompt_input_active {
                 1 + query.config.border.height()
             } else {
                 0

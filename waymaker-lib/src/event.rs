@@ -352,12 +352,14 @@ impl<A: ActionExt> EventLoop<A> {
                                         if let Some(key) = self.combiner.transform(k) {
                                         info!("{key:?}");
                                         let key = KeyCombination::normalized(key);
-                                        // When the action box is active, plain character keys
+                                        // When the action box or prompt input is active, plain character keys
                                         // must always reach the input as Action::Char regardless
                                         // of any shortcut bindings on that key.
                                         let action_box_active = crate::ACTION_BOX_ACTIVE
                                             .load(std::sync::atomic::Ordering::Relaxed);
-                                        if !action_box_active {
+                                        let prompt_input_active = crate::PROMPT_INPUT_ACTIVE
+                                            .load(std::sync::atomic::Ordering::Relaxed);
+                                        if !action_box_active && !prompt_input_active {
                                             if let Some(actions) = self.get_bind(TriggerKind::Key(key)) {
                                                 self.record_key(key.to_string());
                                                 self.send_actions(actions, Some(key.to_string()));
@@ -370,7 +372,7 @@ impl<A: ActionExt> EventLoop<A> {
                                                 self.dispatch_fallback_key(key);
                                             }
                                         } else if let Some(c) = key_code_as_letter(key) {
-                                            // Action box is active: plain chars always go to input.
+                                            // Action box or Prompt input is active: plain chars always go to input.
                                             // Non-char keys (ctrl-c, esc, enter, editing keys) still
                                             // go through the normal bind/fallback path.
                                             self.send(RenderCommand::KeyAction {

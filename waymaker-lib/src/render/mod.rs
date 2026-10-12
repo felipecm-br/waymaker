@@ -84,6 +84,7 @@ fn action_from_null<A: ActionExt>(action: Action<NullActionExt>) -> Option<Actio
         Action::ToggleColumn(x) => Action::ToggleColumn(x),
         Action::ShowColumn(x) => Action::ShowColumn(x),
         Action::Execute(x) => Action::Execute(x),
+        Action::PromptInput(x) => Action::PromptInput(x),
         Action::ExecuteAsync(x) => Action::ExecuteAsync(x),
         Action::ExecuteThen(x) => Action::ExecuteThen(x),
         Action::ExecuteSilent(x) => Action::ExecuteSilent(x),
@@ -208,6 +209,56 @@ fn apply_sort_menu<A: ActionExt>(buffer: &mut Vec<RenderCommand<A>>, sort_menu_a
             }
             other => {
                 *sort_menu_active = false;
+                out.push(other);
+            }
+        }
+    }
+
+    *buffer = out;
+}
+
+#[inline]
+fn apply_prompt_input<A: ActionExt>(
+    buffer: &mut Vec<RenderCommand<A>>,
+    prompt_input_active: bool,
+) {
+    if !prompt_input_active {
+        return;
+    }
+
+    let mut out = Vec::with_capacity(buffer.len());
+
+    for cmd in buffer.drain(..) {
+        match cmd {
+            RenderCommand::Tick => out.push(RenderCommand::Tick),
+            RenderCommand::KeyAction { key, .. } if key.eq_ignore_ascii_case("esc") => {
+                out.push(RenderCommand::Action(Action::Cancel));
+            }
+            RenderCommand::KeyAction { key, .. } if key.eq_ignore_ascii_case("enter") => {
+                out.push(RenderCommand::Action(Action::Accept));
+            }
+            RenderCommand::KeyAction { key, .. } if key.eq_ignore_ascii_case("backspace") => {
+                out.push(RenderCommand::Action(Action::DeleteChar));
+            }
+            RenderCommand::Action(Action::Quit(_))
+            | RenderCommand::Action(Action::Cancel)
+            | RenderCommand::KeyAction {
+                action: Action::Quit(_) | Action::Cancel,
+                ..
+            } => {
+                out.push(RenderCommand::Action(Action::Cancel));
+            }
+            RenderCommand::Action(Action::Accept)
+            | RenderCommand::KeyAction {
+                action: Action::Accept,
+                ..
+            } => {
+                out.push(RenderCommand::Action(Action::Accept));
+            }
+            RenderCommand::Action(a) | RenderCommand::KeyAction { action: a, .. } => {
+                out.push(RenderCommand::Action(a));
+            }
+            other => {
                 out.push(other);
             }
         }
@@ -869,6 +920,15 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
         }
     }
 
+    if let Some(ref p) = ui.config.nav.prompt_input {
+        picker_ui.prompt_input.set_prompt(Some(ratatui::text::Line::styled(
+            p.clone(),
+            ratatui::style::Style::default()
+                .fg(ratatui::style::Color::Magenta)
+                .add_modifier(ratatui::style::Modifier::BOLD),
+        )));
+    }
+
     state.refresh_parent_peek_cache();
     if let Some(ref cwd) = state.cached_cwd {
         let sort_order = ui.config.resolve_sort_for_dir(cwd);
@@ -930,7 +990,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             )
         };
 
-        if state.sort_menu_active {
+        if state.prompt_input_active {
+            apply_prompt_input(&mut buffer, state.prompt_input_active);
+        } else if state.sort_menu_active {
             apply_sort_menu(&mut buffer, &mut state.sort_menu_active);
         } else if ui.config.nav.active {
             if !ui.config.nav.passthrough {
@@ -1276,6 +1338,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         query,
                         action: action_input,
                         action_visible,
+                        prompt_input,
+                        prompt_input_active,
                         results,
                         worker,
                         selector: selections,
@@ -1322,6 +1386,26 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             selections.clear();
                         }
                         Action::Accept => {
+                            if state.prompt_input_active {
+                                state.prompt_input_active = false;
+                                *prompt_input_active = false;
+                                crate::PROMPT_INPUT_ACTIVE
+                                    .store(false, std::sync::atomic::Ordering::Relaxed);
+                                let input_text = std::mem::take(&mut prompt_input.input);
+                                prompt_input.cancel();
+
+                                state.prompt_input_value = Some(input_text.clone());
+                                state.envs.set("WM_INPUT", input_text.clone());
+                                state.envs.set("MM_INPUT", input_text);
+
+                                if let Some(template) = state.prompt_input_template.take() {
+                                    let id = state.prompt_input_stash_id.take().unwrap_or(1);
+                                    state.set_interrupt(Interrupt::ExecuteAsync, template);
+                                    state.discriminant_payload = Some(2 * id + 1);
+                                }
+                                tui.redraw();
+                                continue;
+                            }
                             let ret = if selections.is_empty() {
                                 if let Some(item) = get_current(&picker_ui) {
                                     vec![item.1]
@@ -1336,7 +1420,19 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             return Ok(ret);
                         }
                         Action::Quit(code) => {
-                            if picker_ui.action_visible {
+                            if state.prompt_input_active {
+                                state.prompt_input_active = false;
+                                *prompt_input_active = false;
+                                crate::PROMPT_INPUT_ACTIVE
+                                    .store(false, std::sync::atomic::Ordering::Relaxed);
+                                if let Some(id) = state.prompt_input_stash_id.take() {
+                                    let _ = state.take_actions(id);
+                                }
+                                state.prompt_input_template = None;
+                                prompt_input.cancel();
+                                tui.redraw();
+                                continue;
+                            } else if picker_ui.action_visible {
                                 picker_ui.action_visible = false;
                                 picker_ui.action.cancel();
                                 crate::ACTION_BOX_ACTIVE
@@ -1847,6 +1943,26 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         Action::Print(payload) => {
                             state.set_interrupt(Interrupt::Print, payload);
                         }
+                        Action::PromptInput(payload) => {
+                            let mut remainder = crate::action::Actions::default();
+                            for cmd in events.by_ref() {
+                                if let RenderCommand::Action(a)
+                                | RenderCommand::KeyAction { action: a, .. } = cmd
+                                {
+                                    remainder.push(a);
+                                }
+                            }
+
+                            state.prompt_input_stash_id =
+                                state.stash_actions(remainder, bind_tx.clone());
+                            state.prompt_input_template = Some(payload);
+                            state.prompt_input_active = true;
+                            *prompt_input_active = true;
+                            crate::PROMPT_INPUT_ACTIVE
+                                .store(true, std::sync::atomic::Ordering::Relaxed);
+                            prompt_input.cancel();
+                            tui.redraw();
+                        }
 
                         // Columns
                         Action::SwitchColumn(col_name) => {
@@ -1932,7 +2048,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
 
                         // Edit
                         Action::SetQuery(context) => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.set(context, u16::MAX);
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -1942,7 +2060,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::ForwardChar => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.forward_char()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -1952,7 +2072,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::BackwardChar => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.backward_char()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -1962,7 +2084,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::ForwardWord => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.forward_word()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -1972,7 +2096,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::BackwardWord => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.backward_word()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -1982,7 +2108,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::DeleteChar => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.delete()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -1992,7 +2120,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::DeleteWord => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.delete_word()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -2002,7 +2132,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::DeleteNextChar => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.delete_next()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -2012,7 +2144,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::DeleteNextWord => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.delete_next_word()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -2022,7 +2156,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::DeleteLineStart => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.delete_line_start()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -2032,7 +2168,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::DeleteLineEnd => {
-                            if *action_visible
+                            if state.prompt_input_active {
+                                prompt_input.delete_line_end()
+                            } else if *action_visible
                                 && crate::ACTION_BOX_ACTIVE
                                     .load(std::sync::atomic::Ordering::Relaxed)
                             {
@@ -2042,7 +2180,19 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::Cancel => {
-                            if *action_visible {
+                            if state.prompt_input_active {
+                                state.prompt_input_active = false;
+                                *prompt_input_active = false;
+                                crate::PROMPT_INPUT_ACTIVE
+                                    .store(false, std::sync::atomic::Ordering::Relaxed);
+                                if let Some(id) = state.prompt_input_stash_id.take() {
+                                    let _ = state.take_actions(id);
+                                }
+                                state.prompt_input_template = None;
+                                prompt_input.cancel();
+                                tui.redraw();
+                                continue;
+                            } else if *action_visible {
                                 *action_visible = false;
                                 action_input.cancel();
                                 crate::ACTION_BOX_ACTIVE
@@ -2157,23 +2307,28 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         }
                         Action::Char(c) => {
                             if !c.is_ascii_control() {
-                                let is_action_box_input = *action_visible
-                                    && crate::ACTION_BOX_ACTIVE
-                                        .load(std::sync::atomic::Ordering::Relaxed);
-                                if is_action_box_input {
-                                    action_input.push_char(c)
+                                if state.prompt_input_active {
+                                    prompt_input.push_char(c);
+                                    tui.redraw();
                                 } else {
-                                    if *action_visible {
-                                        *action_visible = false;
-                                        action_input.cancel();
-                                        crate::ACTION_BOX_ACTIVE
-                                            .store(false, std::sync::atomic::Ordering::Relaxed);
-                                    }
-                                    if !(ui.config.nav.active
-                                        && !ui.config.nav.passthrough
-                                        && state.focus == Focus::Results)
-                                    {
-                                        query.push_char(c)
+                                    let is_action_box_input = *action_visible
+                                        && crate::ACTION_BOX_ACTIVE
+                                            .load(std::sync::atomic::Ordering::Relaxed);
+                                    if is_action_box_input {
+                                        action_input.push_char(c)
+                                    } else {
+                                        if *action_visible {
+                                            *action_visible = false;
+                                            action_input.cancel();
+                                            crate::ACTION_BOX_ACTIVE
+                                                .store(false, std::sync::atomic::Ordering::Relaxed);
+                                        }
+                                        if !(ui.config.nav.active
+                                            && !ui.config.nav.passthrough
+                                            && state.focus == Focus::Results)
+                                        {
+                                            query.push_char(c)
+                                        }
                                     }
                                 }
                             }
@@ -2774,7 +2929,26 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 frame.render_widget(p, target_rect);
                             }
                         }
-                        if picker_ui.query.config.show {
+                        if state.prompt_input_active {
+                            cursor_y_offset = render_input(
+                                frame,
+                                input,
+                                &mut picker_ui.prompt_input,
+                                None,
+                                Some(FocusInfo {
+                                    focused: true,
+                                    blink_phase: state.focus_blink,
+                                    color: nav_color,
+                                    do_blink: false,
+                                    bold: true,
+                                    bar: None,
+                                    marker: String::new(),
+                                    nav_char: String::new(),
+                                    nav_prompt: String::new(),
+                                }),
+                            )
+                            .y;
+                        } else if picker_ui.query.config.show {
                             cursor_y_offset = render_input(
                                 frame,
                                 input,
@@ -5167,6 +5341,62 @@ mod test {
         let res_rev = get_nav_bind(&focus_binds_shift, "?");
         assert!(res_rev.is_some());
         assert_eq!(res_rev.unwrap()[0], Action::Help("".into()));
+    }
+
+    #[test]
+    fn test_apply_prompt_input() {
+        // When not active, buffer is untouched
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "enter".to_string(),
+                action: Action::Redraw,
+            },
+        ];
+        apply_prompt_input(&mut buffer, false);
+        assert_eq!(buffer.len(), 1);
+        assert!(matches!(buffer[0], RenderCommand::KeyAction { .. }));
+
+        // When active:
+        // 1. Enter maps to Action::Accept
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "enter".to_string(),
+                action: Action::Redraw,
+            },
+        ];
+        apply_prompt_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        assert!(matches!(buffer[0], RenderCommand::Action(Action::Accept)));
+
+        // 2. Esc maps to Action::Cancel
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "esc".to_string(),
+                action: Action::Quit(0),
+            },
+        ];
+        apply_prompt_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        assert!(matches!(buffer[0], RenderCommand::Action(Action::Cancel)));
+
+        // 3. Backspace maps to Action::DeleteChar
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "backspace".to_string(),
+                action: Action::Redraw,
+            },
+        ];
+        apply_prompt_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        assert!(matches!(buffer[0], RenderCommand::Action(Action::DeleteChar)));
+
+        // 4. Regular characters pass through as Action(Char(c))
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::Action(Action::Char('a')),
+        ];
+        apply_prompt_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        assert!(matches!(buffer[0], RenderCommand::Action(Action::Char('a'))));
     }
 }
 

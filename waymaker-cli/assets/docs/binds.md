@@ -240,6 +240,7 @@ Actions are the operations performed when a trigger is activated.
 | `Become(cmd)`          | Transform the process into the command (replaces process via `exec`, records frecency for targeted items).                          |
 | `BecomeSilent(cmd)`    | Transform the process into the command without clearing the screen (useful for transitioning between different waymaker presets). |
 | `BecomeOr(cmd)`        | Execute the command, ask for confirmation on failure, quit on success, resume on interrupt.                                         |
+| `PromptInput(cmd)`     | Open inline text prompt (`󰆍 prompt: `); executes command template with `{input}` asynchronously on Enter.                             |
 | `Reload(cmd)`          | Rerun the initial command or a new one.                                                                                             |
 | `ReloadNext(n)`        | Cycle through `additional_commands`.                                                                                                |
 | `ReloadPrev`           | Cycle backwards through `additional_commands`.                                                                                      |

@@ -40,3 +40,6 @@ pub mod noninteractive;
 pub static MODE: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 pub static ACTION_BOX_ACTIVE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
+pub static PROMPT_INPUT_ACTIVE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+

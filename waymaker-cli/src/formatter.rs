@@ -102,7 +102,11 @@ impl TemplateAST {
                                     .push(TemplateToken::Literal(std::mem::take(&mut cur_literal)));
                             }
                             let k = key.trim_start_matches('=');
-                            if !key.starts_with(['+', '-', '$']) && k != "query" && k != "q" {
+                            if !key.starts_with(['+', '-', '$'])
+                                && k != "query"
+                                && k != "q"
+                                && k != "input"
+                            {
                                 needs_current = true;
                             }
                             tokens.push(TemplateToken::Key(key.to_string()));
@@ -265,6 +269,15 @@ fn process_key(
 
     if key == "query" || key == "q" {
         let val = state.picker_ui.query.input.clone();
+        return if quote {
+            Some(shell_quote_impl(&val))
+        } else {
+            Some(val)
+        };
+    }
+
+    if key == "input" {
+        let val = state.prompt_input_value.clone().unwrap_or_default();
         return if quote {
             Some(shell_quote_impl(&val))
         } else {
@@ -749,6 +762,58 @@ mod tests {
 
             let result = format_cli(&mut mm_state, "echo {$1} {=$2} {$3}", None);
             assert_eq!(result, "echo 'arg1' arg with space ");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_format_cli_prompt_input() {
+        let (mut mm, injector, _guard) = setup_test_mm();
+        injector.push((None, "1234,agent1,busy".to_string())).unwrap();
+        mm.worker.nucleo.tick(10);
+
+        let mut state_obj = State::new();
+        state_obj.prompt_input_value = Some("review PR #42".to_string());
+        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
+
+        let hidden_columns = vec![false, false, false];
+        let (mut ui, mut picker_ui, mut footer_ui, mut preview_ui) = UI::new(
+            mm.render_config,
+            &mut matcher,
+            mm.worker,
+            mm.selector,
+            None,
+            &mut tui,
+            hidden_columns,
+        );
+
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        {
+            let mut mm_state = state_obj.dispatcher(
+                &mut ui,
+                &mut picker_ui,
+                &mut footer_ui,
+                &mut preview_ui,
+                &event_tx,
+            );
+
+            let result = format_cli(
+                &mut mm_state,
+                "tmux send-keys -t '{=1}' {input} Enter",
+                None,
+            );
+            assert_eq!(
+                result,
+                "tmux send-keys -t '1234' 'review PR #42' Enter"
+            );
+
+            let result_raw = format_cli(
+                &mut mm_state,
+                "echo {=input}",
+                None,
+            );
+            assert_eq!(result_raw, "echo review PR #42");
         }
     }
 }

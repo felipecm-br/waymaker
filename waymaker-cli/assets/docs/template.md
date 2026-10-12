@@ -36,6 +36,9 @@ Note that the default column names (when `columns.names` is unspecified) are `1`
 
 `!` refers to the active column.
 `#` refers to the active index.
+`{query}` or `{q}` refers to the current search query text.
+`{input}` refers to the user input captured via `Action::PromptInput` (shell-quoted).
+`{=input}` refers to raw prompt input without shell quoting.
 
 See examples for more information.
 
@@ -192,6 +195,7 @@ When Waymaker executes a command (e.g., via `Execute`, `Become`, or a preview co
 | `WM_SELECT_COUNT` / `MM_SELECT_COUNT` | `FZF_SELECT_COUNT` | Number of selected items                           |
 | `WM_POS` / `MM_POS`                   | `FZF_POS`          | Current row index (0-indexed cursor position)      |
 | `WM_QUERY` / `MM_QUERY`               | `FZF_QUERY`        | Current input query                                |
+| `WM_INPUT` / `MM_INPUT`               |                    | Input value entered during `PromptInput` mode      |
 | `WM_PREVIEW_COMMAND` / `MM_PREVIEW_COMMAND` |              | The current preview command                        |
 | `WM_OVERRIDE` / `MM_OVERRIDE`         |                    | Path of the last applied override                  |
 | `WM_STORE` / `MM_STORE`               |                    | Current value stored in state (via `Store` action) |
