@@ -936,6 +936,44 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
         });
     }
 
+    /// Dispatches keystrokes asynchronously to target (e.g. `tmux send-keys`) in live input mode,
+    /// followed by a cooperative debounced preview refresh.
+    pub fn _register_live_input_handler(&mut self, formatter: AttachmentFormatter<T, S>) {
+        self.register_interrupt_handler(Interrupt::LiveInputKey, move |state| {
+            let template = state.payload().clone();
+            if !template.is_empty() {
+                let cmd = use_formatter(&formatter, state, &template, None);
+                if cmd.is_empty() {
+                    return;
+                }
+                let mut vars = state.make_env_vars();
+
+                let preview_template = state.preview_payload().clone();
+                let preview_cmd = use_formatter(&formatter, state, &preview_template, None);
+                let extra = env_vars!(
+                    "WM_PREVIEW_COMMAND" => preview_cmd.clone(),
+                    "MM_PREVIEW_COMMAND" => preview_cmd,
+                );
+                vars.extend(extra);
+
+                let event_ctrl = state.event_controller.clone();
+                tokio::spawn(async move {
+                    if let Ok(mut child) = tokio_command_from_script(&cmd)
+                        .envs(vars)
+                        .stdin(Stdio::null())
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn()
+                    {
+                        let _ = child.wait().await;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(25)).await;
+                        let _ = event_ctrl.send(crate::message::Event::PreviewChange);
+                    }
+                });
+            }
+        });
+    }
+
     /// Causes [`Action::Copy`] and [`Action::CopySync`] to execute their payload, and copy the result to the clipboard.
     /// Note:
     /// - intended for direct use

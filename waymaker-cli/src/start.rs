@@ -1164,6 +1164,7 @@ pub async fn start(
     // execute handlers
     mm.register_execute_handler(cli_formatter.clone());
     mm._register_execute_async_handler(cli_formatter.clone());
+    mm._register_live_input_handler(cli_formatter.clone());
     mm.register_copy(
         cli_formatter.clone(),
         copy_trailing_newline,

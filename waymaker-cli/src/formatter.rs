@@ -106,6 +106,8 @@ impl TemplateAST {
                                 && k != "query"
                                 && k != "q"
                                 && k != "input"
+                                && k != "key"
+                                && k != "keys"
                             {
                                 needs_current = true;
                             }
@@ -278,6 +280,15 @@ fn process_key(
 
     if key == "input" {
         let val = state.prompt_input_value.clone().unwrap_or_default();
+        return if quote {
+            Some(shell_quote_impl(&val))
+        } else {
+            Some(val)
+        };
+    }
+
+    if key == "key" || key == "keys" {
+        let val = state.live_input_key.clone().unwrap_or_default();
         return if quote {
             Some(shell_quote_impl(&val))
         } else {
@@ -814,6 +825,57 @@ mod tests {
                 None,
             );
             assert_eq!(result_raw, "echo review PR #42");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_format_cli_live_input() {
+        let (mut mm, injector, _guard) = setup_test_mm();
+        injector.push((None, "1234,agent1,busy".to_string())).unwrap();
+        mm.worker.nucleo.tick(10);
+
+        let mut state_obj = State::new();
+        state_obj.live_input_key = Some("Enter".to_string());
+        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
+
+        let hidden_columns = vec![false, false, false];
+        let (mut ui, mut picker_ui, mut footer_ui, mut preview_ui) = UI::new(
+            mm.render_config,
+            &mut matcher,
+            mm.worker,
+            mm.selector,
+            None,
+            &mut tui,
+            hidden_columns,
+        );
+
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        {
+            let mut mm_state = state_obj.dispatcher(
+                &mut ui,
+                &mut picker_ui,
+                &mut footer_ui,
+                &mut preview_ui,
+                &event_tx,
+            );
+
+            // Raw unquoted {=keys} expands directly
+            let result_raw = format_cli(
+                &mut mm_state,
+                "tmux send-keys -t '123' {=keys}",
+                None,
+            );
+            assert_eq!(result_raw, "tmux send-keys -t '123' Enter");
+
+            // Quoted {keys}
+            let result_quoted = format_cli(
+                &mut mm_state,
+                "tmux send-keys -t '123' {keys}",
+                None,
+            );
+            assert_eq!(result_quoted, "tmux send-keys -t '123' 'Enter'");
         }
     }
 }

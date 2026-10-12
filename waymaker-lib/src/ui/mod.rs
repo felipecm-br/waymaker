@@ -142,6 +142,7 @@ pub struct PickerUI<'a, T: SSS, S: Selection> {
     pub action_config: ActionBoxConfig,
     pub prompt_input: QueryUI,
     pub prompt_input_active: bool,
+    pub live_input_active: bool,
     pub breadcrumb_config: crate::config::BreadcrumbConfig,
     pub results: ResultsUI,
     pub query: QueryUI,
@@ -184,6 +185,7 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
                 ..input_config.clone()
             }),
             prompt_input_active: false,
+            live_input_active: false,
             breadcrumb_config,
             results: ResultsUI::new(results_config, status_config),
             query: QueryUI::new(input_config),
@@ -204,6 +206,7 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
             action_config,
             breadcrumb_config,
             prompt_input_active,
+            live_input_active,
             ..
         } = self;
 
@@ -218,7 +221,7 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
         let mut constraints = [
             Constraint::Length(if breadcrumb_config.show { 1 } else { 0 }), // breadcrumb
             Constraint::Length(action_height), // action (input + preview)
-            Constraint::Length(if query.config.show || *prompt_input_active {
+            Constraint::Length(if query.config.show || *prompt_input_active || *live_input_active {
                 1 + query.config.border.height()
             } else {
                 0

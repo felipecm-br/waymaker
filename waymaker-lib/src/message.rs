@@ -67,6 +67,7 @@ pub enum Interrupt {
     Print,
     Reload,
     Custom,
+    LiveInputKey,
 }
 
 // ---------------------------------------------------------------------

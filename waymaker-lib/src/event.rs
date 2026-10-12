@@ -359,11 +359,22 @@ impl<A: ActionExt> EventLoop<A> {
                                             .load(std::sync::atomic::Ordering::Relaxed);
                                         let prompt_input_active = crate::PROMPT_INPUT_ACTIVE
                                             .load(std::sync::atomic::Ordering::Relaxed);
-                                        if !action_box_active && !prompt_input_active {
+                                        let live_input_active = crate::LIVE_INPUT_ACTIVE
+                                            .load(std::sync::atomic::Ordering::Relaxed);
+                                        if !action_box_active && !prompt_input_active && !live_input_active {
                                             if let Some(actions) = self.get_bind(TriggerKind::Key(key)) {
                                                 self.record_key(key.to_string());
                                                 self.send_actions(actions, Some(key.to_string()));
                                             } else if let Some(c) = key_code_as_letter(key) {
+                                                self.send(RenderCommand::KeyAction {
+                                                    key: c.to_string(),
+                                                    action: Action::Char(c),
+                                                });
+                                            } else {
+                                                self.dispatch_fallback_key(key);
+                                            }
+                                        } else if live_input_active {
+                                            if let Some(c) = key_code_as_letter(key) {
                                                 self.send(RenderCommand::KeyAction {
                                                     key: c.to_string(),
                                                     action: Action::Char(c),

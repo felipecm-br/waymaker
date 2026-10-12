@@ -89,6 +89,12 @@ pub struct State {
     pub prompt_input_stash_id: Option<u8>,
     /// Last confirmed prompt input text (also exposed as WM_INPUT / MM_INPUT and {input}).
     pub prompt_input_value: Option<String>,
+    /// Whether live passthrough keystroke streaming mode is active.
+    pub live_input_active: bool,
+    /// Template to execute when keystrokes arrive in live input mode.
+    pub live_input_template: Option<String>,
+    /// Last dispatched live key or key sequence (also exposed as WM_KEY / MM_KEY and {key}/{keys}).
+    pub live_input_key: Option<String>,
 
     pub(crate) events: Event,
 
@@ -173,6 +179,9 @@ impl State {
             prompt_input_template: None,
             prompt_input_stash_id: None,
             prompt_input_value: None,
+            live_input_active: false,
+            live_input_template: None,
+            live_input_key: None,
 
             input: String::new(),
             iterations: 0,
@@ -589,6 +598,15 @@ impl<'a, 'b: 'a, T: SSS, S: Selection> MMState<'a, 'b, T, S> {
             vars.extend([
                 ("WM_INPUT".to_string(), val.clone()),
                 ("MM_INPUT".to_string(), val.clone()),
+            ]);
+        }
+
+        if let Some(ref val) = self.live_input_key {
+            vars.extend([
+                ("WM_KEY".to_string(), val.clone()),
+                ("MM_KEY".to_string(), val.clone()),
+                ("WM_KEYS".to_string(), val.clone()),
+                ("MM_KEYS".to_string(), val.clone()),
             ]);
         }
 

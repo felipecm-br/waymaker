@@ -85,6 +85,8 @@ fn action_from_null<A: ActionExt>(action: Action<NullActionExt>) -> Option<Actio
         Action::ShowColumn(x) => Action::ShowColumn(x),
         Action::Execute(x) => Action::Execute(x),
         Action::PromptInput(x) => Action::PromptInput(x),
+        Action::LiveInput(x) => Action::LiveInput(x),
+        Action::LiveInputKey(x) => Action::LiveInputKey(x),
         Action::ExecuteAsync(x) => Action::ExecuteAsync(x),
         Action::ExecuteThen(x) => Action::ExecuteThen(x),
         Action::ExecuteSilent(x) => Action::ExecuteSilent(x),
@@ -214,6 +216,139 @@ fn apply_sort_menu<A: ActionExt>(buffer: &mut Vec<RenderCommand<A>>, sort_menu_a
         }
     }
 
+    *buffer = out;
+}
+
+#[inline]
+fn normalize_live_key(key: &str) -> String {
+    let lower = key.to_ascii_lowercase();
+    match lower.as_str() {
+        "enter" | "return" => "Enter".to_string(),
+        "backspace" | "bspace" => "BSpace".to_string(),
+        "tab" => "Tab".to_string(),
+        "btab" | "backtab" | "shift-tab" => "BTab".to_string(),
+        "up" => "Up".to_string(),
+        "down" => "Down".to_string(),
+        "left" => "Left".to_string(),
+        "right" => "Right".to_string(),
+        "space" | " " => "Space".to_string(),
+        "pageup" | "page_up" => "PageUp".to_string(),
+        "pagedown" | "page_down" => "PageDown".to_string(),
+        "home" => "Home".to_string(),
+        "end" => "End".to_string(),
+        k if k.starts_with("ctrl-") => {
+            let rest = &k[5..];
+            format!("C-{rest}")
+        }
+        k if k.starts_with("alt-") => {
+            let rest = &k[4..];
+            format!("M-{rest}")
+        }
+        _ => key.to_string(),
+    }
+}
+
+#[inline]
+fn apply_live_input<A: ActionExt>(
+    buffer: &mut Vec<RenderCommand<A>>,
+    live_input_active: bool,
+) {
+    if !live_input_active {
+        return;
+    }
+
+    let mut out = Vec::with_capacity(buffer.len());
+    let mut current_text_batch = String::new();
+    let mut key_batch: Vec<String> = Vec::new();
+
+    let flush_batch = |key_batch: &mut Vec<String>, current_text_batch: &mut String, out: &mut Vec<RenderCommand<A>>| {
+        if !current_text_batch.is_empty() {
+            key_batch.push(std::mem::take(current_text_batch));
+        }
+        if !key_batch.is_empty() {
+            let keys = std::mem::take(key_batch);
+            out.push(RenderCommand::Action(Action::LiveInputKey(keys.join(" "))));
+        }
+    };
+
+    for cmd in buffer.drain(..) {
+        match cmd {
+            RenderCommand::Tick => {
+                flush_batch(&mut key_batch, &mut current_text_batch, &mut out);
+                out.push(RenderCommand::Tick);
+            }
+            RenderCommand::KeyAction { ref key, .. } if key.eq_ignore_ascii_case("esc") => {
+                flush_batch(&mut key_batch, &mut current_text_batch, &mut out);
+                out.push(RenderCommand::Action(Action::Cancel));
+            }
+            RenderCommand::Action(Action::Quit(_))
+            | RenderCommand::Action(Action::Cancel)
+            | RenderCommand::KeyAction {
+                action: Action::Quit(_) | Action::Cancel,
+                ..
+            } => {
+                flush_batch(&mut key_batch, &mut current_text_batch, &mut out);
+                out.push(RenderCommand::Action(Action::Cancel));
+            }
+            RenderCommand::Action(Action::Char(c))
+            | RenderCommand::KeyAction {
+                action: Action::Char(c),
+                ..
+            } => {
+                if !c.is_ascii_control() {
+                    current_text_batch.push(c);
+                }
+            }
+            RenderCommand::KeyAction { ref key, .. } => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push(normalize_live_key(key));
+            }
+            RenderCommand::Action(Action::Accept) => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push("Enter".to_string());
+            }
+            RenderCommand::Action(Action::DeleteChar) => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push("BSpace".to_string());
+            }
+            RenderCommand::Action(Action::Up(_)) => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push("Up".to_string());
+            }
+            RenderCommand::Action(Action::Down(_)) => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push("Down".to_string());
+            }
+            RenderCommand::Action(Action::ForwardChar) => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push("Right".to_string());
+            }
+            RenderCommand::Action(Action::BackwardChar) => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push("Left".to_string());
+            }
+            other => {
+                flush_batch(&mut key_batch, &mut current_text_batch, &mut out);
+                out.push(other);
+            }
+        }
+    }
+
+    flush_batch(&mut key_batch, &mut current_text_batch, &mut out);
     *buffer = out;
 }
 
@@ -990,7 +1125,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             )
         };
 
-        if state.prompt_input_active {
+        if state.live_input_active {
+            apply_live_input(&mut buffer, state.live_input_active);
+        } else if state.prompt_input_active {
             apply_prompt_input(&mut buffer, state.prompt_input_active);
         } else if state.sort_menu_active {
             apply_sort_menu(&mut buffer, &mut state.sort_menu_active);
@@ -1340,6 +1477,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         action_visible,
                         prompt_input,
                         prompt_input_active,
+                        live_input_active,
                         results,
                         worker,
                         selector: selections,
@@ -1420,7 +1558,16 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             return Ok(ret);
                         }
                         Action::Quit(code) => {
-                            if state.prompt_input_active {
+                            if state.live_input_active {
+                                state.live_input_active = false;
+                                *live_input_active = false;
+                                crate::LIVE_INPUT_ACTIVE
+                                    .store(false, std::sync::atomic::Ordering::Relaxed);
+                                state.live_input_template = None;
+                                state.live_input_key = None;
+                                tui.redraw();
+                                continue;
+                            } else if state.prompt_input_active {
                                 state.prompt_input_active = false;
                                 *prompt_input_active = false;
                                 crate::PROMPT_INPUT_ACTIVE
@@ -1963,6 +2110,31 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             prompt_input.cancel();
                             tui.redraw();
                         }
+                        Action::LiveInput(payload) => {
+                            state.live_input_active = true;
+                            *live_input_active = true;
+                            crate::LIVE_INPUT_ACTIVE
+                                .store(true, std::sync::atomic::Ordering::Relaxed);
+                            let template = if !payload.is_empty() {
+                                payload
+                            } else {
+                                ui.config.nav.live_input.clone().unwrap_or_default()
+                            };
+                            state.live_input_template = Some(template);
+                            tui.redraw();
+                        }
+                        Action::LiveInputKey(keys) => {
+                            if state.live_input_active
+                                && let Some(ref template) = state.live_input_template
+                            {
+                                state.live_input_key = Some(keys.clone());
+                                state.envs.set("WM_KEY", keys.clone());
+                                state.envs.set("MM_KEY", keys.clone());
+                                state.envs.set("WM_KEYS", keys.clone());
+                                state.envs.set("MM_KEYS", keys);
+                                state.set_interrupt(Interrupt::LiveInputKey, template.clone());
+                            }
+                        }
 
                         // Columns
                         Action::SwitchColumn(col_name) => {
@@ -2180,7 +2352,16 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::Cancel => {
-                            if state.prompt_input_active {
+                            if state.live_input_active {
+                                state.live_input_active = false;
+                                *live_input_active = false;
+                                crate::LIVE_INPUT_ACTIVE
+                                    .store(false, std::sync::atomic::Ordering::Relaxed);
+                                state.live_input_template = None;
+                                state.live_input_key = None;
+                                tui.redraw();
+                                continue;
+                            } else if state.prompt_input_active {
                                 state.prompt_input_active = false;
                                 *prompt_input_active = false;
                                 crate::PROMPT_INPUT_ACTIVE
@@ -2929,7 +3110,37 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 frame.render_widget(p, target_rect);
                             }
                         }
-                        if state.prompt_input_active {
+                        if state.live_input_active {
+                            let line = ratatui::text::Line::from(vec![
+                                ratatui::text::Span::styled(
+                                    " 󰌌 LIVE INPUT ",
+                                    ratatui::style::Style::default()
+                                        .fg(ratatui::style::Color::Black)
+                                        .bg(ratatui::style::Color::Green)
+                                        .add_modifier(ratatui::style::Modifier::BOLD),
+                                ),
+                                ratatui::text::Span::raw(" "),
+                                ratatui::text::Span::styled(
+                                    "streaming keys to agent",
+                                    ratatui::style::Style::default()
+                                        .fg(ratatui::style::Color::Green)
+                                        .add_modifier(ratatui::style::Modifier::BOLD),
+                                ),
+                                ratatui::text::Span::raw("  •  "),
+                                ratatui::text::Span::styled(
+                                    "[Esc]",
+                                    ratatui::style::Style::default()
+                                        .fg(ratatui::style::Color::DarkGray)
+                                        .add_modifier(ratatui::style::Modifier::BOLD),
+                                ),
+                                ratatui::text::Span::styled(
+                                    " exit",
+                                    ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
+                                ),
+                            ]);
+                            frame.render_widget(ratatui::widgets::Paragraph::new(line), input);
+                            cursor_y_offset = input.y;
+                        } else if state.prompt_input_active {
                             cursor_y_offset = render_input(
                                 frame,
                                 input,
@@ -5397,6 +5608,79 @@ mod test {
         apply_prompt_input(&mut buffer, true);
         assert_eq!(buffer.len(), 1);
         assert!(matches!(buffer[0], RenderCommand::Action(Action::Char('a'))));
+    }
+
+    #[test]
+    fn test_apply_live_input() {
+        // When not active, buffer is untouched
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "enter".to_string(),
+                action: Action::Redraw,
+            },
+        ];
+        apply_live_input(&mut buffer, false);
+        assert_eq!(buffer.len(), 1);
+        assert!(matches!(buffer[0], RenderCommand::KeyAction { .. }));
+
+        // 1. Esc exits with Action::Cancel
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "esc".to_string(),
+                action: Action::Quit(0),
+            },
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        assert!(matches!(buffer[0], RenderCommand::Action(Action::Cancel)));
+
+        // 2. Consecutive characters are coalesced into a single Action::LiveInputKey batch
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::Action(Action::Char('a')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('b')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('c')),
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        match &buffer[0] {
+            RenderCommand::Action(Action::LiveInputKey(keys)) => {
+                assert_eq!(keys, "abc");
+            }
+            other => panic!("expected LiveInputKey, got {:?}", other),
+        }
+
+        // 3. Characters followed by Enter coalesce into "hello Enter"
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::Action(Action::Char('l')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('s')),
+            RenderCommand::<NullActionExt>::Action(Action::Accept),
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        match &buffer[0] {
+            RenderCommand::Action(Action::LiveInputKey(keys)) => {
+                assert_eq!(keys, "ls Enter");
+            }
+            other => panic!("expected LiveInputKey, got {:?}", other),
+        }
+
+        // 4. Named keys normalize properly
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::Action(Action::DeleteChar),
+            RenderCommand::<NullActionExt>::Action(Action::Up(1)),
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "ctrl-c".to_string(),
+                action: Action::Redraw,
+            },
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        match &buffer[0] {
+            RenderCommand::Action(Action::LiveInputKey(keys)) => {
+                assert_eq!(keys, "BSpace Up C-c");
+            }
+            other => panic!("expected LiveInputKey, got {:?}", other),
+        }
     }
 }
 

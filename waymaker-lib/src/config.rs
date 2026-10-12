@@ -588,6 +588,10 @@ pub struct NavConfig {
     #[serde(alias = "prompt_input", alias = "nav_prompt_input")]
     pub prompt_input: Option<String>,
 
+    /// Optional indicator text shown during live passthrough input mode (`Action::LiveInput`).
+    #[serde(alias = "live_input", alias = "nav_live_input")]
+    pub live_input: Option<String>,
+
     /// Key bindings active while navigation mode is enabled and results pane has focus.
     #[serde(alias = "nav_binds", alias = "focus_binds")]
     #[partial(no_recurse, unwrap)]
@@ -640,6 +644,7 @@ impl Default for NavConfig {
             marker: "".to_string(),
             prompt: "".to_string(),
             prompt_input: None,
+            live_input: None,
             binds: Self::default_binds_for_profile(NavProfile::List),
             notify: false,
             passthrough: false,

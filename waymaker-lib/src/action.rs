@@ -145,6 +145,10 @@ pub enum Action<A: ActionExt = NullActionExt> {
     Execute(String),
     /// Interactive input mode that prompts for text and executes a template with `{input}`
     PromptInput(String),
+    /// Live input mode that streams keystrokes directly to a template with `{key}` or `{keys}`
+    LiveInput(String),
+    /// Internal action: dispatch a live keystroke or batched keystrokes
+    LiveInputKey(String),
     /// non-blocking [`waymaker::Action::Execute`]: subsequent actions in the batch begin after its completion
     ExecuteAsync(String),
     /// non-blocking [`waymaker::Action::Execute`]: subsequent actions in the batch begin after its completion, only if successful
@@ -511,7 +515,7 @@ enum_from_str_display!(
     ForwardChar,BackwardChar, ForwardWord, BackwardWord, DeleteChar, DeleteWord, DeleteNextChar, DeleteNextWord, DeleteLineStart, DeleteLineEnd, Cancel, Redraw, NextColumn, PrevColumn, PrintKey, SortMenu;
 
     tuples:
-    Execute, PromptInput, ExecuteAsync, ExecuteThen, ExecuteSilent, Become, BecomeSilent, Preview,
+    Execute, PromptInput, LiveInput, LiveInputKey, ExecuteAsync, ExecuteThen, ExecuteSilent, Become, BecomeSilent, Preview,
     SetQuery, Pos, QueryPos, SwitchColumn, Store, SetMode,
     CopyAsync, Copy, ChDir;
 
@@ -869,6 +873,14 @@ mod tests {
         let prompt_input: Action = Action::from_str("PromptInput(tmux send-keys -t '{=pid}' '{input}' Enter)").unwrap();
         assert_eq!(prompt_input, Action::PromptInput("tmux send-keys -t '{=pid}' '{input}' Enter".into()));
         assert_eq!(prompt_input.to_string(), "PromptInput(tmux send-keys -t '{=pid}' '{input}' Enter)");
+
+        let live_input: Action = Action::from_str("LiveInput(tmux send-keys -t '{=pid}' {keys})").unwrap();
+        assert_eq!(live_input, Action::LiveInput("tmux send-keys -t '{=pid}' {keys}".into()));
+        assert_eq!(live_input.to_string(), "LiveInput(tmux send-keys -t '{=pid}' {keys})");
+
+        let live_input_key: Action = Action::from_str("LiveInputKey(Enter)").unwrap();
+        assert_eq!(live_input_key, Action::LiveInputKey("Enter".into()));
+        assert_eq!(live_input_key.to_string(), "LiveInputKey(Enter)");
 
         let exec_async: Action = Action::from_str("ExecuteAsync(cargo build)").unwrap();
         assert_eq!(exec_async, Action::ExecuteAsync("cargo build".into()));
