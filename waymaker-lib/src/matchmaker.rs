@@ -1336,6 +1336,7 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                 if cmd.is_empty() && msg.is_none() {
                     return;
                 }
+                let is_rerun = state.contains(Event::PreviewChange);
                 let msg = msg.unwrap_or_else(|| {
                     let mut envs = state.make_env_vars();
                     let extra = env_vars!(
@@ -1343,7 +1344,11 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                         "LINES" => state.previewer_area().map_or("0".to_string(), |r| r.height.to_string()),
                     );
                     envs.extend(extra);
-                    PreviewMessage::Run(cmd.clone(), envs)
+                    if is_rerun {
+                        PreviewMessage::Rerun(cmd.clone(), envs)
+                    } else {
+                        PreviewMessage::Run(cmd.clone(), envs)
+                    }
                 });
 
                 if preview_tx.send(msg.clone()).is_err() {

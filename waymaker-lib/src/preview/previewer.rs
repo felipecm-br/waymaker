@@ -21,6 +21,7 @@ use crate::preview::Preview;
 #[derive(Debug, Default, strum_macros::Display, Clone)]
 pub enum PreviewMessage {
     Run(String, EnvVars),
+    Rerun(String, EnvVars),
     Set(Text<'static>),
     Media(String),
     Markdown(String, Option<usize>),
@@ -212,9 +213,14 @@ impl Previewer {
             let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
 
             let mut is_debouncable = false;
+            let mut force_run = false;
             let mut key = String::new();
             if let PreviewMessage::Run(cmd, _) = &m {
                 is_debouncable = true;
+                key = cmd.clone();
+            } else if let PreviewMessage::Rerun(cmd, _) = &m {
+                is_debouncable = true;
+                force_run = true;
                 key = cmd.clone();
             } else if let PreviewMessage::Media(cmd) = &m {
                 is_debouncable = true;
@@ -225,7 +231,7 @@ impl Previewer {
             }
 
             if is_debouncable {
-                if !self.config.always_trigger && self.last == key {
+                if !force_run && !self.config.always_trigger && self.last == key {
                     continue;
                 }
 
@@ -236,7 +242,7 @@ impl Previewer {
                     self.changed.store(true, Ordering::Release);
                 }
 
-                if self.config.debounce_ms > 0 {
+                if !force_run && self.config.debounce_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(self.config.debounce_ms)).await;
                 }
 
@@ -765,7 +771,8 @@ impl Previewer {
             }
 
             match m {
-                PreviewMessage::Run(cmd, variables) => {
+                PreviewMessage::Run(cmd, variables)
+                | PreviewMessage::Rerun(cmd, variables) => {
                     self.last = cmd.clone();
                     let mut cmd_builder = if let Some(s) = &self.config.shell
                         && s.len() > 0
@@ -868,6 +875,7 @@ impl Previewer {
 
                                     match valid_bytes.into_text() {
                                         Ok(text) => {
+                                            let has_text = !text.lines.is_empty();
                                             for line in text {
                                                 // re-check before pushing
                                                 if current_generation.load(Ordering::Acquire)
@@ -878,9 +886,13 @@ impl Previewer {
                                                 }
                                                 guard.push(line);
                                             }
+                                            if has_text {
+                                                changed.store(true, Ordering::Release);
+                                            }
                                         }
                                         Err(e) => {
                                             if self.config.try_lossy {
+                                                let mut has_text = false;
                                                 for bytes in valid_bytes.split(|b| *b == b'\n') {
                                                     if current_generation.load(Ordering::Acquire)
                                                         != task_gen
@@ -891,6 +903,10 @@ impl Previewer {
                                                     let line =
                                                         String::from_utf8_lossy(bytes).into_owned();
                                                     guard.push(Line::from(line));
+                                                    has_text = true;
+                                                }
+                                                if has_text {
+                                                    changed.store(true, Ordering::Release);
                                                 }
                                             } else {
                                                 error!("Error displaying {cmd_str}: {:?}", e);
@@ -931,6 +947,7 @@ impl Previewer {
                                 {
                                     match leftover.into_text() {
                                         Ok(text) => {
+                                            let has_text = !text.lines.is_empty();
                                             for line in text {
                                                 if current_generation.load(Ordering::Acquire)
                                                     != task_gen
@@ -940,9 +957,13 @@ impl Previewer {
                                                 }
                                                 guard.push(line);
                                             }
+                                            if has_text {
+                                                changed.store(true, Ordering::Release);
+                                            }
                                         }
                                         Err(e) => {
                                             if self.config.try_lossy {
+                                                let mut has_text = false;
                                                 for bytes in leftover.split(|b| *b == b'\n') {
                                                     if lines.is_expired(&guard) {
                                                         return true;
@@ -950,6 +971,10 @@ impl Previewer {
                                                     let line =
                                                         String::from_utf8_lossy(bytes).into_owned();
                                                     guard.push(Line::from(line));
+                                                    has_text = true;
+                                                }
+                                                if has_text {
+                                                    changed.store(true, Ordering::Release);
                                                 }
                                             } else {
                                                 error!("Error displaying {cmd_str}: {:?}", e);
@@ -959,6 +984,7 @@ impl Previewer {
                                     }
                                 }
 
+                                changed.store(true, Ordering::Release);
                                 true
                             });
                             self.current = Some((child, handle))

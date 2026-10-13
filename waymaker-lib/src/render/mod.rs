@@ -1231,6 +1231,18 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     picker_ui.results.set_status_line(None);
                     tui.redraw();
                 }
+                RenderCommand::PreviewChange => {
+                    if let Some(p) = preview_ui.as_mut() {
+                        p.view
+                            .image_id
+                            .fetch_add(1, std::sync::atomic::Ordering::Release);
+                        p.view
+                            .changed
+                            .store(true, std::sync::atomic::Ordering::Release);
+                    }
+                    state.insert(crate::message::Event::PreviewChange);
+                    state.needs_redraw = true;
+                }
                 RenderCommand::HeaderTable(columns) => {
                     picker_ui.header.header_table(columns);
                 }
@@ -5681,6 +5693,21 @@ mod test {
             }
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
+
+        // 5. PreviewChange command is passed through and flushes batch
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::Action(Action::Char('x')),
+            RenderCommand::<NullActionExt>::PreviewChange,
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 2);
+        match &buffer[0] {
+            RenderCommand::Action(Action::LiveInputKey(keys)) => {
+                assert_eq!(keys, "x");
+            }
+            other => panic!("expected LiveInputKey, got {:?}", other),
+        }
+        assert!(matches!(buffer[1], RenderCommand::PreviewChange));
     }
 }
 

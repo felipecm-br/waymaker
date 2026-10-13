@@ -218,7 +218,7 @@ impl<A: ActionExt> EventLoop<A> {
                 self.send(RenderCommand::Refresh);
             }
             Event::PreviewChange => {
-                self.send(RenderCommand::Tick);
+                self.send(RenderCommand::PreviewChange);
             }
             _ => {}
         }

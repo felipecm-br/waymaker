@@ -87,6 +87,7 @@ pub enum RenderCommand<A: ActionExt> {
     HeaderTable(HeaderTable),
     Ack,
     Tick,
+    PreviewChange,
     Refresh,
     NoMatch,
     Empty,
