@@ -210,7 +210,6 @@ impl Previewer {
                 task.abort();
             }
             let m = self.rx.borrow_and_update().clone();
-            let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
 
             let mut is_debouncable = false;
             let mut force_run = false;
@@ -242,7 +241,7 @@ impl Previewer {
                     self.changed.store(true, Ordering::Release);
                 }
 
-                if self.config.debounce_ms > 0 {
+                if !force_run && self.config.debounce_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(self.config.debounce_ms)).await;
                 }
 
@@ -264,7 +263,7 @@ impl Previewer {
                     }
                 }
 
-                if self.rx.has_changed().unwrap_or(false) {
+                if !force_run && self.rx.has_changed().unwrap_or(false) {
                     continue;
                 }
             }
@@ -319,6 +318,7 @@ impl Previewer {
 
                         let media_size = self.config.media_size;
                         let rx = self.rx.clone();
+                        let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
                         let handle = tokio::spawn(async move {
                             let is_stale = {
                                 let rx = rx.clone();
@@ -509,6 +509,7 @@ impl Previewer {
                         let diagram_theme = self.config.diagram_theme;
                         let diagram_background = self.config.diagram_background;
 
+                        let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
                         let handle = tokio::task::spawn_blocking(move || {
                             let is_stale = || {
                                 rx.has_changed().unwrap_or(false)
@@ -803,6 +804,7 @@ impl Previewer {
 
                     // we need the child handle
                     if let Some(mut child) = cmd_builder._spawn() {
+                        let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
                         if let Some(stdout) = child.stdout.take() {
                             let lines = self.lines.clone();
                             let mut guard = self.lines.read();
@@ -854,7 +856,7 @@ impl Previewer {
                                             let has_text = !text.lines.is_empty();
                                             if delay_clear && !has_swapped {
                                                 staged.extend(text.lines);
-                                                if staged.len() >= 500 {
+                                                if !staged.is_empty() {
                                                     if current_generation.load(Ordering::Acquire)
                                                         != task_gen
                                                     {
@@ -923,7 +925,7 @@ impl Previewer {
                                                 }
                                                 if delay_clear
                                                     && !has_swapped
-                                                    && staged.len() >= 500
+                                                    && !staged.is_empty()
                                                 {
                                                     if current_generation.load(Ordering::Acquire)
                                                         != task_gen
@@ -1556,5 +1558,32 @@ mod tests {
         let _ = std::fs::remove_file(&p1);
         let _ = std::fs::remove_file(&p2);
         let _ = std::fs::remove_file(&p3);
+    }
+
+    #[tokio::test]
+    async fn test_previewer_run_command() {
+        let mut previewer_cfg = crate::config::PreviewerConfig::default();
+        previewer_cfg.delay_clear = true;
+        previewer_cfg.debounce_ms = 20;
+
+        let (previewer, tx) = Previewer::new(previewer_cfg);
+        let lines = previewer.lines.clone();
+
+        let handle = tokio::spawn(previewer.run());
+
+        let _ = tx.send(PreviewMessage::Run("echo hello world".to_string(), vec![].into()));
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        let _ = tx.send(PreviewMessage::Run("echo hello world".to_string(), vec![].into()));
+
+        let start = std::time::Instant::now();
+        while start.elapsed() < std::time::Duration::from_secs(2) {
+            if lines.len() > 0 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+
+        handle.abort();
+        assert!(lines.len() > 0, "Lines should be populated with 'hello world'");
     }
 }

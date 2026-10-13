@@ -3480,7 +3480,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
         // ------------------------------
         // send events into controller
         for e in events.iter() {
-            controller_tx.send(e)._elog();
+            if !matches!(e, Event::PreviewChange) {
+                controller_tx.send(e)._elog();
+            }
         }
         // =================================
 
