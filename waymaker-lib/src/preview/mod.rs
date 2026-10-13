@@ -27,6 +27,14 @@ impl<T> AppendOnly<T> {
         self.0.store(Arc::new(boxcar::Vec::new()));
     }
 
+    pub fn replace_all(&self, items: Vec<T>) {
+        let new_vec = boxcar::Vec::new();
+        for item in items {
+            new_vec.push(item);
+        }
+        self.0.store(Arc::new(new_vec));
+    }
+
     pub fn push(&self, val: T) {
         self.0.load().push(val);
     }

@@ -736,8 +736,10 @@ impl PreviewUI {
 
             let header_count = self.initial().header_lines.min(height);
             let remaining_lines = rl.saturating_sub(header_count);
+            let remaining_space = height.saturating_sub(header_count);
 
-            self.offset = remaining_lines.saturating_sub(height);
+            self.offset = remaining_lines.saturating_sub(remaining_space);
+            self.attained_target = true;
         }
         self.pan_y = i32::MAX / 2;
         self.view
@@ -1355,23 +1357,36 @@ impl PreviewUI {
     pub fn make_preview(&mut self) -> Paragraph<'_> {
         let rl = self.view.len();
         let height = self.area.height as usize;
-        let mut offset = self.offset;
+        let mut offset;
+
+        let header_count = self.initial().header_lines.min(height);
+        let remaining_lines = rl.saturating_sub(header_count);
+        let remaining_space = height.saturating_sub(header_count);
+        let tail_offset = remaining_lines.saturating_sub(remaining_space);
 
         // this only triggers on preview change but not guaranteed on every preview change -- attaching it to the event handler is worse
         if rl < self.last_count {
-            self.offset = 0;
+            if self.initial().tail {
+                self.offset = tail_offset;
+            } else {
+                self.offset = 0;
+            }
             self.attained_target = false;
-            self.jump = (false, 0)
+            self.jump = (false, 0);
+        } else if rl > self.last_count && self.initial().tail {
+            let prev_remaining = self.last_count.saturating_sub(header_count);
+            let prev_tail = prev_remaining.saturating_sub(remaining_space);
+            // If the user was at the tail or hasn't attained target yet, follow the tail
+            if self.offset >= prev_tail || !self.attained_target {
+                self.offset = tail_offset;
+                self.attained_target = true;
+            }
         }
         self.last_count = rl;
 
         if self.initial().tail && !self.attained_target {
-            let header_count = self.initial().header_lines.min(height);
-            let remaining_lines = rl.saturating_sub(header_count);
-            let remaining_space = height.saturating_sub(header_count);
-
             // get current offset
-            offset = remaining_lines.saturating_sub(remaining_space);
+            offset = tail_offset;
             // apply initial offset only if index is set
             if self.initial().index.is_some() && self.initial().offset < 0 {
                 offset = offset.saturating_sub(self.initial().offset.unsigned_abs());
@@ -1383,8 +1398,11 @@ impl PreviewUI {
             && !self.attained_target
             && target < rl
         {
-            self.offset = self.target_to_offset(target);
+            offset = self.target_to_offset(target);
+            self.offset = offset;
             self.attained_target = true;
+        } else {
+            offset = self.offset;
         };
 
         if height == 0 {
@@ -2244,12 +2262,18 @@ mod tests {
         ui.update_dimensions(&Rect::new(0, 0, 40, 10));
 
         let _ = ui.make_preview();
-        assert_eq!(ui.offset, 20, "Initial tail offset should position at bottom (30 - 10 = 20)");
+        assert_eq!(
+            ui.offset, 20,
+            "Initial tail offset should position at bottom (30 - 10 = 20)"
+        );
         assert!(ui.attained_target);
 
         // Scrolling up moves reading position backwards
         ui.up(1);
-        assert_eq!(ui.offset, 19, "Scrolling up by 1 line decreases offset to 19");
+        assert_eq!(
+            ui.offset, 19,
+            "Scrolling up by 1 line decreases offset to 19"
+        );
 
         // Scrolling down moves back towards tail
         ui.down(1);
@@ -2262,5 +2286,40 @@ mod tests {
         let _ = ui.make_preview();
         assert_eq!(ui.offset, 20);
         assert!(ui.attained_target);
+
+        // When buffer grows from 30 to 50 lines while at tail:
+        let new_text: ratatui::text::Text<'static> = (0..50)
+            .map(|i| format!("Line {}", i))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into();
+        previewer.set_string(new_text);
+        let _ = ui.make_preview();
+        assert_eq!(
+            ui.offset, 40,
+            "Tail follow should automatically track new bottom (50 - 10 = 40)"
+        );
+
+        // If user scrolls up into history, growth should not yank away from reading position
+        ui.up(5);
+        assert_eq!(ui.offset, 35);
+        let even_more_text: ratatui::text::Text<'static> = (0..60)
+            .map(|i| format!("Line {}", i))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into();
+        previewer.set_string(even_more_text);
+        let _ = ui.make_preview();
+        assert_eq!(
+            ui.offset, 35,
+            "Should preserve reading scroll position when user scrolled up"
+        );
+
+        // scroll_end explicitly snaps back to tail
+        ui.scroll_end();
+        assert_eq!(
+            ui.offset, 50,
+            "scroll_end returns directly to bottom (60 - 10 = 50)"
+        );
     }
 }
