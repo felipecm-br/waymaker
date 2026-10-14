@@ -1249,7 +1249,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     footer_ui.init();
                     picker_ui.query.set_prompt(None);
                     picker_ui.results.set_status_line(None);
-                    tui.redraw();
+                    state.needs_redraw = true;
                 }
                 RenderCommand::PreviewChange => {
                     if let Some(p) = preview_ui.as_mut() {
@@ -2418,7 +2418,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
 
                         // Other
                         Action::Redraw => {
-                            tui.redraw();
+                            state.needs_redraw = true;
                         }
                         Action::ToggleFocus => {
                             if *action_visible

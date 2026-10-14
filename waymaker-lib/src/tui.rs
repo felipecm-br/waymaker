@@ -49,6 +49,14 @@ where
         crossterm::terminal::enable_raw_mode()?;
 
         let (width, height) = Self::full_size().unwrap_or_default();
+        if let Some(ref layout) = config.layout {
+            let request = layout
+                .percentage
+                .compute_clamped(height, layout.min, layout.max);
+            if request >= height || layout.percentage.inner() >= 100 {
+                config.layout = None;
+            }
+        }
         let area = if let Some(ref layout) = config.layout {
             let request = layout
                 .percentage
@@ -149,7 +157,6 @@ where
         execute!(backend, EnterAlternateScreen)?;
 
         if clear {
-            execute!(backend, crossterm::terminal::Clear(ClearType::All))?;
             self.terminal.clear()?;
         }
 
@@ -289,7 +296,11 @@ where
     }
 
     pub fn redraw(&mut self) {
-        self.terminal.resize(self.area)._elog();
+        if self.is_fullscreen() {
+            let _ = self.terminal.clear();
+        } else {
+            self.terminal.resize(self.area)._elog();
+        }
     }
 
     // note: do not start before event stream

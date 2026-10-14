@@ -47,11 +47,7 @@ impl UI {
         assert!(!worker.columns.is_empty());
 
         if config.results.reverse.is_none() {
-            config.results.reverse = (
-                tui.is_fullscreen() && tui.area.y < tui.area.height / 2
-                // reverse if fullscreen + cursor is in lower half of the screen
-            )
-            .into()
+            config.results.reverse = Some(false);
         }
 
         let ui_area = [
