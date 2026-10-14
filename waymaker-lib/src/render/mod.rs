@@ -2851,10 +2851,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         0
                     };
 
-                    let effective_footer_height = if base_footer_height > 0
-                        && has_footer_separator
-                        && (show_nav_hints || state.preview_fullscreen || show_sort_menu)
-                    {
+                    let effective_footer_height = if base_footer_height > 0 && has_footer_separator {
                         base_footer_height + 1
                     } else {
                         base_footer_height
