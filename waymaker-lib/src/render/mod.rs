@@ -1110,6 +1110,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
     }
 
     let mut buffer = Vec::with_capacity(256);
+    let mut last_preview_poll = std::time::Instant::now();
 
     while render_rx.recv_many(&mut buffer, 256).await > 0 {
         while let Ok(cmd) = render_rx.try_recv() {
@@ -1126,6 +1127,28 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
         if let Some(p) = preview_ui.as_mut() {
             if p.is_pan_settling() {
                 state.needs_redraw = true;
+            }
+            if p.visible() && !p.command().is_empty() {
+                let poll_interval = p.poll_interval();
+                let effective_interval = if state.live_input_active {
+                    poll_interval.or(Some(std::time::Duration::from_millis(150)))
+                } else {
+                    poll_interval
+                };
+
+                if let Some(interval) = effective_interval {
+                    if last_preview_poll.elapsed() >= interval {
+                        last_preview_poll = std::time::Instant::now();
+                        p.view
+                            .image_id
+                            .fetch_add(1, std::sync::atomic::Ordering::Release);
+                        p.view
+                            .changed
+                            .store(true, std::sync::atomic::Ordering::Release);
+                        state.insert(crate::message::Event::PreviewChange);
+                        state.needs_redraw = true;
+                    }
+                }
             }
         }
         let (mut did_pause, mut did_reload, mut did_exit, mut did_resize, mut did_cursor_wrap) =

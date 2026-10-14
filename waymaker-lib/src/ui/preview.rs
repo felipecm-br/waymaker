@@ -70,6 +70,13 @@ impl PreviewUI {
         })
     }
 
+    pub fn poll_interval(&self) -> Option<std::time::Duration> {
+        self.setting()
+            .and_then(|s| s.poll_ms)
+            .or(self.config.poll_ms)
+            .map(std::time::Duration::from_millis)
+    }
+
     pub(crate) fn active_border(&self) -> Option<&BorderSetting> {
         if self.is_fullscreen() {
             return None;
@@ -2382,5 +2389,31 @@ mod tests {
             ui.offset, 50,
             "scroll_end returns directly to bottom (60 - 10 = 50)"
         );
+    }
+
+    #[test]
+    fn test_preview_poll_interval_config() {
+        use crate::preview::previewer::Previewer;
+        let (previewer, _tx) = Previewer::new(Default::default());
+
+        // Default has no poll interval
+        let config = PreviewConfig::default();
+        let ui = PreviewUI::new(previewer.view(), config, [40, 10]);
+        assert_eq!(ui.poll_interval(), None);
+
+        // Global poll_ms on PreviewConfig
+        let mut config = PreviewConfig::default();
+        config.poll_ms = Some(500);
+        let ui = PreviewUI::new(previewer.view(), config, [40, 10]);
+        assert_eq!(ui.poll_interval(), Some(std::time::Duration::from_millis(500)));
+
+        // Layout-specific override
+        let mut config = PreviewConfig::default();
+        config.poll_ms = Some(500);
+        let mut setting = crate::config::PreviewSetting::default();
+        setting.poll_ms = Some(250);
+        config.layout.push(setting);
+        let ui = PreviewUI::new(previewer.view(), config, [40, 10]);
+        assert_eq!(ui.poll_interval(), Some(std::time::Duration::from_millis(250)));
     }
 }

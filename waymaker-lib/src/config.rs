@@ -2179,6 +2179,12 @@ pub struct PreviewConfig {
 
     #[serde(default)]
     pub initial_layout: u8,
+
+    /// Preview auto-refresh / polling interval in milliseconds.
+    /// When set, periodically re-runs the preview command to stream live output.
+    #[partial(alias = "poll")]
+    #[serde(default, alias = "poll_interval", alias = "poll_interval_ms", alias = "refresh_ms", alias = "interval_ms")]
+    pub poll_ms: Option<u64>,
 }
 
 impl PreviewConfig {
@@ -2209,6 +2215,7 @@ impl Default for PreviewConfig {
             markdown: true,
             diagrams: PreviewDiagramsConfig::default(),
             inline_images: true,
+            poll_ms: None,
         }
     }
 }
@@ -2592,6 +2599,10 @@ pub struct PreviewSetting {
     #[serde(alias = "scroll")]
     #[serde(default)]
     pub initial: PartialPreviewInitialSetting,
+
+    /// Preview auto-refresh / polling interval in milliseconds for this layout.
+    #[serde(default, alias = "poll_interval", alias = "poll_interval_ms", alias = "refresh_ms", alias = "interval_ms")]
+    pub poll_ms: Option<u64>,
 }
 
 #[partial(path, derive(Debug, Clone, PartialEq, Deserialize, Serialize))]
