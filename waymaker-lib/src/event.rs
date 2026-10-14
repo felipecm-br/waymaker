@@ -374,13 +374,29 @@ impl<A: ActionExt> EventLoop<A> {
                                                 self.dispatch_fallback_key(key);
                                             }
                                         } else if live_input_active {
-                                            if let Some(c) = key_code_as_letter(key) {
+                                            if key == key!(esc) {
+                                                self.send_key_action(Action::Cancel, "esc".to_string());
+                                            } else if let Some(c) = key_code_as_letter(key) {
                                                 self.send(RenderCommand::KeyAction {
                                                     key: c.to_string(),
                                                     action: Action::Char(c),
                                                 });
                                             } else {
-                                                self.dispatch_fallback_key(key);
+                                                let key_str = self.print_key(key);
+                                                match key {
+                                                    key!(enter) => self.send_key_action(Action::Accept, key_str),
+                                                    key!(backspace) => self.send_key_action(Action::DeleteChar, key_str),
+                                                    key!(up) => self.send_key_action(Action::Up(1), key_str),
+                                                    key!(down) => self.send_key_action(Action::Down(1), key_str),
+                                                    key!(left) => self.send_key_action(Action::BackwardChar, key_str),
+                                                    key!(right) => self.send_key_action(Action::ForwardChar, key_str),
+                                                    _ => {
+                                                        self.send(RenderCommand::KeyAction {
+                                                            key: key_str,
+                                                            action: Action::Redraw,
+                                                        });
+                                                    }
+                                                }
                                             }
                                         } else if let Some(c) = key_code_as_letter(key) {
                                             // Action box or Prompt input is active: plain chars always go to input.

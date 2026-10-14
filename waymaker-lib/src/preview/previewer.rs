@@ -856,7 +856,7 @@ impl Previewer {
                                             let has_text = !text.lines.is_empty();
                                             if delay_clear && !has_swapped {
                                                 staged.extend(text.lines);
-                                                if !staged.is_empty() {
+                                                if staged.len() >= 500 {
                                                     if current_generation.load(Ordering::Acquire)
                                                         != task_gen
                                                     {
@@ -925,7 +925,7 @@ impl Previewer {
                                                 }
                                                 if delay_clear
                                                     && !has_swapped
-                                                    && !staged.is_empty()
+                                                    && staged.len() >= 500
                                                 {
                                                     if current_generation.load(Ordering::Acquire)
                                                         != task_gen

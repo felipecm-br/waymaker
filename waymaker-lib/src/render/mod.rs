@@ -227,6 +227,7 @@ fn normalize_live_key(key: &str) -> String {
         "backspace" | "bspace" => "BSpace".to_string(),
         "tab" => "Tab".to_string(),
         "btab" | "backtab" | "shift-tab" => "BTab".to_string(),
+        "delete" | "dc" => "DC".to_string(),
         "up" => "Up".to_string(),
         "down" => "Down".to_string(),
         "left" => "Left".to_string(),
@@ -295,9 +296,22 @@ fn apply_live_input<A: ActionExt>(
                 action: Action::Char(c),
                 ..
             } => {
-                if !c.is_ascii_control() {
+                if c == ' ' {
+                    if !current_text_batch.is_empty() {
+                        key_batch.push(std::mem::take(&mut current_text_batch));
+                    }
+                    key_batch.push("Space".to_string());
+                } else if !c.is_ascii_control() {
                     current_text_batch.push(c);
                 }
+            }
+            RenderCommand::KeyAction { ref key, .. }
+                if key == " " || key.eq_ignore_ascii_case("space") =>
+            {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push("Space".to_string());
             }
             RenderCommand::KeyAction { ref key, .. } => {
                 if !current_text_batch.is_empty() {
@@ -316,6 +330,12 @@ fn apply_live_input<A: ActionExt>(
                     key_batch.push(std::mem::take(&mut current_text_batch));
                 }
                 key_batch.push("BSpace".to_string());
+            }
+            RenderCommand::Action(Action::DeleteNextChar) => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push("DC".to_string());
             }
             RenderCommand::Action(Action::Up(_)) => {
                 if !current_text_batch.is_empty() {
@@ -3123,33 +3143,63 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         if state.live_input_active {
-                            let line = ratatui::text::Line::from(vec![
-                                ratatui::text::Span::styled(
-                                    " 󰌌 LIVE INPUT ",
-                                    ratatui::style::Style::default()
-                                        .fg(ratatui::style::Color::Black)
-                                        .bg(ratatui::style::Color::Green)
-                                        .add_modifier(ratatui::style::Modifier::BOLD),
-                                ),
-                                ratatui::text::Span::raw(" "),
-                                ratatui::text::Span::styled(
-                                    "streaming keys to agent",
-                                    ratatui::style::Style::default()
-                                        .fg(ratatui::style::Color::Green)
-                                        .add_modifier(ratatui::style::Modifier::BOLD),
-                                ),
-                                ratatui::text::Span::raw("  •  "),
-                                ratatui::text::Span::styled(
-                                    "[Esc]",
-                                    ratatui::style::Style::default()
-                                        .fg(ratatui::style::Color::DarkGray)
-                                        .add_modifier(ratatui::style::Modifier::BOLD),
-                                ),
-                                ratatui::text::Span::styled(
-                                    " exit",
-                                    ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
-                                ),
-                            ]);
+                            let line = if input.width >= 48 {
+                                ratatui::text::Line::from(vec![
+                                    ratatui::text::Span::styled(
+                                        " 󰌌 LIVE INPUT ",
+                                        ratatui::style::Style::default()
+                                            .fg(ratatui::style::Color::Black)
+                                            .bg(ratatui::style::Color::Green)
+                                            .add_modifier(ratatui::style::Modifier::BOLD),
+                                    ),
+                                    ratatui::text::Span::raw(" "),
+                                    ratatui::text::Span::styled(
+                                        "streaming keys to agent",
+                                        ratatui::style::Style::default()
+                                            .fg(ratatui::style::Color::Green)
+                                            .add_modifier(ratatui::style::Modifier::BOLD),
+                                    ),
+                                    ratatui::text::Span::raw("  •  "),
+                                    ratatui::text::Span::styled(
+                                        "[Esc]",
+                                        ratatui::style::Style::default()
+                                            .fg(ratatui::style::Color::DarkGray)
+                                            .add_modifier(ratatui::style::Modifier::BOLD),
+                                    ),
+                                    ratatui::text::Span::styled(
+                                        " exit",
+                                        ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
+                                    ),
+                                ])
+                            } else {
+                                ratatui::text::Line::from(vec![
+                                    ratatui::text::Span::styled(
+                                        " 󰌌 LIVE ",
+                                        ratatui::style::Style::default()
+                                            .fg(ratatui::style::Color::Black)
+                                            .bg(ratatui::style::Color::Green)
+                                            .add_modifier(ratatui::style::Modifier::BOLD),
+                                    ),
+                                    ratatui::text::Span::raw(" "),
+                                    ratatui::text::Span::styled(
+                                        "streaming",
+                                        ratatui::style::Style::default()
+                                            .fg(ratatui::style::Color::Green)
+                                            .add_modifier(ratatui::style::Modifier::BOLD),
+                                    ),
+                                    ratatui::text::Span::raw(" • "),
+                                    ratatui::text::Span::styled(
+                                        "[Esc]",
+                                        ratatui::style::Style::default()
+                                            .fg(ratatui::style::Color::DarkGray)
+                                            .add_modifier(ratatui::style::Modifier::BOLD),
+                                    ),
+                                    ratatui::text::Span::styled(
+                                        " exit",
+                                        ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
+                                    ),
+                                ])
+                            };
                             frame.render_widget(ratatui::widgets::Paragraph::new(line), input);
                             cursor_y_offset = input.y;
                         } else if state.prompt_input_active {
@@ -5710,6 +5760,59 @@ mod test {
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
         assert!(matches!(buffer[1], RenderCommand::PreviewChange));
+
+        // 6. Space character alone maps to "Space"
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::Action(Action::Char(' ')),
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        match &buffer[0] {
+            RenderCommand::Action(Action::LiveInputKey(keys)) => {
+                assert_eq!(keys, "Space");
+            }
+            other => panic!("expected LiveInputKey, got {:?}", other),
+        }
+
+        // 7. Space between words maps to "foo Space bar"
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::Action(Action::Char('f')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('o')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('o')),
+            RenderCommand::<NullActionExt>::Action(Action::Char(' ')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('b')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('a')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('r')),
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        match &buffer[0] {
+            RenderCommand::Action(Action::LiveInputKey(keys)) => {
+                assert_eq!(keys, "foo Space bar");
+            }
+            other => panic!("expected LiveInputKey, got {:?}", other),
+        }
+
+        // 8. Tab, Delete, BackTab map to Tab, DC, BTab
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "tab".to_string(),
+                action: Action::Redraw,
+            },
+            RenderCommand::<NullActionExt>::Action(Action::DeleteNextChar),
+            RenderCommand::<NullActionExt>::KeyAction {
+                key: "backtab".to_string(),
+                action: Action::Redraw,
+            },
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        match &buffer[0] {
+            RenderCommand::Action(Action::LiveInputKey(keys)) => {
+                assert_eq!(keys, "Tab DC BTab");
+            }
+            other => panic!("expected LiveInputKey, got {:?}", other),
+        }
     }
 }
 

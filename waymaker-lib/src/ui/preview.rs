@@ -127,7 +127,11 @@ impl PreviewUI {
 
         let mut picker = None;
         if config.media.active {
-            if std::env::var("TMUX").is_ok()
+            let is_tmux = std::env::var("TMUX").is_ok()
+                || std::env::var("TERM_PROGRAM").is_ok_and(|v| v == "tmux")
+                || std::env::var("TERM").is_ok_and(|t| t.starts_with("tmux"));
+
+            if is_tmux
                 && std::env::var("TERM_PROGRAM")
                     .map(|v| v != "tmux")
                     .unwrap_or(true)
@@ -139,7 +143,10 @@ impl PreviewUI {
             }
 
             use std::io::IsTerminal;
-            let mut p = if std::io::stdout().is_terminal() {
+            let mut p = if is_tmux {
+                query_tty_picker(std::time::Duration::from_millis(100))
+                    .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks())
+            } else if std::io::stdout().is_terminal() {
                 ratatui_image::picker::Picker::from_query_stdio()
                     .or_else(|_| query_tty_picker(std::time::Duration::from_millis(100)))
                     .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks())
@@ -1569,6 +1576,7 @@ impl PreviewUI {
 fn query_tty_picker(timeout: std::time::Duration) -> anyhow::Result<ratatui_image::picker::Picker> {
     use nix::sys::{
         select::{FdSet, select},
+        termios::{FlushArg, SetArg, Termios, cfmakeraw, tcflush, tcgetattr, tcsetattr},
         time::{TimeVal, TimeValLike},
     };
     use std::fs::OpenOptions;
@@ -1588,7 +1596,37 @@ fn query_tty_picker(timeout: std::time::Duration) -> anyhow::Result<ratatui_imag
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status();
+    }
 
+    // Put /dev/tty into raw mode so responses can be read immediately without
+    // waiting for a newline (which terminal escape sequences never have).
+    // Ensure termios is restored and any remaining unread bytes are flushed on exit.
+    use std::os::fd::{AsRawFd, RawFd};
+    let orig_termios = tcgetattr(tty.as_fd()).ok();
+    if let Some(mut raw_termios) = orig_termios.clone() {
+        cfmakeraw(&mut raw_termios);
+        let _ = tcsetattr(tty.as_fd(), SetArg::TCSANOW, &raw_termios);
+    }
+
+    struct TtyGuard {
+        fd: RawFd,
+        orig: Option<Termios>,
+    }
+    impl Drop for TtyGuard {
+        fn drop(&mut self) {
+            let borrowed = unsafe { std::os::fd::BorrowedFd::borrow_raw(self.fd) };
+            let _ = tcflush(borrowed, FlushArg::TCIFLUSH);
+            if let Some(ref orig) = self.orig {
+                let _ = tcsetattr(borrowed, SetArg::TCSANOW, orig);
+            }
+        }
+    }
+    let _guard = TtyGuard {
+        fd: tty.as_raw_fd(),
+        orig: orig_termios,
+    };
+
+    if is_tmux {
         let query = b"\x1bPtmux;\x1b\x1b_Gi=1,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b\\\x1bPtmux;\x1b\x1b[16t\x1b\\";
         tty.write_all(query)?;
     } else {
