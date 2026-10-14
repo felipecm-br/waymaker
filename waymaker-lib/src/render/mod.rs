@@ -1573,7 +1573,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                     state.set_interrupt(Interrupt::ExecuteAsync, template);
                                     state.discriminant_payload = Some(2 * id + 1);
                                 }
-                                tui.redraw();
+                                state.needs_redraw = true;
                                 continue;
                             }
                             let ret = if selections.is_empty() {
@@ -1597,7 +1597,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                     .store(false, std::sync::atomic::Ordering::Relaxed);
                                 state.live_input_template = None;
                                 state.live_input_key = None;
-                                tui.redraw();
+                                state.needs_redraw = true;
                                 continue;
                             } else if state.prompt_input_active {
                                 state.prompt_input_active = false;
@@ -1609,7 +1609,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 }
                                 state.prompt_input_template = None;
                                 prompt_input.cancel();
-                                tui.redraw();
+                                state.needs_redraw = true;
                                 continue;
                             } else if picker_ui.action_visible {
                                 picker_ui.action_visible = false;
@@ -1946,7 +1946,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                     };
                                     state.preview_fullscreen = false;
                                 }
-                                tui.redraw();
+                                state.needs_redraw = true;
                             }
                         }
 
@@ -1996,7 +1996,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                         };
                                         state.preview_fullscreen = false;
                                     }
-                                    tui.redraw();
+                                    state.needs_redraw = true;
                                 } else {
                                     state.update_preview_payload(p.command());
                                 }
@@ -2011,7 +2011,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                             Some(0)
                                         } else {
                                             p.toggle_show();
-                                            tui.redraw();
+                                            state.needs_redraw = true;
                                             None
                                         }
                                     } else {
@@ -2042,11 +2042,11 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                             };
                                             state.preview_fullscreen = false;
                                         }
-                                        tui.redraw();
+                                        state.needs_redraw = true;
                                     }
                                 } else {
                                     p.toggle_show();
-                                    tui.redraw();
+                                    state.needs_redraw = true;
                                 }
                             }
                         }
@@ -2140,7 +2140,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             crate::PROMPT_INPUT_ACTIVE
                                 .store(true, std::sync::atomic::Ordering::Relaxed);
                             prompt_input.cancel();
-                            tui.redraw();
+                            state.needs_redraw = true;
                         }
                         Action::LiveInput(payload) => {
                             state.live_input_active = true;
@@ -2153,7 +2153,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 ui.config.nav.live_input.clone().unwrap_or_default()
                             };
                             state.live_input_template = Some(template);
-                            tui.redraw();
+                            state.needs_redraw = true;
                         }
                         Action::LiveInputKey(keys) => {
                             if state.live_input_active
@@ -2391,7 +2391,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                     .store(false, std::sync::atomic::Ordering::Relaxed);
                                 state.live_input_template = None;
                                 state.live_input_key = None;
-                                tui.redraw();
+                                state.needs_redraw = true;
                                 continue;
                             } else if state.prompt_input_active {
                                 state.prompt_input_active = false;
@@ -2403,14 +2403,14 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 }
                                 state.prompt_input_template = None;
                                 prompt_input.cancel();
-                                tui.redraw();
+                                state.needs_redraw = true;
                                 continue;
                             } else if *action_visible {
                                 *action_visible = false;
                                 action_input.cancel();
                                 crate::ACTION_BOX_ACTIVE
                                     .store(false, std::sync::atomic::Ordering::Relaxed);
-                                tui.redraw();
+                                state.needs_redraw = true;
                             } else {
                                 query.cancel()
                             }
@@ -2429,7 +2429,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 action_input.cancel();
                                 crate::ACTION_BOX_ACTIVE
                                     .store(false, std::sync::atomic::Ordering::Relaxed);
-                                tui.redraw();
+                                state.needs_redraw = true;
                                 continue;
                             }
                             if ui.config.nav.active {
@@ -2461,7 +2461,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 action_input.cancel();
                                 crate::ACTION_BOX_ACTIVE
                                     .store(false, std::sync::atomic::Ordering::Relaxed);
-                                tui.redraw();
+                                state.needs_redraw = true;
                                 continue;
                             }
                             if ui.config.nav.active {
@@ -2483,7 +2483,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 action_input.cancel();
                                 crate::ACTION_BOX_ACTIVE
                                     .store(false, std::sync::atomic::Ordering::Relaxed);
-                                tui.redraw();
+                                state.needs_redraw = true;
                                 continue;
                             }
                             if ui.config.nav.active {
@@ -2501,7 +2501,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         Action::Overlay(index) => {
                             if let Some(x) = overlay_ui.as_mut() {
                                 x.enable(index, &ui.area());
-                                tui.redraw();
+                                state.needs_redraw = true;
                             };
                         }
                         Action::Custom(e) => {
@@ -2522,7 +2522,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             if !c.is_ascii_control() {
                                 if state.prompt_input_active {
                                     prompt_input.push_char(c);
-                                    tui.redraw();
+                                    state.needs_redraw = true;
                                 } else {
                                     let is_action_box_input = *action_visible
                                         && crate::ACTION_BOX_ACTIVE

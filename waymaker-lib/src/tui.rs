@@ -49,6 +49,14 @@ where
         crossterm::terminal::enable_raw_mode()?;
 
         let (width, height) = Self::full_size().unwrap_or_default();
+        if let Some(ref layout) = config.layout {
+            let request = layout
+                .percentage
+                .compute_clamped(height, layout.min, layout.max);
+            if request >= height {
+                config.layout = None;
+            }
+        }
         let area = if let Some(ref layout) = config.layout {
             let request = layout
                 .percentage
