@@ -2736,6 +2736,14 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
 
                     let mut _area = area;
 
+                    if let Some(p) = preview_ui.as_mut() {
+                        if state.live_input_active {
+                            p.set_border_color_override(Some(Color::Green));
+                        } else {
+                            p.set_border_color_override(None);
+                        }
+                    }
+
                     let full_width_footer = footer_ui.is_single_column()
                         && footer_ui.config.row_connection == RowConnectionStyle::Full;
 
@@ -2851,10 +2859,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         0
                     };
 
-                    let effective_footer_height = if base_footer_height > 0
-                        && has_footer_separator
-                        && (show_nav_hints || state.preview_fullscreen || show_sort_menu)
-                    {
+                    let effective_footer_height = if base_footer_height > 0 && has_footer_separator {
                         base_footer_height + 1
                     } else {
                         base_footer_height
@@ -3317,9 +3322,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
 
                             let preview_border = preview_ui.as_ref().map(|p| p.border());
 
-                            let preview_border_color = preview_border
-                                .map(|b| b.color)
-                                .filter(|c| *c != ratatui::style::Color::Reset);
+                            let preview_border_color = preview_ui
+                                .as_ref()
+                                .and_then(|p| p.effective_border_color());
 
                             let preview_border_type = preview_border.and_then(|b| b.r#type);
 
@@ -4962,6 +4967,35 @@ mod test {
 
         // p.border() should fall back to config.border when layout has no border override
         assert_eq!(preview_ui.border().color, Color::DarkGray);
+    }
+
+    #[test]
+    fn test_preview_border_color_override_live_input() {
+        use crate::preview::previewer::Previewer;
+        let (previewer, _tx) = Previewer::new(Default::default());
+        let mut config = crate::config::PreviewConfig::default();
+        config.border.sides = Some(ratatui::widgets::Borders::LEFT);
+        config.border.color = Color::DarkGray;
+        config.layout.push(crate::config::PreviewSetting {
+            border: None,
+            ..Default::default()
+        });
+        let mut preview_ui = PreviewUI::new(previewer.view(), config, [80, 25]);
+
+        assert_eq!(preview_ui.effective_border_color(), Some(Color::DarkGray));
+
+        // When live input is active, border override takes precedence
+        preview_ui.set_border_color_override(Some(Color::Green));
+        assert_eq!(preview_ui.effective_border_color(), Some(Color::Green));
+
+        let block = preview_ui.make_block().expect("block should exist");
+        let mut buffer = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 10, 5));
+        ratatui::widgets::Widget::render(block, Rect::new(0, 0, 10, 5), &mut buffer);
+        assert_eq!(buffer.cell((0, 0)).unwrap().fg, Color::Green);
+
+        // Resetting returns back to DarkGray
+        preview_ui.set_border_color_override(None);
+        assert_eq!(preview_ui.effective_border_color(), Some(Color::DarkGray));
     }
 
     #[test]

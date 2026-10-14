@@ -54,9 +54,22 @@ pub struct PreviewUI {
     diagram_png_cache: Option<(usize, u64, Vec<u8>, u32, u32)>,
     last_placeholder_transmission: Option<(usize, u32, u32, u32)>,
     pub was_image: bool,
+    pub border_color_override: Option<ratatui::style::Color>,
 }
 
 impl PreviewUI {
+    pub fn set_border_color_override(&mut self, color: Option<ratatui::style::Color>) {
+        self.border_color_override = color;
+    }
+
+    pub fn effective_border_color(&self) -> Option<ratatui::style::Color> {
+        self.border_color_override.or_else(|| {
+            self.active_border()
+                .map(|b| b.color)
+                .filter(|c| *c != ratatui::style::Color::Reset)
+        })
+    }
+
     pub(crate) fn active_border(&self) -> Option<&BorderSetting> {
         if self.is_fullscreen() {
             return None;
@@ -215,6 +228,7 @@ impl PreviewUI {
             diagram_png_cache: None,
             last_placeholder_transmission: None,
             was_image: false,
+            border_color_override: None,
         };
         ret.set_layout(idx);
         ret
@@ -1333,8 +1347,13 @@ impl PreviewUI {
     pub fn make_block<'a>(&'a self) -> Option<ratatui::widgets::Block<'a>> {
         if let Some(border) = self.active_border() {
             let mut block = border.as_block();
+            if let Some(override_color) = self.border_color_override {
+                block = block.border_style(ratatui::style::Style::default().fg(override_color));
+            }
             if let Some(title) = self.title_text() {
-                let fg = if border.title_fg != ratatui::style::Color::Reset {
+                let fg = if let Some(override_color) = self.border_color_override {
+                    override_color
+                } else if border.title_fg != ratatui::style::Color::Reset {
                     border.title_fg
                 } else if self.config.border.title_fg != ratatui::style::Color::Reset {
                     self.config.border.title_fg
@@ -1523,7 +1542,9 @@ impl PreviewUI {
             } else {
                 area.bottom()
             };
-            let border_color = if border.color != ratatui::style::Color::Reset {
+            let border_color = if let Some(override_color) = self.border_color_override {
+                override_color
+            } else if border.color != ratatui::style::Color::Reset {
                 border.color
             } else if self.config.border.color != ratatui::style::Color::Reset {
                 self.config.border.color
@@ -1538,7 +1559,9 @@ impl PreviewUI {
         } else {
             let top_y = area.y;
             let bottom_y = area.bottom();
-            let border_color = if self.config.border.color != ratatui::style::Color::Reset {
+            let border_color = if let Some(override_color) = self.border_color_override {
+                override_color
+            } else if self.config.border.color != ratatui::style::Color::Reset {
                 self.config.border.color
             } else {
                 ratatui::style::Color::DarkGray
