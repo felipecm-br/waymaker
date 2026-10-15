@@ -2877,7 +2877,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         };
                         ui.config.nav_hints_height(count)
                     } else if footer_ui.show {
-                        footer_ui.height()
+                        footer_ui.content_height()
                     } else {
                         0
                     };
@@ -4974,6 +4974,44 @@ mod test {
         for x in 9..20 {
             assert_eq!(buffer.cell((x, 0)).unwrap().symbol(), "─");
         }
+    }
+
+    #[test]
+    fn test_footer_height_calculation_with_separator() {
+        use crate::config::{DisplayConfig, HorizontalSeparator};
+        use crate::ui::DisplayUI;
+
+        let mut config = DisplayConfig::default();
+        config.content = Some(crate::utils::serde::StringOrVec::String(
+            "[Enter] Jump • [Esc] Exit".to_string(),
+        ));
+        config.separator = HorizontalSeparator::Light;
+
+        let footer_ui = DisplayUI::new(config);
+        assert_eq!(footer_ui.content_height(), 1);
+        assert_eq!(footer_ui.height(), 2);
+
+        let has_footer_separator =
+            footer_ui.config.separator != HorizontalSeparator::None;
+        let base_footer_height = footer_ui.content_height();
+        let effective_footer_height = if base_footer_height > 0 && has_footer_separator {
+            base_footer_height + 1
+        } else {
+            base_footer_height
+        };
+
+        // Must be exactly 2 (1 separator row + 1 content row), avoiding any dead space
+        assert_eq!(effective_footer_height, 2);
+
+        // When separator is None, effective height is exactly 1 row
+        let mut config_no_sep = DisplayConfig::default();
+        config_no_sep.content = Some(crate::utils::serde::StringOrVec::String(
+            "[Enter] Jump • [Esc] Exit".to_string(),
+        ));
+        config_no_sep.separator = HorizontalSeparator::None;
+        let footer_no_sep = DisplayUI::new(config_no_sep);
+        assert_eq!(footer_no_sep.content_height(), 1);
+        assert_eq!(footer_no_sep.height(), 1);
     }
 
     #[test]

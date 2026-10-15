@@ -65,6 +65,14 @@ impl DisplayUI {
         self.width = new_w;
     }
 
+    /// Return the content height in rows (text lines + border height), excluding any separator line.
+    pub fn content_height(&self) -> u16 {
+        if !self.show {
+            return 0;
+        }
+        self.height + self.config.border.height()
+    }
+
     pub fn height(&self) -> u16 {
         if !self.show {
             return 0;
