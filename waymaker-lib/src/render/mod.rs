@@ -250,6 +250,16 @@ fn normalize_live_key(key: &str) -> String {
 }
 
 #[inline]
+pub fn quote_live_token(token: &str) -> String {
+    if token == ";" {
+        r"'\;'".to_string()
+    } else {
+        let escaped = token.replace('\'', r"'\''");
+        format!("'{escaped}'")
+    }
+}
+
+#[inline]
 fn apply_live_input<A: ActionExt>(
     buffer: &mut Vec<RenderCommand<A>>,
     live_input_active: bool,
@@ -268,7 +278,12 @@ fn apply_live_input<A: ActionExt>(
         }
         if !key_batch.is_empty() {
             let keys = std::mem::take(key_batch);
-            out.push(RenderCommand::Action(Action::LiveInputKey(keys.join(" "))));
+            let formatted_keys = keys
+                .into_iter()
+                .map(|k| quote_live_token(&k))
+                .collect::<Vec<_>>()
+                .join(" ");
+            out.push(RenderCommand::Action(Action::LiveInputKey(formatted_keys)));
         }
     };
 
@@ -301,6 +316,11 @@ fn apply_live_input<A: ActionExt>(
                         key_batch.push(std::mem::take(&mut current_text_batch));
                     }
                     key_batch.push("Space".to_string());
+                } else if c == ';' {
+                    if !current_text_batch.is_empty() {
+                        key_batch.push(std::mem::take(&mut current_text_batch));
+                    }
+                    key_batch.push(";".to_string());
                 } else if !c.is_ascii_control() {
                     current_text_batch.push(c);
                 }
@@ -312,6 +332,12 @@ fn apply_live_input<A: ActionExt>(
                     key_batch.push(std::mem::take(&mut current_text_batch));
                 }
                 key_batch.push("Space".to_string());
+            }
+            RenderCommand::KeyAction { ref key, .. } if key == ";" => {
+                if !current_text_batch.is_empty() {
+                    key_batch.push(std::mem::take(&mut current_text_batch));
+                }
+                key_batch.push(";".to_string());
             }
             RenderCommand::KeyAction { ref key, .. } => {
                 if !current_text_batch.is_empty() {
@@ -5803,12 +5829,12 @@ mod test {
         assert_eq!(buffer.len(), 1);
         match &buffer[0] {
             RenderCommand::Action(Action::LiveInputKey(keys)) => {
-                assert_eq!(keys, "abc");
+                assert_eq!(keys, "'abc'");
             }
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
 
-        // 3. Characters followed by Enter coalesce into "hello Enter"
+        // 3. Characters followed by Enter coalesce into "'ls' 'Enter'"
         let mut buffer = vec![
             RenderCommand::<NullActionExt>::Action(Action::Char('l')),
             RenderCommand::<NullActionExt>::Action(Action::Char('s')),
@@ -5818,7 +5844,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
         match &buffer[0] {
             RenderCommand::Action(Action::LiveInputKey(keys)) => {
-                assert_eq!(keys, "ls Enter");
+                assert_eq!(keys, "'ls' 'Enter'");
             }
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
@@ -5836,7 +5862,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
         match &buffer[0] {
             RenderCommand::Action(Action::LiveInputKey(keys)) => {
-                assert_eq!(keys, "BSpace Up C-c");
+                assert_eq!(keys, "'BSpace' 'Up' 'C-c'");
             }
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
@@ -5850,13 +5876,13 @@ mod test {
         assert_eq!(buffer.len(), 2);
         match &buffer[0] {
             RenderCommand::Action(Action::LiveInputKey(keys)) => {
-                assert_eq!(keys, "x");
+                assert_eq!(keys, "'x'");
             }
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
         assert!(matches!(buffer[1], RenderCommand::PreviewChange));
 
-        // 6. Space character alone maps to "Space"
+        // 6. Space character alone maps to "'Space'"
         let mut buffer = vec![
             RenderCommand::<NullActionExt>::Action(Action::Char(' ')),
         ];
@@ -5864,12 +5890,12 @@ mod test {
         assert_eq!(buffer.len(), 1);
         match &buffer[0] {
             RenderCommand::Action(Action::LiveInputKey(keys)) => {
-                assert_eq!(keys, "Space");
+                assert_eq!(keys, "'Space'");
             }
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
 
-        // 7. Space between words maps to "foo Space bar"
+        // 7. Space between words maps to "'foo' 'Space' 'bar'"
         let mut buffer = vec![
             RenderCommand::<NullActionExt>::Action(Action::Char('f')),
             RenderCommand::<NullActionExt>::Action(Action::Char('o')),
@@ -5883,12 +5909,12 @@ mod test {
         assert_eq!(buffer.len(), 1);
         match &buffer[0] {
             RenderCommand::Action(Action::LiveInputKey(keys)) => {
-                assert_eq!(keys, "foo Space bar");
+                assert_eq!(keys, "'foo' 'Space' 'bar'");
             }
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
 
-        // 8. Tab, Delete, BackTab map to Tab, DC, BTab
+        // 8. Tab, Delete, BackTab map to "'Tab' 'DC' 'BTab'"
         let mut buffer = vec![
             RenderCommand::<NullActionExt>::KeyAction {
                 key: "tab".to_string(),
@@ -5904,7 +5930,23 @@ mod test {
         assert_eq!(buffer.len(), 1);
         match &buffer[0] {
             RenderCommand::Action(Action::LiveInputKey(keys)) => {
-                assert_eq!(keys, "Tab DC BTab");
+                assert_eq!(keys, "'Tab' 'DC' 'BTab'");
+            }
+            other => panic!("expected LiveInputKey, got {:?}", other),
+        }
+
+        // 9. Special characters and semicolons are properly isolated and quoted
+        let mut buffer = vec![
+            RenderCommand::<NullActionExt>::Action(Action::Char('(')),
+            RenderCommand::<NullActionExt>::Action(Action::Char(';')),
+            RenderCommand::<NullActionExt>::Action(Action::Char(')')),
+            RenderCommand::<NullActionExt>::Action(Action::Char('\'')),
+        ];
+        apply_live_input(&mut buffer, true);
+        assert_eq!(buffer.len(), 1);
+        match &buffer[0] {
+            RenderCommand::Action(Action::LiveInputKey(keys)) => {
+                assert_eq!(keys, r"'(' '\;' ')'\'''");
             }
             other => panic!("expected LiveInputKey, got {:?}", other),
         }
