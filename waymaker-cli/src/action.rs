@@ -521,7 +521,6 @@ pub fn action_handler(
                 });
                 if let Some(i) = found_idx {
                     state.picker_ui.results.cursor_jump(i as u32);
-                    let _ = render_tx.send(RenderCommand::Action(Action::Pos(i as i32)));
                     target_found = true;
                     crate::start::TARGET_ITEM.lock().unwrap().take();
                     unsafe {
@@ -546,14 +545,12 @@ pub fn action_handler(
                                     col0.raw(raw) == item_str.as_str()
                                 }) {
                                     state.picker_ui.results.cursor_jump(i as u32);
-                                    let _ = render_tx.send(RenderCommand::Action(Action::Pos(i as i32)));
                                     restored = true;
                                 }
                             }
                             if !restored {
                                 let target_idx = prev_idx.min(count.saturating_sub(1));
                                 state.picker_ui.results.cursor_jump(target_idx);
-                                let _ = render_tx.send(RenderCommand::Action(Action::Pos(target_idx as i32)));
                                 restored = true;
                             }
                         }
@@ -561,7 +558,6 @@ pub fn action_handler(
                 }
                 if !restored {
                     state.picker_ui.results.cursor_jump(0);
-                    let _ = render_tx.send(RenderCommand::Action(Action::Pos(0)));
                 }
             }
 
