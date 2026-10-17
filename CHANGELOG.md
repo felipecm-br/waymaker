@@ -1,6 +1,22 @@
 ## [Unreleased]
 
-## [0.3.0] - 2026-10-12
+## [0.3.1] - 2026-10-17
+
+### 🚀 Features
+
+- Implement high-performance LiveInput passthrough mode
+- Support periodic preview polling and live output streaming via `poll_ms`
+- Dynamically style preview border with live input green when active
+
+### 🐛 Bug Fixes
+
+- Safely quote tokens and isolate semicolons for shell and tmux execution in live input
+- Prevent double-counting separator height in effective footer layout
+- Remove redundant async `Action::Pos` dispatch on reload cursor restoration
+- Resolve space bar forwarding, preview tail flicker, and terminal query leaks in live input
+- Eliminate flickering and fix tail tracking during live input streaming
+- Propagate live input preview change events and force rerun on passthrough
+- Resolve blank preview, event loop feedback, and first chunk swap
 
 ### 🚀 Features
 
