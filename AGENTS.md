@@ -51,6 +51,12 @@ Releasing is the explicit "ship it" step, intentionally decoupled from coding ta
   5. Push `main` to `origin`.
   6. Create annotated tag: `git tag -a vX.Y.Z -m "Release vX.Y.Z: <summary>"`.
   7. Push tag: `git push origin vX.Y.Z`.
+  8. **Post-Release Storage Hygiene**: Run `cargo clean` after the release is cut and `just install` has updated `$HOME/.local/bin/wm`, and remove any finished feature/release worktrees (`awt rm <branch>` or `awt sweep`). `target/` grows without bound as 100–180 MB test binaries accumulate across workspace crates.
+
+## Storage & Worktree Hygiene
+
+- Before finishing any task, remove temporary files, scratch artifacts, and completed feature worktrees (`awt rm <branch>`) created for the task, and only those. Never delete files or worktrees you did not create without asking the user.
+- Because `target/` accumulates multiple test binaries per crate edit, run `cargo clean` in secondary worktrees before or when closing them, and after every release.
 
 
 ## Navigation Hints

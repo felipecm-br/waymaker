@@ -72,8 +72,11 @@ Turn accumulated mainline commits into a tagged, published version. This skill g
    git push origin vX.Y.Z
    ```
 
-## Phase 5: Verification & Reporting
+## Phase 5: Verification, Storage Hygiene & Reporting
 
 1. Verify tag exists on remote: `git ls-remote --tags origin vX.Y.Z`.
 2. Monitor CI run (e.g. `gh run list --workflow=release.yml` or `gh release view vX.Y.Z`).
-3. Report the release summary to the user.
+3. **Post-Release Storage Hygiene**:
+   - In Rust projects, once the global release binary is installed (`just install`) and the release tag is pushed, run `cargo clean` in any release/feature worktree created for the cycle and remove completed worktrees (`awt rm <branch>` or `awt sweep`).
+   - Prune accumulated test binaries (`cargo clean` after release or `cargo clean-all --keep-days 7`) so `target/` does not grow unbounded.
+4. Report the release summary to the user.
