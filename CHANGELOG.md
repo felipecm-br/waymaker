@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-18
+
+### 🧹 Storage & Worktree Hygiene
+
+- Enforce post-release `cargo clean` and worktree pruning in the release workflow (`.agents/skills/release/SKILL.md`) to prevent unbounded multi-gigabyte `target/` accumulation across worktrees
+- Document storage and worktree hygiene guidelines (`dev-gc --dry-run`, `cargo clean-all`, `awt rm`) in `AGENTS.md`
+
 ## [0.3.1] - 2026-10-17
 
 ### 🚀 Features
