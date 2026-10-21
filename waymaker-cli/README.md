@@ -294,6 +294,26 @@ path = "~/Downloads"
 startup_command = "wm -o jump"
 ```
 
+#### Extra Windows (`[[window]]`)
+
+Like Sesh, sessions and wildcards can open additional Tmux windows. Define reusable windows once with `[[window]]` and reference them by name through `windows = [...]`:
+
+```toml
+[[wildcard]]
+pattern = "~/dev/github/starship-studio/*"
+startup_command = "agy"          # optional; runs in window 0
+windows = ["server"]
+
+[[window]]
+name = "server"
+startup_script = "npx -y live-server --port=5500"   # `startup_command` is accepted as an alias
+# path = "~/other/dir"           # optional; defaults to the session path
+```
+
+- Extra windows are created detached when the session is first created, then focus returns to window 0.
+- An explicit `[[session]]` match takes precedence over wildcards.
+- Names without a matching `[[window]]` definition are skipped.
+
 ### Dynamic CLI Overrides
 
 Waymaker features a compact, expressive override syntax allowing on-the-fly customization:

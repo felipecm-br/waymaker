@@ -142,6 +142,10 @@ pub struct SessionConfig {
     pub session: Vec<ConfiguredSession>,
     #[serde(default)]
     pub wildcard: Vec<WildcardSession>,
+    /// Reusable window definitions referenced by name from `windows = [...]`
+    /// in `[[session]]` and `[[wildcard]]` (sesh-compatible `[[window]]`).
+    #[serde(default)]
+    pub window: Vec<WindowConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -150,12 +154,29 @@ pub struct ConfiguredSession {
     pub path: String,
     #[serde(default)]
     pub startup_command: Option<String>,
+    #[serde(default)]
+    pub windows: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct WildcardSession {
     pub pattern: String,
-    pub startup_command: String,
+    #[serde(default)]
+    pub startup_command: Option<String>,
+    #[serde(default)]
+    pub windows: Vec<String>,
+}
+
+/// A reusable Tmux window definition (sesh-compatible `[[window]]`).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct WindowConfig {
+    pub name: String,
+    /// Command sent to the window once created (sesh: `startup_script`).
+    #[serde(default, alias = "startup_command")]
+    pub startup_script: Option<String>,
+    /// Working directory; defaults to the session path.
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 /// Load session configuration. Checks WAYMAKER_SESSION_CONFIG, SESH_CONFIG,
@@ -254,12 +275,108 @@ pub fn find_startup_command(
                 || pattern.matches_path(path)
                 || pattern.matches_path_with(path, opts)
             {
-                return Some(w.startup_command.clone());
+                if let Some(ref cmd) = w.startup_command {
+                    return Some(cmd.clone());
+                }
             }
         }
     }
 
     None
+}
+
+/// Check whether a glob `pattern` (with `~` expansion) matches `path`.
+fn wildcard_matches(pattern: &str, path: &Path, canonical: &Path) -> bool {
+    let expanded = expand_tilde(pattern);
+    let pat_str = expanded.to_string_lossy();
+    let Ok(pattern) = glob::Pattern::new(&pat_str) else {
+        return false;
+    };
+    let opts = glob::MatchOptions {
+        case_sensitive: true,
+        require_literal_separator: false,
+        require_literal_leading_dot: false,
+    };
+    pattern.matches_path(canonical)
+        || pattern.matches_path_with(canonical, opts)
+        || pattern.matches_path(path)
+        || pattern.matches_path_with(path, opts)
+}
+
+/// Resolve the extra windows configured for a target directory or session name.
+/// An explicit `[[session]]` match wins over wildcards; names that do not
+/// resolve to a `[[window]]` definition are skipped.
+pub fn find_session_windows(
+    path: &Path,
+    target_name: Option<&str>,
+    config: &SessionConfig,
+) -> Vec<WindowConfig> {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let mut names: Option<&Vec<String>> = None;
+
+    for s in &config.session {
+        let expanded = expand_tilde(&s.path);
+        let s_canonical = expanded.canonicalize().unwrap_or(expanded.clone());
+        let by_path =
+            s_canonical == canonical || expanded == path || s.path == path.to_string_lossy();
+        let by_name = target_name
+            .map(|t| t == s.name || strip_icon(t) == strip_icon(&s.name))
+            .unwrap_or(false);
+        if (by_path || by_name) && !s.windows.is_empty() {
+            names = Some(&s.windows);
+            break;
+        }
+    }
+
+    if names.is_none() {
+        for w in &config.wildcard {
+            if !w.windows.is_empty() && wildcard_matches(&w.pattern, path, &canonical) {
+                names = Some(&w.windows);
+                break;
+            }
+        }
+    }
+
+    names
+        .map(|list| {
+            list.iter()
+                .filter_map(|n| config.window.iter().find(|w| &w.name == n).cloned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Create the configured extra windows (detached) in an already-created session,
+/// then restore focus to the first window so the main startup command stays active.
+fn spawn_session_windows(session_name: &str, session_path: &Path, windows: &[WindowConfig]) {
+    if windows.is_empty() {
+        return;
+    }
+    for win in windows {
+        let dir = win
+            .path
+            .as_deref()
+            .map(expand_tilde)
+            .unwrap_or_else(|| session_path.to_path_buf());
+        let target = format!("{}:", session_name);
+        let created = Command::new("tmux")
+            .args(["new-window", "-d", "-t", &target, "-n", &win.name, "-c"])
+            .arg(&dir)
+            .status()
+            .map(|st| st.success())
+            .unwrap_or(false);
+        if created {
+            if let Some(ref script) = win.startup_script {
+                let win_target = format!("{}:{}", session_name, win.name);
+                let _ = Command::new("tmux")
+                    .args(["send-keys", "-t", &win_target, script, "Enter"])
+                    .status();
+            }
+        }
+    }
+    let _ = Command::new("tmux")
+        .args(["select-window", "-t", &format!("{}:^", session_name)])
+        .status();
 }
 
 /// Switch client if inside Tmux, or attach if outside.
@@ -317,6 +434,9 @@ pub fn connect(target: &str, switch_only: bool) -> anyhow::Result<()> {
                     .args(["send-keys", "-t", &session_name, cmd, "Enter"])
                     .status();
             }
+
+            let windows = find_session_windows(&canonical, Some(&s.name), &config);
+            spawn_session_windows(&session_name, &canonical, &windows);
         }
 
         switch_or_attach(&session_name, switch_only)?;
@@ -351,6 +471,9 @@ pub fn connect(target: &str, switch_only: bool) -> anyhow::Result<()> {
                     .args(["send-keys", "-t", &session_name, &cmd, "Enter"])
                     .status();
             }
+
+            let windows = find_session_windows(&canonical, Some(&session_name), &config);
+            spawn_session_windows(&session_name, &canonical, &windows);
         }
 
         switch_or_attach(&session_name, switch_only)?;
@@ -995,6 +1118,74 @@ startup_command = "wm -o jump"
         let other_path = home.join("Pictures");
         let cmd = find_startup_command(&other_path, Some("Pictures"), &config);
         assert_eq!(cmd, None);
+    }
+
+    #[test]
+    fn test_parse_windows_schema() {
+        let toml_str = r#"
+[[wildcard]]
+pattern = "~/dev/github/**"
+startup_command = "agy"
+windows = ["server"]
+
+[[wildcard]]
+pattern = "~/only-windows/*"
+windows = ["server"]
+
+[[window]]
+name = "server"
+startup_script = "npx -y live-server --port=5500"
+
+[[window]]
+name = "git"
+startup_command = "lazygitrs"
+path = "~/Downloads"
+"#;
+        let config: SessionConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.window.len(), 2);
+        assert_eq!(config.wildcard[0].windows, vec!["server"]);
+        assert_eq!(config.wildcard[1].startup_command, None);
+        // `startup_command` is accepted as an alias for sesh's `startup_script`.
+        assert_eq!(config.window[1].startup_script.as_deref(), Some("lazygitrs"));
+    }
+
+    #[test]
+    fn test_find_session_windows() {
+        let home = dirs::home_dir().unwrap();
+        let toml_str = r#"
+[[wildcard]]
+pattern = "~/dev/github/**"
+startup_command = "agy"
+windows = ["server"]
+
+[[session]]
+name = "Downloads"
+path = "~/Downloads"
+windows = ["git", "missing"]
+
+[[window]]
+name = "server"
+startup_script = "npx -y live-server --port=5500"
+
+[[window]]
+name = "git"
+startup_script = "lazygitrs"
+"#;
+        let config: SessionConfig = toml::from_str(toml_str).unwrap();
+
+        // Wildcard match resolves the referenced window definition.
+        let w = find_session_windows(&home.join("dev/github/starship-studio/main"), None, &config);
+        assert_eq!(w.len(), 1);
+        assert_eq!(w[0].name, "server");
+        assert_eq!(w[0].startup_script.as_deref(), Some("npx -y live-server --port=5500"));
+
+        // Explicit session match wins; unknown window names are skipped.
+        let w = find_session_windows(&home.join("Downloads"), Some("Downloads"), &config);
+        assert_eq!(w.len(), 1);
+        assert_eq!(w[0].name, "git");
+
+        // No match -> no extra windows.
+        assert!(find_session_windows(&home.join("Pictures"), Some("Pictures"), &config).is_empty());
     }
 
     #[test]
