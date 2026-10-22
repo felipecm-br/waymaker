@@ -89,6 +89,10 @@ tick_rate = 60
 #               "Darkgray", "Lightred", "Lightgreen", "Lightyellow", "Lightblue",
 #               "Lightmagenta", "Lightcyan", "White", or hex "#RRGGBB"
 # color = "Darkgray"
+# Multi-color frame gradient (top-left -> bottom-right, overrides `color` on the frame lines).
+# Values: "aurora", "nebula", "rainbow", "blackhole", "warm", "cool", "lavender",
+#         "monochrome", or "#RRGGBB, #RRGGBB, ..." | Default: "" (off)
+# gradient = "aurora"
 
 # Interactive sort menu grid displayed in the footer.
 [ui.sort_menu]

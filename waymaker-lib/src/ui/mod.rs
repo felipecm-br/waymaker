@@ -1,4 +1,5 @@
 mod display;
+pub mod gradient;
 mod input;
 mod overlay;
 mod preview;

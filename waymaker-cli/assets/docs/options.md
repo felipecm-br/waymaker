@@ -332,6 +332,7 @@ Most UI components have a `border` block:
 - `padding`: Padding inside the border. Can be 1 value (all), 2 (vertical, horizontal), or 4 (top, right, bottom, left).
 - `title`: Optional text to display on the border.
 - `title_modifier`: Style modifier for the title.
+- `gradient`: Multi-color gradient for the frame, running from the top-left to the bottom-right corner (OKLab interpolation; titles keep their color). A preset (`aurora`, `nebula`, `rainbow`, `blackhole`, `warm`, `cool`, `lavender`, `monochrome`) or two or more `#rrggbb` stops separated by commas. Empty (default) keeps the solid `color`. Currently applied to `ui.border` (the outer frame).
 
 ### Key Binds (`binds.`, `b`)
 

@@ -4350,6 +4350,9 @@ fn render_ui(frame: &mut Frame, area: &mut Rect, ui: &UI) {
     if ui.config.border.sides.is_some() {
         let widget = ui.make_ui();
         frame.render_widget(widget, *area);
+        if let Some(stops) = crate::ui::gradient::parse_stops(&ui.config.border.gradient) {
+            crate::ui::gradient::paint_frame(frame.buffer_mut(), *area, &stops);
+        }
     }
     *area = ui.compute_area(area);
 }

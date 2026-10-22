@@ -2411,6 +2411,12 @@ pub struct BorderSetting {
     /// When `Color::Reset` (the default) the title inherits the border color.
     #[serde(deserialize_with = "camelcase_normalized")]
     pub title_fg: Color,
+    /// Paints the frame with a multi-color gradient from the top-left to the
+    /// bottom-right corner (applied to the `ui` border). Either a preset
+    /// (`aurora`, `nebula`, `rainbow`, `blackhole`, `warm`, `cool`, `lavender`,
+    /// `monochrome`) or two or more `#rrggbb` stops separated by commas.
+    /// Empty (the default) keeps the solid `color`.
+    pub gradient: String,
 }
 
 impl BorderSetting {
