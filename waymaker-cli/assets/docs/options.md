@@ -333,6 +333,7 @@ Most UI components have a `border` block:
 - `title`: Optional text to display on the border.
 - `title_modifier`: Style modifier for the title.
 - `gradient`: Multi-color gradient for the frame, running from the top-left to the bottom-right corner (OKLab interpolation; titles keep their color). A preset (`aurora`, `nebula`, `rainbow`, `blackhole`, `warm`, `cool`, `lavender`, `monochrome`) or two or more `#rrggbb` stops separated by commas. Empty (default) keeps the solid `color`. Currently applied to `ui.border` (the outer frame).
+  - The environment variable `WM_BORDER_GRADIENT` sets `ui.border.gradient` and turns the outer frame on (rounded, all sides) when the config leaves it off; `WM_BORDER_TITLE` labels the frame when it has no title. Meant for session-wide toggles (e.g. exported by tmux); CLI overrides still win.
 
 ### Key Binds (`binds.`, `b`)
 

@@ -43,6 +43,32 @@ use waymaker::{
 };
 use waymaker_partial::Apply;
 
+/// `WM_BORDER_GRADIENT` (a gradient preset or hex stops, e.g. exported by a
+/// session-wide toggle) turns on a rounded outer frame painted with that
+/// gradient; `WM_BORDER_TITLE` labels it when the config has no title.
+/// Applied before CLI overrides, which still win.
+fn apply_border_gradient_env(border: &mut waymaker::config::BorderSetting) {
+    let Ok(gradient) = std::env::var("WM_BORDER_GRADIENT") else {
+        return;
+    };
+    let gradient = gradient.trim();
+    if waymaker::ui::gradient::parse_stops(gradient).is_none() {
+        return;
+    }
+    border.gradient = gradient.to_string();
+    if border.r#type.is_none() {
+        border.r#type = Some(ratatui::widgets::BorderType::Rounded);
+    }
+    if border.sides.is_none_or(|sides| sides.is_empty()) {
+        border.sides = Some(ratatui::widgets::Borders::ALL);
+    }
+    if border.title.is_empty()
+        && let Ok(title) = std::env::var("WM_BORDER_TITLE")
+    {
+        border.title = title;
+    }
+}
+
 pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     if cli.test_keys {
         super::crokey::main();
@@ -170,6 +196,7 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     {
         config.tui.clear_on_exit = false;
     }
+    apply_border_gradient_env(&mut config.render.ui.border);
     config.apply(partial); // resolve config.exit first
     config.resolve();
 
