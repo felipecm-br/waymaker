@@ -2060,6 +2060,7 @@ mod tests {
 
     #[test]
     fn test_is_kitty_supported_escape_hatch() {
+        let _lock = crate::utils::lock_test_env();
         let prev_wm = std::env::var("WM_INLINE_DIAGRAMS").ok();
         let prev_mm = std::env::var("MM_INLINE_DIAGRAMS").ok();
         unsafe {

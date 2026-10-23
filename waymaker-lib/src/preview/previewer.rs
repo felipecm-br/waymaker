@@ -1310,6 +1310,7 @@ mod tests {
         let file_path = temp_dir.join(format!("test_diag_{}.mmd", std::process::id()));
         std::fs::write(&file_path, "graph TD\n    A[Client] --> B[Server]").unwrap();
 
+        let _env_lock = crate::utils::lock_test_env_async().await;
         unsafe {
             std::env::set_var("WM_INLINE_DIAGRAMS", "1");
             std::env::set_var("MM_INLINE_DIAGRAMS", "1");
@@ -1362,6 +1363,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_preview_transition_from_markdown_diagram_to_code_file() {
+        let _env_lock = crate::utils::lock_test_env_async().await;
         let mut previewer_cfg = crate::config::PreviewerConfig::default();
         previewer_cfg.media = true;
         previewer_cfg.markdown_diagrams = true;
@@ -1476,6 +1478,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_media_preview_cooperative_cancellation() {
+        let _env_lock = crate::utils::lock_test_env_async().await;
         let mut previewer_cfg = crate::config::PreviewerConfig::default();
         previewer_cfg.media = true;
         previewer_cfg.debounce_ms = 0;

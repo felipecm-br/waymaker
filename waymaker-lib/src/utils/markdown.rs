@@ -1696,6 +1696,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_inline_diagrams() {
+        let _env_lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_DIAGRAMS").ok();
         unsafe {
             std::env::set_var("MM_INLINE_DIAGRAMS", "1");
@@ -1763,6 +1764,7 @@ graph LR
 
     #[test]
     fn test_render_markdown_ansi_inline_diagrams() {
+        let _env_lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_DIAGRAMS").ok();
         unsafe {
             std::env::set_var("MM_INLINE_DIAGRAMS", "1");
@@ -1800,11 +1802,10 @@ graph TD
         );
     }
 
-    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn test_render_markdown_inline_local_image() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
         unsafe {
             std::env::set_var("MM_INLINE_IMAGES", "1");
@@ -1869,7 +1870,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_image_relative_path_and_lru_cache() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         clear_image_placeholder_cache();
 
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
@@ -1932,7 +1933,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_image_fallback_when_disabled_or_missing() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
         unsafe {
             std::env::set_var("MM_INLINE_IMAGES", "0");
@@ -1976,7 +1977,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_image_url_encoded_and_spaces() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
         unsafe {
             std::env::set_var("MM_INLINE_IMAGES", "1");
@@ -2022,7 +2023,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_image_data_uri() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
         unsafe {
             std::env::set_var("MM_INLINE_IMAGES", "1");
@@ -2071,7 +2072,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_image_disabled_flag_independence() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
         let prev_diag = std::env::var("MM_INLINE_DIAGRAMS").ok();
         unsafe {
@@ -2139,7 +2140,7 @@ graph TD
 
     #[test]
     fn test_is_inline_images_enabled_env_semantics() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev_wm = std::env::var("WM_INLINE_IMAGES").ok();
         let prev_mm = std::env::var("MM_INLINE_IMAGES").ok();
         let prev_diag = std::env::var("MM_INLINE_DIAGRAMS").ok();
@@ -2221,7 +2222,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_image_in_list_item_no_orphan_bullet() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
         unsafe {
             std::env::set_var("MM_INLINE_IMAGES", "1");
@@ -2265,7 +2266,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_image_file_scheme_and_relative_priority() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
         unsafe {
             std::env::set_var("MM_INLINE_IMAGES", "1");
@@ -2318,7 +2319,7 @@ graph TD
 
     #[test]
     fn test_render_markdown_image_svg_data_uri() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
         unsafe {
             std::env::set_var("MM_INLINE_IMAGES", "1");
