@@ -998,7 +998,7 @@ pub fn process_envs(mut envs: HashMap<String, EnvValue>) -> HashMap<String, Stri
 
     if envs.get("EDITOR").is_none() && std::env::var("EDITOR").ok().map_or(true, |x| x.is_empty()) {
         let ev = EnvValue::new(guess_editor_cmd());
-        envs.insert("PAGER".to_string(), ev);
+        envs.insert("EDITOR".to_string(), ev);
     }
 
     // First pass: static envs
