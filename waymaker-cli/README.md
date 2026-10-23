@@ -114,9 +114,9 @@ flowchart TD
 Modal pickers launch in centered Tmux popups sized to the Golden Ratio **$75\% \times 60\%$**, providing an optimal $2^\circ\text{–}5^\circ$ foveal viewing cone with an internal 40/60 candidate/preview division:
 - `Prefix + e` / `Prefix + C-e`: **Workspace Files** (`wm -o workspace`) — browse files, markdown, and Mermaid diagrams.
 - `Prefix + /`: **Live Ripgrep** (`wm -o rg`) — full-text search with line-synchronized preview.
-- `Prefix + y` / `Prefix + C-y`: **Scrollback Extractor** (`wm -o yank`) — extrakto-style regex token and URL extractor.
+- `Prefix + y` / `Prefix + C-y`: **Scrollback Extractor** (`wm -o yank` <sup>†</sup>) — extrakto-style regex token and URL extractor.
 - `Prefix + P`: **GitHub Pull Request Review** (`wm -o pr`) — interactive PR inspection and diff viewer.
-- `Prefix + ?`: **Keybindings HUD** (`wm -o keybindings`) — searchable workflow cheat sheet.
+- `Prefix + ?`: **Keybindings HUD** (`wm -o keybindings` <sup>†</sup>) — searchable workflow cheat sheet.
 
 ### 3. Polymorphic Zsh ZLE & Smart Tab
 - **Empty Buffer + `Tab`**: Instantly launches `_jump_widget` (`wm --no-read -o jump`) — jump anywhere without typing verbs (`cd`, `z`).
@@ -141,16 +141,18 @@ Waymaker presets are modular, reusable TOML configurations stored in `~/.config/
 | **`jump`** | `wm -o jump` | Flagship frecency directory navigator, file manager, and tree inspector. | `Enter`: `cd` to path<br>`e` / `Ctrl+E`: Open in Neovim<br>`l`: Drill into directory<br>`h`: Jump to parent<br>`u`: `@undo` file action<br>`Ctrl+U`: Ancestor hierarchy jump<br>`y` / `x` / `p`: Yank, Cut, Paste |
 | **`workspace`** | `wm -o workspace` | Workspace file inspector for code, markdown, and Mermaid diagrams. | `Enter`: Toggle 60% / 100% fullscreen preview<br>`Tab`: Cycle sources (Local $\to$ Frecency $\to$ Bookmarks)<br>`s` / `Ctrl+S`: Modal diagram viewer<br>`Ctrl+V`: Insert path into origin pane<br>`e`: Open in Neovim |
 | **`rg`** | `wm -o rg` | Live workspace full-text search with ripgrep and line-synced `bat` preview. | `Enter`: Open at line (`nvim +{line} {file}`)<br>`Ctrl+S`: Toggle Case Sensitivity (`[Aa]`)<br>`Ctrl+W`: Toggle Whole Word (`[W]`)<br>`Ctrl+/`: Cycle preview layouts |
-| **`yank`** | `wm -o yank` | Extrakto-style regex token, path, URL, and git hash extractor from scrollback. | `Enter`: Copy to clipboard<br>`Ctrl+V`: Insert into origin pane<br>`Tab`: Cycle filter tabs (`all` $\to$ `cmd` $\to$ `path` $\to$ `url` $\to$ `sha`)<br>`b`: Open URL in browser |
+| **`yank`** <sup>†</sup> | `wm -o yank` | Extrakto-style regex token, path, URL, and git hash extractor from scrollback. | `Enter`: Copy to clipboard<br>`Ctrl+V`: Insert into origin pane<br>`Tab`: Cycle filter tabs (`all` $\to$ `cmd` $\to$ `path` $\to$ `url` $\to$ `sha`)<br>`b`: Open URL in browser |
 | **`session-picker`** | `wm session` / `wm -o session-picker` | High-performance Tmux session switcher with live pane previews and icon badges. | `Enter`: Connect to session (`wm connect`)<br>`d`: Terminate session<br>`Tab`: Filter active vs configured sessions |
 | **`ftb`** | `wm -o ftb` | Tab completion backend for Zsh `fzf-tab` with multi-column Nucleo fuzzy matching. | `Tab`: Select item<br>`Shift-Tab`: Previous<br>`Ctrl+P`: Toggle preview |
 | **`kill`** | `wm -o kill` | Interactive TCP listening port and process terminator with live connection telemetry. | `Enter`: Send `SIGTERM` (15)<br>`Ctrl+X`: Force `SIGKILL` (-9) |
-| **`keybindings`** | `wm -o keybindings` | Interactive workflow HUD and shortcut cheat sheet across Tmux, Zsh, Hyprland, and Neovim. | `Enter`: Execute workflow<br>`Tab`: Cycle categories<br>`y`: Copy keybinding |
-| **`wt`** | `wm -o wt` | Interactive Git worktree switcher integrated with worktrunk and status preview. | `Enter`: Checkout worktree |
+| **`keybindings`** <sup>†</sup> | `wm -o keybindings` | Interactive workflow HUD and shortcut cheat sheet across Tmux, Zsh, Hyprland, and Neovim. | `Enter`: Execute workflow<br>`Tab`: Cycle categories<br>`y`: Copy keybinding |
+| **`wt`** <sup>†</sup> | `wm -o wt` | Interactive Git worktree switcher integrated with worktrunk and status preview. | `Enter`: Checkout worktree |
 | **`memory`** | `wm -o memory` | AI agent memory, instructions, skills, and rules explorer. | `Enter`: Open file in editor |
 | **`pr`** | `wm -o pr` | GitHub Pull Request review modal with diff inspection. | `Enter`: Open PR in browser<br>`d`: View full diff |
-| **`borders`** | `wm -o borders` | Live Hyprland window border gradient switcher. | `j` / `k`: Live preview on window<br>`Enter`: Persist style |
-| **`animations`** | `wm -o animations` | Live Hyprland window animation curve switcher. | `j` / `k`: Live preview curve<br>`Enter`: Persist animation |
+| **`borders`** <sup>†</sup> | `wm -o borders` | Live Hyprland window border gradient switcher. | `j` / `k`: Live preview on window<br>`Enter`: Persist style |
+| **`animations`** <sup>†</sup> | `wm -o animations` | Live Hyprland window animation curve switcher. | `j` / `k`: Live preview curve<br>`Enter`: Persist animation |
+
+<sup>†</sup> Not bundled with Waymaker: these presets live in the author's dotfiles and are listed as examples of what presets can do. `install.sh` and `wm --download` do not install them.
 
 ---
 
