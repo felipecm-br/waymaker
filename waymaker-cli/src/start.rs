@@ -631,7 +631,17 @@ pub fn map_reader_batched(
 }
 
 pub static COMMAND_ARGS: Mutex<Vec<std::ffi::OsString>> = Mutex::new(Vec::new());
-pub static TARGET_ITEM: Mutex<Option<String>> = Mutex::new(None);
+/// Item to place the cursor on after the next sync. Seeded once from an
+/// inherited `WM_TARGET_ITEM` (or legacy `MM_TARGET_ITEM`); after that it lives
+/// only here, since mutating the process environment races with other threads.
+pub static TARGET_ITEM: std::sync::LazyLock<Mutex<Option<String>>> =
+    std::sync::LazyLock::new(|| {
+        Mutex::new(
+            std::env::var("WM_TARGET_ITEM")
+                .or_else(|_| std::env::var("MM_TARGET_ITEM"))
+                .ok(),
+        )
+    });
 pub static PREV_RELOAD_ITEM: Mutex<Option<(Option<String>, u32, std::path::PathBuf)>> =
     Mutex::new(None);
 pub static CHDIR_NEW_DIR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -1288,11 +1298,7 @@ pub async fn start(
             target_path.to_path_buf()
         };
 
-        let mut target_to_select = TARGET_ITEM.lock().unwrap().clone().or_else(|| {
-            std::env::var("WM_TARGET_ITEM")
-                .or_else(|_| std::env::var("MM_TARGET_ITEM"))
-                .ok()
-        });
+        let mut target_to_select = TARGET_ITEM.lock().unwrap().clone();
         if target_to_select.is_none() {
             if target_path == Path::new("..") || path == ".." {
                 if let Ok(cwd) = std::env::current_dir() {
@@ -1341,16 +1347,8 @@ pub async fn start(
             CHDIR_NEW_DIR.store(true, std::sync::atomic::Ordering::SeqCst);
             if let Some(t) = target_to_select {
                 *TARGET_ITEM.lock().unwrap() = Some(t.clone());
-                unsafe {
-                    std::env::set_var("WM_TARGET_ITEM", &t);
-                    std::env::set_var("MM_TARGET_ITEM", t);
-                }
             } else {
                 TARGET_ITEM.lock().unwrap().take();
-                unsafe {
-                    std::env::remove_var("WM_TARGET_ITEM");
-                    std::env::remove_var("MM_TARGET_ITEM");
-                }
                 // Entering a child directory (or new directory with no specific target):
                 // Reset cursor to 0 and clear any previous reload item.
                 state.picker_ui.results.cursor_jump(0);
@@ -1391,11 +1389,7 @@ pub async fn start(
 
     let sync_render_tx = render_tx.clone();
     mm.register_event_handler(Event::Synced | Event::Resynced, move |state, _| {
-        let target_opt = TARGET_ITEM.lock().unwrap().clone().or_else(|| {
-            std::env::var("WM_TARGET_ITEM")
-                .or_else(|_| std::env::var("MM_TARGET_ITEM"))
-                .ok()
-        });
+        let target_opt = TARGET_ITEM.lock().unwrap().clone();
 
         if let Some(target) = target_opt {
             let count = state.picker_ui.worker.counts().0;
@@ -1415,16 +1409,8 @@ pub async fn start(
                 ));
                 state.needs_redraw = true;
                 TARGET_ITEM.lock().unwrap().take();
-                unsafe {
-                    std::env::remove_var("WM_TARGET_ITEM");
-                    std::env::remove_var("MM_TARGET_ITEM");
-                }
             } else if !state.picker_ui.results.status.running {
                 TARGET_ITEM.lock().unwrap().take();
-                unsafe {
-                    std::env::remove_var("WM_TARGET_ITEM");
-                    std::env::remove_var("MM_TARGET_ITEM");
-                }
                 state.picker_ui.results.cursor_jump(0);
                 let _ = sync_render_tx.send(waymaker::message::RenderCommand::Action(
                     waymaker::action::Action::Pos(0),

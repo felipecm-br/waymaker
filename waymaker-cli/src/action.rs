@@ -324,18 +324,10 @@ pub fn action_handler(
                         .set(Some(saved.query.clone()), saved.query_cursor as u16);
                     if let Some(ref target) = saved.focused_item {
                         *crate::start::TARGET_ITEM.lock().unwrap() = Some(target.clone());
-                        unsafe {
-                            std::env::set_var("WM_TARGET_ITEM", target);
-                            std::env::set_var("MM_TARGET_ITEM", target);
-                        }
                     }
                 } else {
                     state.picker_ui.query.set(Some(String::new()), 0);
                     *crate::start::TARGET_ITEM.lock().unwrap() = None;
-                    unsafe {
-                        std::env::remove_var("WM_TARGET_ITEM");
-                        std::env::remove_var("MM_TARGET_ITEM");
-                    }
                 }
                 state.picker_ui.update();
             }
@@ -426,18 +418,10 @@ pub fn action_handler(
                         .set(Some(saved.query.clone()), saved.query_cursor as u16);
                     if let Some(ref target) = saved.focused_item {
                         *crate::start::TARGET_ITEM.lock().unwrap() = Some(target.clone());
-                        unsafe {
-                            std::env::set_var("WM_TARGET_ITEM", target);
-                            std::env::set_var("MM_TARGET_ITEM", target);
-                        }
                     }
                 } else {
                     state.picker_ui.query.set(Some(String::new()), 0);
                     *crate::start::TARGET_ITEM.lock().unwrap() = None;
-                    unsafe {
-                        std::env::remove_var("WM_TARGET_ITEM");
-                        std::env::remove_var("MM_TARGET_ITEM");
-                    }
                 }
                 state.picker_ui.update();
             }
@@ -504,11 +488,7 @@ pub fn action_handler(
                 state.picker_ui.update();
             }
 
-            let target_opt = crate::start::TARGET_ITEM
-                .lock()
-                .unwrap()
-                .clone()
-                .or_else(|| std::env::var("WM_TARGET_ITEM").or_else(|_| std::env::var("MM_TARGET_ITEM")).ok());
+            let target_opt = crate::start::TARGET_ITEM.lock().unwrap().clone();
 
             let mut target_found = false;
 
@@ -523,10 +503,6 @@ pub fn action_handler(
                     state.picker_ui.results.cursor_jump(i as u32);
                     target_found = true;
                     crate::start::TARGET_ITEM.lock().unwrap().take();
-                    unsafe {
-                        std::env::remove_var("WM_TARGET_ITEM");
-                        std::env::remove_var("MM_TARGET_ITEM");
-                    }
                 }
             }
 
@@ -1221,10 +1197,6 @@ pub fn action_handler(
                         if let Some(item_name) = dest.file_name() {
                             let name = item_name.to_string_lossy().to_string();
                             *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
-                            unsafe {
-                                std::env::set_var("WM_TARGET_ITEM", &name);
-                                std::env::set_var("MM_TARGET_ITEM", name);
-                            }
                         }
                     }
                     let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
@@ -1268,10 +1240,6 @@ pub fn action_handler(
                             if let Some(target_name) = target.file_name() {
                                 let name = target_name.to_string_lossy().to_string();
                                 *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
-                                unsafe {
-                                    std::env::set_var("WM_TARGET_ITEM", &name);
-                                    std::env::set_var("MM_TARGET_ITEM", name);
-                                }
                             }
                         }
                         let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
@@ -1359,10 +1327,6 @@ pub fn action_handler(
                             if let Some(item_name) = dest.file_name() {
                                 let name = item_name.to_string_lossy().to_string();
                                 *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
-                                unsafe {
-                                    std::env::set_var("WM_TARGET_ITEM", &name);
-                                    std::env::set_var("MM_TARGET_ITEM", name);
-                                }
                             }
                         }
                         let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
