@@ -213,27 +213,24 @@ impl<A: ActionExt> BindMap<A> {
 
         for action in actions.iter() {
             if let Action::Semantic(alias) = action {
-                if let Some(alias_actions) = self.resolve_alias(alias, mode) {
-                    let has_nested_aliases = alias_actions
-                        .iter()
-                        .any(|a| matches!(a, Action::Semantic(_)));
-                    let flat_actions = if has_nested_aliases {
-                        self.resolve_actions(alias_actions, mode)?
-                    } else {
-                        alias_actions.clone()
-                    };
-
-                    let already_traced = matches!(flat_actions.first(), Some(Action::Trace(_)));
-                    if !already_traced {
-                        resolved.push(Action::Trace(format!("@@{alias}")));
-                        resolved.extend(flat_actions);
-                        resolved.push(Action::Trace(String::new()));
-                    } else {
-                        resolved.extend(flat_actions);
-                    }
+                // If any alias is unresolvable, the whole sequence is invalid
+                let alias_actions = self.resolve_alias(alias, mode)?;
+                let has_nested_aliases = alias_actions
+                    .iter()
+                    .any(|a| matches!(a, Action::Semantic(_)));
+                let flat_actions = if has_nested_aliases {
+                    self.resolve_actions(alias_actions, mode)?
                 } else {
-                    // If any alias is unresolvable, the whole sequence is invalid
-                    return None;
+                    alias_actions.clone()
+                };
+
+                let already_traced = matches!(flat_actions.first(), Some(Action::Trace(_)));
+                if !already_traced {
+                    resolved.push(Action::Trace(format!("@@{alias}")));
+                    resolved.extend(flat_actions);
+                    resolved.push(Action::Trace(String::new()));
+                } else {
+                    resolved.extend(flat_actions);
                 }
             } else {
                 resolved.push(action.clone());
