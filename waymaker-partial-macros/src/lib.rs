@@ -832,8 +832,10 @@ pub fn partial(attr: TokenStream, item: TokenStream) -> TokenStream {
                         #(#set_field_arms)*
                         _ => {
                             #(
+                                // Only fall through when the flattened target doesn't know `head`;
+                                // a Missing raised deeper names the real unknown field.
                                 match waymaker_partial::Set::set(#flattened_field_targets, path, val) {
-                                    Err(waymaker_partial::PartialSetError::Missing(_)) => {}
+                                    Err(waymaker_partial::PartialSetError::Missing(ref m)) if m == head => {}
                                     x => return x,
                                 }
                             )*

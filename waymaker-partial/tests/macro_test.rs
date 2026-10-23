@@ -667,6 +667,41 @@ mod tests {
     }
 
     #[test]
+    fn test_flatten_reports_nested_missing_field() {
+        #[partial(path)]
+        #[derive(Debug, PartialEq, Default, Clone, Serialize)]
+        struct Leaf {
+            pub a: i32,
+        }
+
+        #[partial(path)]
+        #[derive(Debug, PartialEq, Default, Clone, Serialize)]
+        struct InnerFlat {
+            #[partial(recurse)]
+            pub ui: Leaf,
+        }
+
+        #[partial(path)]
+        #[derive(Debug, PartialEq, Default, Clone, Serialize)]
+        struct Root {
+            #[serde(flatten)]
+            #[partial(recurse)]
+            pub flat: InnerFlat,
+        }
+
+        let mut p = PartialRoot::default();
+
+        // The flattened struct knows `ui`, so the error names the unknown leaf
+        // rather than blaming `ui` itself.
+        let res = p.set(&["ui".to_string(), "nope".to_string()], &["0".to_string()]);
+        assert_eq!(res, Err(PartialSetError::Missing("nope".to_string())));
+
+        p.set(&["ui".to_string(), "a".to_string()], &["7".to_string()])
+            .unwrap();
+        assert_eq!(p.flat.ui.a, Some(7));
+    }
+
+    #[test]
     fn test_serde_with_mirroring_unwrapped() {
         use serde::{Deserialize, Deserializer, Serialize};
 
