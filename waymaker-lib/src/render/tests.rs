@@ -1,6 +1,7 @@
 use super::*;
 use crate::action::{Action, Actions, NullActionExt};
 use crate::message::RenderCommand;
+use ratatui::layout::Rect;
 use ratatui::widgets::BorderType;
 use std::collections::HashMap;
 
