@@ -546,6 +546,17 @@ pub fn map_reader_batched(
         let mut batch: Vec<(Option<std::sync::Arc<str>>, String)> = Vec::with_capacity(512);
         let mut current_group: Option<std::sync::Arc<str>> = None;
 
+        // Inject on a separate thread so reading the next batch overlaps with
+        // indexing the previous one. A single consumer keeps the input order.
+        let (batch_tx, batch_rx) = std::sync::mpsc::sync_channel::<Vec<_>>(16);
+        let consumer = std::thread::spawn(move || {
+            for chunk in batch_rx {
+                if injector.extend(chunk.into_iter()).is_err() {
+                    break;
+                }
+            }
+        });
+
         if let Some(delim) = input_separator {
             let delim_byte = delim as u8;
             let mut byte_buf = Vec::new();
@@ -575,7 +586,7 @@ pub fn map_reader_batched(
                 if batch.len() >= 512 {
                     let mut chunk = Vec::with_capacity(512);
                     std::mem::swap(&mut batch, &mut chunk);
-                    if injector.extend(chunk.into_iter()).is_err() {
+                    if batch_tx.send(chunk).is_err() {
                         break;
                     }
                 }
@@ -608,7 +619,7 @@ pub fn map_reader_batched(
                 if batch.len() >= 512 {
                     let mut chunk = Vec::with_capacity(512);
                     std::mem::swap(&mut batch, &mut chunk);
-                    if injector.extend(chunk.into_iter()).is_err() {
+                    if batch_tx.send(chunk).is_err() {
                         break;
                     }
                 }
@@ -616,8 +627,11 @@ pub fn map_reader_batched(
         }
 
         if !batch.is_empty() {
-            let _ = injector.extend(batch.into_iter());
+            let _ = batch_tx.send(batch);
         }
+        // Everything is injected once the consumer drains the channel.
+        drop(batch_tx);
+        let _ = consumer.join();
 
         if let Some(render_tx) = abort_empty
             && total == 0
@@ -2392,6 +2406,11 @@ pub async fn start_filter(
         tokio::spawn(async { Ok(0) })
     };
 
+    // Match while input is still streaming, so matching overlaps with reading
+    // instead of starting only after the last line arrives.
+    while !handle.is_finished() {
+        mm.worker.nucleo.tick(10);
+    }
     let _ = handle.await;
 
     mm.worker.find(query);
@@ -2399,30 +2418,37 @@ pub async fn start_filter(
     // Wait until matching is complete with 10ms timeout per tick
     while mm.worker.nucleo.tick(10).running {}
 
-    let items = mm.worker.get_all_sorted();
+    let code = {
+        let items = mm.worker.get_all_sorted();
 
-    if items.is_empty() {
-        return 1;
-    }
-
-    let stdout = std::io::stdout();
-    let mut out = std::io::BufWriter::new(stdout.lock());
-    for item in items {
-        let raw = if mm.worker.columns.len() == 1 {
-            mm.worker.columns[0].raw(item).to_string()
+        if items.is_empty() {
+            1
         } else {
-            mm.worker
-                .columns
-                .iter()
-                .map(|col| col.raw(item))
-                .collect::<Vec<_>>()
-                .join("\t")
-        };
-        let _ = writeln!(out, "{}", raw);
-    }
-    let _ = out.flush();
+            let stdout = std::io::stdout();
+            let mut out = std::io::BufWriter::new(stdout.lock());
+            for item in items {
+                if mm.worker.columns.len() == 1 {
+                    let _ = writeln!(out, "{}", mm.worker.columns[0].raw(item));
+                } else {
+                    let raw = mm
+                        .worker
+                        .columns
+                        .iter()
+                        .map(|col| col.raw(item))
+                        .collect::<Vec<_>>()
+                        .join("\t");
+                    let _ = writeln!(out, "{}", raw);
+                }
+            }
+            let _ = out.flush();
+            0
+        }
+    };
 
-    0
+    // The caller exits right after this. Freeing every injected item first
+    // costs tens of milliseconds on large inputs, so leave that to the OS.
+    std::mem::forget(mm);
+    code
 }
 
 /// Benchmark continuous streaming frametime on Ratatui test backend.
