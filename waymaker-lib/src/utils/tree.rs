@@ -153,14 +153,12 @@ fn build_tree(
                     Style::default().fg(Color::DarkGray),
                 ));
             }
-        } else if !is_dir {
-            if let Ok(meta) = entry.metadata() {
-                let size = format_size(meta.len());
-                spans.push(Span::styled(
-                    format!(" ({size})"),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
+        } else if !is_dir && let Ok(meta) = entry.metadata() {
+            let size = format_size(meta.len());
+            spans.push(Span::styled(
+                format!(" ({size})"),
+                Style::default().fg(Color::DarkGray),
+            ));
         }
 
         lines.push(Line::from(spans));

@@ -1,7 +1,7 @@
-use waymaker_partial::SimpleDeserializer;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
+use waymaker_partial::SimpleDeserializer;
 
 fn de<T: DeserializeOwned>(input: &[&str]) -> T {
     let data: Vec<String> = input.iter().map(|s| s.to_string()).collect();
@@ -19,14 +19,14 @@ fn de_err<T: DeserializeOwned>(input: &[&str]) {
 #[test]
 fn primitives() {
     assert_eq!(de::<i32>(&["1", "2"]), 1);
-    assert_eq!(de::<bool>(&["false", "true"]), false);
+    assert!(!de::<bool>(&["false", "true"]));
     assert_eq!(de::<String>(&["first", "second"]), "first");
 }
 
 #[test]
 fn bool_ok() {
-    assert_eq!(de::<bool>(&["true"]), true);
-    assert_eq!(de::<bool>(&["false"]), false);
+    assert!(de::<bool>(&["true"]));
+    assert!(!de::<bool>(&["false"]));
 }
 
 #[test]

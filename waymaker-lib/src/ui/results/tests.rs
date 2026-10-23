@@ -479,8 +479,8 @@ fn test_results_ui_cut_and_yanked_navbar_and_flash_icons() {
 
 #[test]
 fn test_results_ui_active_and_inactive_group_header_styling() {
-    use std::sync::Arc;
     use ratatui::widgets::Widget;
+    use std::sync::Arc;
 
     #[derive(Clone)]
     struct ItemWithGroup {
@@ -596,4 +596,3 @@ fn test_results_ui_active_and_inactive_group_header_styling() {
     assert!(cell_g2_active.modifier.contains(Modifier::BOLD));
     assert!(!cell_g2_active.modifier.contains(Modifier::DIM));
 }
-

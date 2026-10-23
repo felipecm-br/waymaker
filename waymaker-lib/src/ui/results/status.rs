@@ -75,7 +75,6 @@ impl ResultsUI {
         self.status_template = template
             .unwrap_or(status_config.template.clone().into())
             .style(status_config.style)
-            .into()
     }
 }
 
@@ -83,7 +82,7 @@ pub struct StatusUI {}
 
 impl StatusUI {
     pub fn parse_template_to_status_line(s: &str) -> Line<'static> {
-        let parts = match split_on_nesting(&s, ['{', '}']) {
+        let parts = match split_on_nesting(s, ['{', '}']) {
             Ok(x) => x,
             Err(n) => {
                 if n > 0 {
@@ -146,43 +145,37 @@ impl StatusUI {
             if let Some(bg_token) = token
                 .strip_prefix("bg=")
                 .or_else(|| token.strip_prefix("bg:"))
+                && let Ok(color) = Color::from_str(bg_token)
             {
-                if let Ok(color) = Color::from_str(bg_token) {
-                    style = style.bg(color);
-                    bg_set = true;
-                    matched_any = true;
-                    continue;
-                }
+                style = style.bg(color);
+                bg_set = true;
+                matched_any = true;
+                continue;
             }
 
             if let Some(fg_token) = token
                 .strip_prefix("fg=")
                 .or_else(|| token.strip_prefix("fg:"))
+                && let Ok(color) = Color::from_str(fg_token)
             {
-                if let Ok(color) = Color::from_str(fg_token) {
-                    style = style.fg(color);
-                    fg_set = true;
-                    matched_any = true;
-                    continue;
-                }
+                style = style.fg(color);
+                fg_set = true;
+                matched_any = true;
+                continue;
             }
 
-            if !fg_set {
-                if let Ok(color) = Color::from_str(token) {
-                    style = style.fg(color);
-                    fg_set = true;
-                    matched_any = true;
-                    continue;
-                }
+            if !fg_set && let Ok(color) = Color::from_str(token) {
+                style = style.fg(color);
+                fg_set = true;
+                matched_any = true;
+                continue;
             }
 
-            if !bg_set {
-                if let Ok(color) = Color::from_str(token) {
-                    style = style.bg(color);
-                    bg_set = true;
-                    matched_any = true;
-                    continue;
-                }
+            if !bg_set && let Ok(color) = Color::from_str(token) {
+                style = style.bg(color);
+                bg_set = true;
+                matched_any = true;
+                continue;
             }
 
             match token.to_lowercase().as_str() {
@@ -281,7 +274,8 @@ mod tests {
         assert!(style2.add_modifier.contains(Modifier::DIM));
         assert!(style2.add_modifier.contains(Modifier::UNDERLINED));
 
-        let style_blinks = StatusUI::parse_style("slow_blink,rapid_blink,reversed,hidden,crossed_out").unwrap();
+        let style_blinks =
+            StatusUI::parse_style("slow_blink,rapid_blink,reversed,hidden,crossed_out").unwrap();
         assert!(style_blinks.add_modifier.contains(Modifier::SLOW_BLINK));
         assert!(style_blinks.add_modifier.contains(Modifier::RAPID_BLINK));
         assert!(style_blinks.add_modifier.contains(Modifier::REVERSED));

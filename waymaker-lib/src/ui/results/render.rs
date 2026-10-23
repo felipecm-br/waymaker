@@ -59,7 +59,7 @@ impl ResultsUI {
         }
 
         let cwd = std::env::current_dir().unwrap_or_default();
-        let offset = self.bottom as u32;
+        let offset = self.bottom;
         let end = self.bottom + self.height as u32;
         let as_cols = !self.config.stacked_columns;
 
@@ -272,10 +272,10 @@ impl ResultsUI {
             })
             .max()
             .unwrap_or(0);
-        if max_group_width > 0 {
-            if let Some(first_vis) = widths.iter().position(|&w| w != 0) {
-                widths[first_vis] = widths[first_vis].max(max_group_width);
-            }
+        if max_group_width > 0
+            && let Some(first_vis) = widths.iter().position(|&w| w != 0)
+        {
+            widths[first_vis] = widths[first_vis].max(max_group_width);
         }
 
         // When symlink targets are enabled, expand column 0 to use all
@@ -349,16 +349,10 @@ impl ResultsUI {
         )| {
             let group_h = match &t.0 {
                 Some(crate::nucleo::GroupHeader::Named(_)) => 1,
-                Some(crate::nucleo::GroupHeader::TierSeparator) => {
-                    if !matches!(
-                        self.config.tier.separator,
-                        HorizontalSeparator::None | HorizontalSeparator::Underline
-                    ) {
-                        1
-                    } else {
-                        0
-                    }
-                }
+                Some(crate::nucleo::GroupHeader::TierSeparator) => u16::from(!matches!(
+                    self.config.tier.separator,
+                    HorizontalSeparator::None | HorizontalSeparator::Underline
+                )),
                 None => 0,
             };
             group_h
@@ -580,23 +574,23 @@ impl ResultsUI {
                         let col_count = row.len();
                         let mut push = vec![];
 
-                        for (rev_i, mut col) in row.into_iter().rev().enumerate() {
+                        for (rev_i, col) in row.iter_mut().rev().enumerate() {
                             let col_idx = col_count.saturating_sub(1 + rev_i);
                             let mut height = col.height() as u16;
                             if remaining_height == 0 {
                                 break;
                             } else if remaining_height < height {
-                                clip_text_lines(&mut col, remaining_height, !self.reverse());
+                                clip_text_lines(col, remaining_height, !self.reverse());
                                 height = remaining_height;
                             }
                             remaining_height -= height;
 
                             if let Some(color) = b_color {
-                                apply_bookmark_text_style(&mut col, color);
+                                apply_bookmark_text_style(col, color);
                             }
 
                             prefix_span(
-                                &mut col,
+                                col,
                                 prefix.clone(),
                                 self.active_prefix_style(&icon_name, is_selected, is_spinner, &cwd),
                                 self.inactive_prefix_style(
@@ -616,7 +610,7 @@ impl ResultsUI {
                             );
                             if self.config.icons && col_idx == 0 {
                                 insert_icon_span(
-                                    &mut col,
+                                    col,
                                     &icon_name,
                                     !is_selected && nav_bar_span.is_some(),
                                     is_current_row,
@@ -817,23 +811,23 @@ impl ResultsUI {
                 let col_count = row.len();
                 let mut push = vec![];
 
-                for (rev_i, mut col) in row.into_iter().rev().enumerate() {
+                for (rev_i, col) in row.iter_mut().rev().enumerate() {
                     let col_idx = col_count.saturating_sub(1 + rev_i);
                     let mut height = col.height() as u16;
                     if remaining_height == 0 {
                         break;
                     } else if remaining_height < height {
-                        clip_text_lines(&mut col, remaining_height, !self.reverse());
+                        clip_text_lines(col, remaining_height, !self.reverse());
                         height = remaining_height;
                     }
                     remaining_height -= height;
 
                     if let Some(color) = b_color {
-                        apply_bookmark_text_style(&mut col, color);
+                        apply_bookmark_text_style(col, color);
                     }
 
                     prefix_span(
-                        &mut col,
+                        col,
                         prefix.clone(),
                         self.active_prefix_style(&icon_name, is_selected, is_spinner, &cwd),
                         self.inactive_prefix_style(&icon_name, is_selected, is_spinner, &cwd),
@@ -848,7 +842,7 @@ impl ResultsUI {
                     );
                     if self.config.icons && col_idx == 0 {
                         insert_icon_span(
-                            &mut col,
+                            col,
                             &icon_name,
                             !is_selected && nav_bar_span.is_some(),
                             is_current_row,
@@ -877,7 +871,7 @@ impl ResultsUI {
                         let has_nav = !is_selected && nav_bar_span.is_some();
                         let prefix_skip = if has_nav { 2 } else { 1 };
                         let skip = if col_idx == 0 { prefix_skip } else { 0 };
-                        apply_tier_underline(&mut col, target_w, skip);
+                        apply_tier_underline(col, target_w, skip);
                     }
 
                     let row = Row::new(vec![col.clone()]).height(height);
@@ -925,7 +919,7 @@ impl ResultsUI {
                     *c
                 };
                 if self.height - remaining_height > c {
-                    let idx = self.bottom as u32 + i as u32 - 1;
+                    let idx = self.bottom + i as u32 - 1;
                     log::debug!(
                         "Mapped click position to index: {c} -> {idx} with remaining {remaining_height}",
                     );
@@ -934,100 +928,99 @@ impl ResultsUI {
             }
 
             // insert group header or tier separator
-            if let Some(ref group) = group {
-                if remaining_height > 0 {
-                    let is_first = rows.is_empty();
-                    let is_last = remaining_height <= 1;
-                    let nav_bar_span = get_nav_bar_span(is_first, is_last, false, false, false);
+            if let Some(ref group) = group
+                && remaining_height > 0
+            {
+                let is_first = rows.is_empty();
+                let is_last = remaining_height <= 1;
+                let nav_bar_span = get_nav_bar_span(is_first, is_last, false, false, false);
 
-                    let row_opt = match group {
-                        crate::nucleo::GroupHeader::Named(group_name) => {
-                            let is_active = active_group_name.as_ref().map(|s| s.as_ref())
-                                == Some(group_name.as_ref());
-                            let group_style: Style = if is_active {
-                                self.config.group_header_style.into()
-                            } else {
-                                self.config.inactive_group_header_style.into()
-                            };
-                            let mut line_spans = vec![];
-                            if let Some(nav_span) = nav_bar_span {
-                                line_spans.push(nav_span);
+                let row_opt = match group {
+                    crate::nucleo::GroupHeader::Named(group_name) => {
+                        let is_active = active_group_name.as_ref().map(|s| s.as_ref())
+                            == Some(group_name.as_ref());
+                        let group_style: Style = if is_active {
+                            self.config.group_header_style.into()
+                        } else {
+                            self.config.inactive_group_header_style.into()
+                        };
+                        let mut line_spans = vec![];
+                        if let Some(nav_span) = nav_bar_span {
+                            line_spans.push(nav_span);
+                        }
+                        line_spans.push(Span::raw(" "));
+                        line_spans.push(Span::styled(group_name.to_string(), group_style));
+
+                        let line = ratatui::text::Line::from(line_spans);
+                        if as_cols {
+                            let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
+                            let mut cells = vec![];
+                            for i in 0..widths.len() {
+                                if i == first_visible {
+                                    cells.push(ratatui::widgets::Cell::from(line.clone()));
+                                } else {
+                                    cells.push(ratatui::widgets::Cell::from(""));
+                                }
                             }
-                            line_spans.push(Span::raw(" "));
-                            line_spans.push(Span::styled(group_name.to_string(), group_style));
+                            Some(Row::new(cells).height(1))
+                        } else {
+                            Some(Row::new(vec![line]).height(1))
+                        }
+                    }
+                    crate::nucleo::GroupHeader::TierSeparator => {
+                        let tier_sep = self.config.tier.separator;
+                        if matches!(
+                            tier_sep,
+                            HorizontalSeparator::None | HorizontalSeparator::Underline
+                        ) {
+                            None
+                        } else {
+                            let sep_char = tier_sep.as_str();
+                            let tier_style: Style = self.config.tier.style.into();
+                            let total_w = self.width as usize;
 
-                            let line = ratatui::text::Line::from(line_spans);
                             if as_cols {
+                                let mut cells = vec![];
                                 let first_visible =
                                     widths.iter().position(|&w| w != 0).unwrap_or(0);
-                                let mut cells = vec![];
-                                for i in 0..widths.len() {
-                                    if i == first_visible {
-                                        cells.push(ratatui::widgets::Cell::from(line.clone()));
-                                    } else {
+                                for (col_i, &w) in widths.iter().enumerate() {
+                                    if w == 0 {
                                         cells.push(ratatui::widgets::Cell::from(""));
+                                        continue;
                                     }
-                                }
-                                Some(Row::new(cells).height(1))
-                            } else {
-                                Some(Row::new(vec![line]).height(1))
-                            }
-                        }
-                        crate::nucleo::GroupHeader::TierSeparator => {
-                            let tier_sep = self.config.tier.separator;
-                            if matches!(
-                                tier_sep,
-                                HorizontalSeparator::None | HorizontalSeparator::Underline
-                            ) {
-                                None
-                            } else {
-                                let sep_char = tier_sep.as_str();
-                                let tier_style: Style = self.config.tier.style.into();
-                                let total_w = self.width as usize;
-
-                                if as_cols {
-                                    let mut cells = vec![];
-                                    let first_visible =
-                                        widths.iter().position(|&w| w != 0).unwrap_or(0);
-                                    for (col_i, &w) in widths.iter().enumerate() {
-                                        if w == 0 {
-                                            cells.push(ratatui::widgets::Cell::from(""));
-                                            continue;
-                                        }
-                                        let mut spans = vec![];
-                                        let mut fill_w = w as usize;
-                                        if col_i == first_visible {
-                                            if let Some(nav_span) = nav_bar_span.clone() {
-                                                fill_w = fill_w.saturating_sub(nav_span.width());
-                                                spans.push(nav_span);
-                                            }
-                                        }
-                                        let line_str = sep_char.repeat(fill_w);
-                                        spans.push(Span::styled(line_str, tier_style));
-                                        cells.push(ratatui::widgets::Cell::from(
-                                            ratatui::text::Line::from(spans),
-                                        ));
-                                    }
-                                    Some(Row::new(cells).height(1))
-                                } else {
                                     let mut spans = vec![];
-                                    let mut fill_w = total_w;
-                                    if let Some(nav_span) = nav_bar_span {
+                                    let mut fill_w = w as usize;
+                                    if col_i == first_visible
+                                        && let Some(nav_span) = nav_bar_span.clone()
+                                    {
                                         fill_w = fill_w.saturating_sub(nav_span.width());
                                         spans.push(nav_span);
                                     }
                                     let line_str = sep_char.repeat(fill_w);
                                     spans.push(Span::styled(line_str, tier_style));
-                                    Some(Row::new(vec![ratatui::text::Line::from(spans)]).height(1))
+                                    cells.push(ratatui::widgets::Cell::from(
+                                        ratatui::text::Line::from(spans),
+                                    ));
                                 }
+                                Some(Row::new(cells).height(1))
+                            } else {
+                                let mut spans = vec![];
+                                let mut fill_w = total_w;
+                                if let Some(nav_span) = nav_bar_span {
+                                    fill_w = fill_w.saturating_sub(nav_span.width());
+                                    spans.push(nav_span);
+                                }
+                                let line_str = sep_char.repeat(fill_w);
+                                spans.push(Span::styled(line_str, tier_style));
+                                Some(Row::new(vec![ratatui::text::Line::from(spans)]).height(1))
                             }
                         }
-                    };
-
-                    if let Some(row) = row_opt {
-                        rows.push(row);
-                        remaining_height = remaining_height.saturating_sub(1);
                     }
+                };
+
+                if let Some(row) = row_opt {
+                    rows.push(row);
+                    remaining_height = remaining_height.saturating_sub(1);
                 }
             }
             if remaining_height == 0 {
@@ -1384,7 +1377,7 @@ impl ResultsUI {
         // doesn't loop back after results is exhausted so we have to set here
         if let Click::ResultPos(_c) = click {
             log::debug!("Mapped click to last row = {i}");
-            *click = Click::ResultIdx(self.bottom as u32 + i as u32 - 1);
+            *click = Click::ResultIdx(self.bottom + i as u32 - 1);
         }
 
         if self.reverse() {
@@ -1407,14 +1400,13 @@ impl ResultsUI {
             if surplus > 0 {
                 // occupy full row
                 let is_single_col = widths.iter().filter(|&&w| w != 0).count() <= 1;
-                if matches!(self.config.row_connection, RowConnectionStyle::Full)
+                if (matches!(self.config.row_connection, RowConnectionStyle::Full)
                     || is_single_col
                     || (matches!(self.config.row_connection, RowConnectionStyle::Disjoint)
-                        && self.config.right_align_last)
+                        && self.config.right_align_last))
+                    && let Some(s) = widths.iter_mut().rfind(|w| **w != 0)
                 {
-                    if let Some(s) = widths.iter_mut().rfind(|w| **w != 0) {
-                        *s += surplus;
-                    }
+                    *s += surplus;
                 }
             }
 

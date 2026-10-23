@@ -166,23 +166,23 @@ pub fn detect_color_mode() -> ColorMode {
                 return ColorMode::Dark;
             }
         }
-        if let Some(ref bg) = omarchy.background {
-            if let Some((r, g, b)) = parse_hex_color(bg) {
-                let lum = 0.2126 * (r as f32) + 0.7152 * (g as f32) + 0.0722 * (b as f32);
-                if lum > 140.0 {
-                    return ColorMode::Light;
-                } else {
-                    return ColorMode::Dark;
-                }
+        if let Some(ref bg) = omarchy.background
+            && let Some((r, g, b)) = parse_hex_color(bg)
+        {
+            let lum = 0.2126 * (r as f32) + 0.7152 * (g as f32) + 0.0722 * (b as f32);
+            if lum > 140.0 {
+                return ColorMode::Light;
+            } else {
+                return ColorMode::Dark;
             }
         }
     }
 
     // Priority 2: COLORFGBG terminal variable
-    if let Ok(colorfgbg) = std::env::var("COLORFGBG") {
-        if let Some(mode) = parse_colorfgbg(&colorfgbg) {
-            return mode;
-        }
+    if let Ok(colorfgbg) = std::env::var("COLORFGBG")
+        && let Some(mode) = parse_colorfgbg(&colorfgbg)
+    {
+        return mode;
     }
 
     // Fallback: Dark mode default
@@ -251,14 +251,14 @@ fn resolve_omarchy_mode(omarchy: &Option<OmarchyColors>) -> Option<ColorMode> {
             return Some(ColorMode::Dark);
         }
     }
-    if let Some(ref bg) = o.background {
-        if let Some((r, g, b)) = parse_hex_color(bg) {
-            let lum = 0.2126 * (r as f32) + 0.7152 * (g as f32) + 0.0722 * (b as f32);
-            if lum > 140.0 {
-                return Some(ColorMode::Light);
-            } else {
-                return Some(ColorMode::Dark);
-            }
+    if let Some(ref bg) = o.background
+        && let Some((r, g, b)) = parse_hex_color(bg)
+    {
+        let lum = 0.2126 * (r as f32) + 0.7152 * (g as f32) + 0.0722 * (b as f32);
+        if lum > 140.0 {
+            return Some(ColorMode::Light);
+        } else {
+            return Some(ColorMode::Dark);
         }
     }
     None
@@ -281,21 +281,19 @@ pub fn compute_theme_fingerprint(theme_opt: DiagramTheme, bg_opt: DiagramBackgro
     (mode as u8).hash(&mut hasher);
     (bg_opt as u8).hash(&mut hasher);
     use_omarchy.hash(&mut hasher);
-    if use_omarchy {
-        if let Some(ref o) = omarchy {
-            o.mode.hash(&mut hasher);
-            o.accent.hash(&mut hasher);
-            o.background.hash(&mut hasher);
-            o.foreground.hash(&mut hasher);
-            o.lighter_background.hash(&mut hasher);
-            o.selection.hash(&mut hasher);
-            o.blue.hash(&mut hasher);
-            o.red.hash(&mut hasher);
-            o.green.hash(&mut hasher);
-            o.yellow.hash(&mut hasher);
-            o.magenta.hash(&mut hasher);
-            o.cyan.hash(&mut hasher);
-        }
+    if use_omarchy && let Some(ref o) = omarchy {
+        o.mode.hash(&mut hasher);
+        o.accent.hash(&mut hasher);
+        o.background.hash(&mut hasher);
+        o.foreground.hash(&mut hasher);
+        o.lighter_background.hash(&mut hasher);
+        o.selection.hash(&mut hasher);
+        o.blue.hash(&mut hasher);
+        o.red.hash(&mut hasher);
+        o.green.hash(&mut hasher);
+        o.yellow.hash(&mut hasher);
+        o.magenta.hash(&mut hasher);
+        o.cyan.hash(&mut hasher);
     }
     hasher.finish()
 }
@@ -653,12 +651,12 @@ pub fn render_mermaid_to_image_with_options(
     let cache_key = (hash, scale_key, theme_fp);
 
     // Check LRU cache first
-    if let Ok(mut cache) = DIAGRAM_CACHE.lock() {
-        if let Some((_, img)) = cache.shift_remove_entry(&cache_key) {
-            let cloned = img.clone();
-            cache.insert(cache_key, img);
-            return Some(cloned);
-        }
+    if let Ok(mut cache) = DIAGRAM_CACHE.lock()
+        && let Some((_, img)) = cache.shift_remove_entry(&cache_key)
+    {
+        let cloned = img.clone();
+        cache.insert(cache_key, img);
+        return Some(cloned);
     }
 
     // Stage 1: Mermaid → SVG with theme
@@ -890,10 +888,10 @@ fn detect_kitty_support() -> bool {
         p.contains("ghostty") || p.contains("kitty")
     };
 
-    if let Ok(prog) = std::env::var("TERM_PROGRAM") {
-        if is_prog_supported(&prog) {
-            return true;
-        }
+    if let Ok(prog) = std::env::var("TERM_PROGRAM")
+        && is_prog_supported(&prog)
+    {
+        return true;
     }
 
     // 5. In tmux, query outer terminal from tmux client or global environment
@@ -901,24 +899,22 @@ fn detect_kitty_support() -> bool {
         if let Ok(output) = std::process::Command::new("tmux")
             .args(["display-message", "-p", "#{client_termname}"])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let term = String::from_utf8_lossy(&output.stdout).to_lowercase();
-                if term.contains("ghostty") || term.contains("kitty") {
-                    return true;
-                }
+            let term = String::from_utf8_lossy(&output.stdout).to_lowercase();
+            if term.contains("ghostty") || term.contains("kitty") {
+                return true;
             }
         }
 
         if let Ok(output) = std::process::Command::new("tmux")
             .args(["show-environment", "-g", "TERM_PROGRAM"])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let out_str = String::from_utf8_lossy(&output.stdout).to_lowercase();
-                if out_str.contains("ghostty") || out_str.contains("kitty") {
-                    return true;
-                }
+            let out_str = String::from_utf8_lossy(&output.stdout).to_lowercase();
+            if out_str.contains("ghostty") || out_str.contains("kitty") {
+                return true;
             }
         }
     }
@@ -941,7 +937,9 @@ pub fn is_kitty_terminal_supported() -> bool {
 /// (like WezTerm or legacy Alacritty) fall back gracefully to text preview.
 pub fn is_kitty_supported() -> bool {
     // 1. Explicit user override via environment variable has top precedence (WM_INLINE_DIAGRAMS or legacy MM_INLINE_DIAGRAMS)
-    if let Ok(val) = std::env::var("WM_INLINE_DIAGRAMS").or_else(|_| std::env::var("MM_INLINE_DIAGRAMS")) {
+    if let Ok(val) =
+        std::env::var("WM_INLINE_DIAGRAMS").or_else(|_| std::env::var("MM_INLINE_DIAGRAMS"))
+    {
         let v = val.trim();
         if v == "0"
             || v.eq_ignore_ascii_case("false")
@@ -1052,7 +1050,6 @@ pub fn transmit_kitty_raw(seq: &str) {
     #[cfg(test)]
     {
         let _ = seq;
-        return;
     }
 
     #[cfg(not(test))]
@@ -1282,12 +1279,12 @@ pub fn render_mermaid_to_unicode_placeholders_with_options(
     let cache_key = (hash, cols, rows, theme_fp);
 
     // 4. Check LRU placeholder cache first
-    if let Ok(mut cache) = PLACEHOLDER_CACHE.lock() {
-        if let Some((_, diag)) = cache.shift_remove_entry(&cache_key) {
-            let cloned = diag.clone();
-            cache.insert(cache_key, diag);
-            return Some(cloned);
-        }
+    if let Ok(mut cache) = PLACEHOLDER_CACHE.lock()
+        && let Some((_, diag)) = cache.shift_remove_entry(&cache_key)
+    {
+        let cloned = diag.clone();
+        cache.insert(cache_key, diag);
+        return Some(cloned);
     }
 
     // 5. Encode image to PNG (only executed on cache miss)

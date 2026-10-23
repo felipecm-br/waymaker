@@ -41,7 +41,5 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      # Reports warnings without failing; switch to `-- -D warnings` once the
-      # existing backlog is cleared.
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --locked
+        run: cargo clippy --workspace --all-targets -F waymaker-cli/experimental --locked -- -D warnings

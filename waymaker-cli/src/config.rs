@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 use indexmap::IndexMap;
+use std::collections::HashMap;
 use waymaker::SortOrder;
 use waymaker::action::Actions;
 use waymaker::binds::Trigger;
 use waymaker::config::*;
 use waymaker_partial_macros::partial;
-use std::collections::HashMap;
 
 use crate::action::MMAction;
 
@@ -127,12 +127,11 @@ impl PathMatchPattern {
                 return true;
             }
 
-            if expanded.contains('*') || expanded.contains('?') || expanded.contains('[') {
-                if let Ok(glob_pattern) = glob::Pattern::new(&expanded) {
-                    if glob_pattern.matches(&cwd_str) {
-                        return true;
-                    }
-                }
+            if (expanded.contains('*') || expanded.contains('?') || expanded.contains('['))
+                && let Ok(glob_pattern) = glob::Pattern::new(&expanded)
+                && glob_pattern.matches(&cwd_str)
+            {
+                return true;
             }
             false
         };
@@ -328,8 +327,7 @@ mod tests {
 
     #[test]
     fn test_all_asset_presets_deserialization() {
-        let presets_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/presets");
+        let presets_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/presets");
         let mut failures = Vec::new();
         fn check_dir(dir: &std::path::Path, failures: &mut Vec<(std::path::PathBuf, String)>) {
             for entry in std::fs::read_dir(dir).unwrap() {
@@ -366,13 +364,11 @@ mod tests {
         let jump_partial: PartialConfig = toml::from_str(jump_str).unwrap();
 
         let mut config = Config::default();
-        if let Ok(user_str) =
-            std::fs::read_to_string("/home/fecavmi/.config/waymaker/config.toml")
-                .or_else(|_| std::fs::read_to_string("/home/fecavmi/.config/matchmaker/config.toml"))
+        if let Ok(user_str) = std::fs::read_to_string("/home/fecavmi/.config/waymaker/config.toml")
+            .or_else(|_| std::fs::read_to_string("/home/fecavmi/.config/matchmaker/config.toml"))
+            && let Ok(user_partial) = toml::from_str::<PartialConfig>(&user_str)
         {
-            if let Ok(user_partial) = toml::from_str::<PartialConfig>(&user_str) {
-                config.apply(user_partial);
-            }
+            config.apply(user_partial);
         }
         config.apply(jump_partial);
 

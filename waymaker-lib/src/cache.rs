@@ -134,7 +134,9 @@ impl std::fmt::Debug for DirCacheStore {
 impl DirCacheStore {
     /// Default state path: `~/.local/state/waymaker/dir_cache.redb` (with fallback to `matchmaker/dir_cache.redb` if existing)
     pub fn default_db_path() -> Option<PathBuf> {
-        if let Ok(p) = std::env::var("WM_DIR_CACHE_DB").or_else(|_| std::env::var("MM_DIR_CACHE_DB")) {
+        if let Ok(p) =
+            std::env::var("WM_DIR_CACHE_DB").or_else(|_| std::env::var("MM_DIR_CACHE_DB"))
+        {
             return Some(PathBuf::from(p));
         }
         let base = dirs::state_dir().or_else(dirs::data_local_dir)?;
@@ -309,16 +311,15 @@ impl DirCacheStore {
         };
 
         let mut keys_to_remove = Vec::new();
-        if let Ok(read_txn) = db.begin_read() {
-            if let Ok(table) = read_txn.open_table(DIR_CACHE_TABLE) {
-                if let Ok(iter) = table.iter() {
-                    for entry in iter.flatten() {
-                        let path_str = entry.0.value();
-                        let p = Path::new(path_str);
-                        if !p.exists() {
-                            keys_to_remove.push(path_str.to_string());
-                        }
-                    }
+        if let Ok(read_txn) = db.begin_read()
+            && let Ok(table) = read_txn.open_table(DIR_CACHE_TABLE)
+            && let Ok(iter) = table.iter()
+        {
+            for entry in iter.flatten() {
+                let path_str = entry.0.value();
+                let p = Path::new(path_str);
+                if !p.exists() {
+                    keys_to_remove.push(path_str.to_string());
                 }
             }
         }

@@ -81,10 +81,10 @@ impl PreviewUI {
         if self.is_fullscreen() {
             return None;
         }
-        if let Some(layout_border) = self.setting().and_then(|s| s.border.as_ref()) {
-            if !layout_border.is_empty() {
-                return Some(layout_border);
-            }
+        if let Some(layout_border) = self.setting().and_then(|s| s.border.as_ref())
+            && !layout_border.is_empty()
+        {
+            return Some(layout_border);
         }
 
         (!self.config.border.is_empty()).then_some(&self.config.border)
@@ -319,7 +319,7 @@ impl PreviewUI {
         if let ret = &self.config.layout[self.layout_idx]
             && ret.layout.max != 0
         {
-            Some(&ret)
+            Some(ret)
         } else {
             None
         }
@@ -415,40 +415,39 @@ impl PreviewUI {
         self.show_diagram = !self.show_diagram;
         if self.show_diagram {
             // Find diagram nearest to current preview scroll position
-            if let Ok(offsets) = self.view.diagram_offsets.lock() {
-                if !offsets.is_empty() {
-                    let height = (self.area.height as usize).max(1);
-                    let cur_scroll = self.offset;
-                    let mut best_idx = 0;
-                    let mut best_score = (1u8, usize::MAX, usize::MAX);
+            if let Ok(offsets) = self.view.diagram_offsets.lock()
+                && !offsets.is_empty()
+            {
+                let height = (self.area.height as usize).max(1);
+                let cur_scroll = self.offset;
+                let mut best_idx = 0;
+                let mut best_score = (1u8, usize::MAX, usize::MAX);
 
-                    for (i, &diag_line) in offsets.iter().enumerate() {
-                        let is_in_viewport =
-                            diag_line >= cur_scroll && diag_line < cur_scroll + height;
-                        let score = if is_in_viewport {
-                            // Priority 0: inside visible viewport
-                            // Secondary: distance from top of viewport
-                            (0u8, 0usize, diag_line.saturating_sub(cur_scroll))
-                        } else if diag_line < cur_scroll {
-                            // Priority 1: above viewport
-                            (1u8, cur_scroll.saturating_sub(diag_line), 0usize)
-                        } else {
-                            // Priority 1: below viewport
-                            (
-                                1u8,
-                                diag_line.saturating_sub(cur_scroll + height) + 1,
-                                0usize,
-                            )
-                        };
-                        if score < best_score {
-                            best_score = score;
-                            best_idx = i;
-                        }
+                for (i, &diag_line) in offsets.iter().enumerate() {
+                    let is_in_viewport = diag_line >= cur_scroll && diag_line < cur_scroll + height;
+                    let score = if is_in_viewport {
+                        // Priority 0: inside visible viewport
+                        // Secondary: distance from top of viewport
+                        (0u8, 0usize, diag_line.saturating_sub(cur_scroll))
+                    } else if diag_line < cur_scroll {
+                        // Priority 1: above viewport
+                        (1u8, cur_scroll.saturating_sub(diag_line), 0usize)
+                    } else {
+                        // Priority 1: below viewport
+                        (
+                            1u8,
+                            diag_line.saturating_sub(cur_scroll + height) + 1,
+                            0usize,
+                        )
+                    };
+                    if score < best_score {
+                        best_score = score;
+                        best_idx = i;
                     }
-                    self.view
-                        .current_diagram_idx
-                        .store(best_idx, std::sync::atomic::Ordering::Release);
                 }
+                self.view
+                    .current_diagram_idx
+                    .store(best_idx, std::sync::atomic::Ordering::Release);
             }
 
             self.reset_diagram_pan();
@@ -458,17 +457,16 @@ impl PreviewUI {
                     .view
                     .current_diagram_idx
                     .load(std::sync::atomic::Ordering::Relaxed);
-                if let Some(src) = sources.get(cur_idx) {
-                    if let Some(img) = crate::utils::mermaid::render_mermaid_to_image_with_options(
+                if let Some(src) = sources.get(cur_idx)
+                    && let Some(img) = crate::utils::mermaid::render_mermaid_to_image_with_options(
                         src,
                         2.0,
                         self.config.diagrams.theme,
                         self.config.diagrams.background,
-                    ) {
-                        if let Ok(mut g) = self.view.image.lock() {
-                            *g = Some(img);
-                        }
-                    }
+                    )
+                    && let Ok(mut g) = self.view.image.lock()
+                {
+                    *g = Some(img);
                 }
             }
         }
@@ -616,18 +614,18 @@ impl PreviewUI {
     }
 
     pub fn is_pan_settling(&mut self) -> bool {
-        if let Some(t) = self.last_pan_instant {
-            if t.elapsed() >= std::time::Duration::from_millis(150) {
-                self.last_pan_instant = None;
-                self.last_crop_params = None; // Invalidate cache to force high-quality settle render
-                self.view
-                    .image_id
-                    .fetch_add(1, std::sync::atomic::Ordering::Release);
-                self.view
-                    .changed
-                    .store(true, std::sync::atomic::Ordering::Release);
-                return true;
-            }
+        if let Some(t) = self.last_pan_instant
+            && t.elapsed() >= std::time::Duration::from_millis(150)
+        {
+            self.last_pan_instant = None;
+            self.last_crop_params = None; // Invalidate cache to force high-quality settle render
+            self.view
+                .image_id
+                .fetch_add(1, std::sync::atomic::Ordering::Release);
+            self.view
+                .changed
+                .store(true, std::sync::atomic::Ordering::Release);
+            return true;
         }
         false
     }
@@ -1459,51 +1457,51 @@ impl PreviewUI {
 
         let title_text = self.title_text();
 
-        if self.active_border().is_none() {
-            if let Some(title) = &title_text {
-                let is_media = self.config.media.active && {
-                    let p = std::path::Path::new(title);
-                    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
-                        matches!(
-                            ext.to_ascii_lowercase().as_str(),
-                            "png"
-                                | "jpg"
-                                | "jpeg"
-                                | "gif"
-                                | "webp"
-                                | "bmp"
-                                | "ico"
-                                | "tiff"
-                                | "pdf"
-                                | "mp4"
-                                | "mkv"
-                                | "webm"
-                                | "mov"
-                                | "avi"
-                                | "flv"
-                                | "m4v"
-                                | "wmv"
-                        )
-                    } else {
-                        false
-                    }
-                };
-
-                if !is_media {
-                    let fg = if self.config.border.title_fg == ratatui::style::Color::Reset {
-                        self.config.border.color
-                    } else {
-                        self.config.border.title_fg
-                    };
-                    let title_line = Line::from(Span::styled(
-                        title.clone(),
-                        Style::default()
-                            .fg(fg)
-                            .add_modifier(self.config.border.title_modifier),
-                    ));
-                    lines.insert(0, title_line);
-                    lines.truncate(height);
+        if self.active_border().is_none()
+            && let Some(title) = &title_text
+        {
+            let is_media = self.config.media.active && {
+                let p = std::path::Path::new(title);
+                if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+                    matches!(
+                        ext.to_ascii_lowercase().as_str(),
+                        "png"
+                            | "jpg"
+                            | "jpeg"
+                            | "gif"
+                            | "webp"
+                            | "bmp"
+                            | "ico"
+                            | "tiff"
+                            | "pdf"
+                            | "mp4"
+                            | "mkv"
+                            | "webm"
+                            | "mov"
+                            | "avi"
+                            | "flv"
+                            | "m4v"
+                            | "wmv"
+                    )
+                } else {
+                    false
                 }
+            };
+
+            if !is_media {
+                let fg = if self.config.border.title_fg == ratatui::style::Color::Reset {
+                    self.config.border.color
+                } else {
+                    self.config.border.title_fg
+                };
+                let title_line = Line::from(Span::styled(
+                    title.clone(),
+                    Style::default()
+                        .fg(fg)
+                        .add_modifier(self.config.border.title_modifier),
+                ));
+                lines.insert(0, title_line);
+                lines.truncate(height);
             }
         }
 
@@ -1592,11 +1590,12 @@ impl PreviewUI {
 
         let buf = frame.buffer_mut();
         for y in top_y..bottom_y {
-            if y >= start_y && y <= end_y {
-                if let Some(cell) = buf.cell_mut((right_x, y)) {
-                    cell.set_char('▐');
-                    cell.set_style(style);
-                }
+            if y >= start_y
+                && y <= end_y
+                && let Some(cell) = buf.cell_mut((right_x, y))
+            {
+                cell.set_char('▐');
+                cell.set_style(style);
             }
         }
     }
@@ -1708,12 +1707,12 @@ fn query_tty_picker(timeout: std::time::Duration) -> anyhow::Result<ratatui_imag
         if let Some(end) = rest.find('t') {
             let part = &rest[..end];
             let mut nums = part.split(';');
-            if let (Some(h_str), Some(w_str)) = (nums.next(), nums.next()) {
-                if let (Ok(h), Ok(w)) = (h_str.parse::<u16>(), w_str.parse::<u16>()) {
-                    if w > 0 && h > 0 {
-                        font_size = Some(ratatui_image::FontSize::new(w, h));
-                    }
-                }
+            if let (Some(h_str), Some(w_str)) = (nums.next(), nums.next())
+                && let (Ok(h), Ok(w)) = (h_str.parse::<u16>(), w_str.parse::<u16>())
+                && w > 0
+                && h > 0
+            {
+                font_size = Some(ratatui_image::FontSize::new(w, h));
             }
         }
     }
@@ -2405,7 +2404,10 @@ mod tests {
         let mut config = PreviewConfig::default();
         config.poll_ms = Some(500);
         let ui = PreviewUI::new(previewer.view(), config, [40, 10]);
-        assert_eq!(ui.poll_interval(), Some(std::time::Duration::from_millis(500)));
+        assert_eq!(
+            ui.poll_interval(),
+            Some(std::time::Duration::from_millis(500))
+        );
 
         // Layout-specific override
         let mut config = PreviewConfig::default();
@@ -2414,6 +2416,9 @@ mod tests {
         setting.poll_ms = Some(250);
         config.layout.push(setting);
         let ui = PreviewUI::new(previewer.view(), config, [40, 10]);
-        assert_eq!(ui.poll_interval(), Some(std::time::Duration::from_millis(250)));
+        assert_eq!(
+            ui.poll_interval(),
+            Some(std::time::Duration::from_millis(250))
+        );
     }
 }

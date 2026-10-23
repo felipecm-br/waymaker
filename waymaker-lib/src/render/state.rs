@@ -231,7 +231,7 @@ impl State {
         if let Ok(dir_entries) = std::fs::read_dir(parent) {
             for entry in dir_entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
-                let is_dir = entry.file_type().map_or(false, |t| t.is_dir());
+                let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
                 entries.push((name, is_dir));
             }
         }
@@ -293,15 +293,12 @@ impl State {
         actions: Actions<A>,
         bind_tx: BindSender<A>,
     ) -> Option<u8> {
-        let Some((idx, slot)) = self
+        let (idx, slot) = self
             .async_actions
             .iter_mut()
             .enumerate()
             .skip(1)
-            .find(|(_, x)| x.is_none())
-        else {
-            return None;
-        };
+            .find(|(_, x)| x.is_none())?;
 
         let closure = move || {
             for a in actions {
@@ -458,7 +455,7 @@ impl State {
     }
 
     pub fn events(&mut self) -> Event {
-        self.events.clone()
+        self.events
     }
 }
 

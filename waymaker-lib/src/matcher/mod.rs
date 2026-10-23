@@ -13,7 +13,12 @@ pub trait MatcherEngine: Send + Sync {
     fn search(&mut self, query: &str, items: &[String]) -> Vec<MatchResult>;
 
     /// Perform a search in parallel across multiple threads.
-    fn search_parallel(&mut self, query: &str, items: &[String], threads: usize) -> Vec<MatchResult>;
+    fn search_parallel(
+        &mut self,
+        query: &str,
+        items: &[String],
+        threads: usize,
+    ) -> Vec<MatchResult>;
 
     /// Extract matching character offsets for highlight rendering in TUI.
     fn highlight_indices(&mut self, query: &str, haystack: &str) -> Vec<u32>;
@@ -74,7 +79,7 @@ impl MatcherEngine for NucleoEngine {
             let utf32 = nucleo::Utf32Str::new(item, &mut buf);
             if let Some(score) = pattern.score(utf32, &mut self.matcher) {
                 results.push(MatchResult {
-                    score: score as u32,
+                    score,
                     index: i as u32,
                 });
             }
@@ -84,7 +89,12 @@ impl MatcherEngine for NucleoEngine {
         results
     }
 
-    fn search_parallel(&mut self, query: &str, items: &[String], _threads: usize) -> Vec<MatchResult> {
+    fn search_parallel(
+        &mut self,
+        query: &str,
+        items: &[String],
+        _threads: usize,
+    ) -> Vec<MatchResult> {
         // Fallback to sequential for single Nucleo Matcher (or use nucleo worker in full TUI)
         self.search(query, items)
     }
@@ -171,7 +181,12 @@ impl MatcherEngine for FrizbeeEngine {
             .collect()
     }
 
-    fn search_parallel(&mut self, query: &str, items: &[String], threads: usize) -> Vec<MatchResult> {
+    fn search_parallel(
+        &mut self,
+        query: &str,
+        items: &[String],
+        threads: usize,
+    ) -> Vec<MatchResult> {
         if query.is_empty() {
             return items
                 .iter()
@@ -251,7 +266,12 @@ impl MatcherEngine for MatcherBackend {
         }
     }
 
-    fn search_parallel(&mut self, query: &str, items: &[String], threads: usize) -> Vec<MatchResult> {
+    fn search_parallel(
+        &mut self,
+        query: &str,
+        items: &[String],
+        threads: usize,
+    ) -> Vec<MatchResult> {
         match self {
             Self::Nucleo(e) => e.search_parallel(query, items, threads),
             #[cfg(feature = "frizbee")]
@@ -303,10 +323,7 @@ mod tests {
     #[test]
     fn test_frizbee_typo_tolerance() {
         let mut engine = FrizbeeEngine::new().with_typo_tolerance(true);
-        let items = vec![
-            "config.toml".to_string(),
-            "cargo.lock".to_string(),
-        ];
+        let items = vec!["config.toml".to_string(), "cargo.lock".to_string()];
         // Typo: "cnfig" missing 'o'
         let res = engine.search("cnfig", &items);
         assert!(!res.is_empty(), "Frizbee should match with typo tolerance");

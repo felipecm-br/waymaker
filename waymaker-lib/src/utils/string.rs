@@ -48,7 +48,7 @@ pub fn fit_width(input: &str, width: usize) -> String {
 
     // Pad if needed
     if used < width {
-        out.extend(std::iter::repeat(' ').take(width - used));
+        out.extend(std::iter::repeat_n(' ', width - used));
     }
 
     out
@@ -90,6 +90,7 @@ pub static ALLOWED_CHARS: &[char] = &[' ', '-', '_', '.', ':', '/', '+', '@', '$
 /// * `Ok(Vec<u16>)` - The newly allocated widths that fit within `total_available_space`.
 /// * `Err(Vec<u16>)` - The absolute minimal allocation possible that satisfies all relative
 ///   and minimum-width constraints, returned if it exceeds `total_available_space`.
+///
 /// Allocates widths to a constrained available space while preserving order relations,
 /// ignoring zero-widths, and enforcing a minimum width floor.
 pub fn allocate_widths(

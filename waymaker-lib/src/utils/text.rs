@@ -104,10 +104,8 @@ pub fn prefix_span<'a, 'b: 'a>(
                     || current_nav_bar_style.bg.is_some()
                     || !current_nav_bar_style.modifier.is_empty();
                 if has_nav_style {
-                    if !is_cut_or_yanked {
-                        if let Some(fg) = current_nav_bar_style.fg {
-                            s = s.fg(fg);
-                        }
+                    if !is_cut_or_yanked && let Some(fg) = current_nav_bar_style.fg {
+                        s = s.fg(fg);
                     }
                     if let Some(bg) = current_nav_bar_style
                         .bg
@@ -120,10 +118,10 @@ pub fn prefix_span<'a, 'b: 'a>(
                         s = s.add_modifier(current_nav_bar_style.modifier);
                     }
                 } else {
-                    if !is_cut_or_yanked {
-                        if let Some(fg) = override_style.fg.or(current_row_style.fg) {
-                            s = s.fg(fg);
-                        }
+                    if !is_cut_or_yanked
+                        && let Some(fg) = override_style.fg.or(current_row_style.fg)
+                    {
+                        s = s.fg(fg);
                     }
                     if let Some(bg) = override_style.bg.or(current_row_style.bg) {
                         s = s.bg(bg);
@@ -300,7 +298,7 @@ pub fn wrap_text<'a>(text: Text<'a>, max_width: u16) -> (Text<'a>, bool) {
     (Text::from(new_lines), did_wrap_any)
 }
 
-/// Convert `Text` into lines of plain `String`s
+// Convert `Text` into lines of plain `String`s
 // pub fn text_to_lines(text: &Text) -> Vec<String> {
 //     text.iter()
 //         .map(|spans| {
@@ -312,7 +310,7 @@ pub fn wrap_text<'a>(text: Text<'a>, max_width: u16) -> (Text<'a>, bool) {
 //         .collect()
 // }
 
-/// Convert `Text` into a single `String` with newlines
+// Convert `Text` into a single `String` with newlines
 // pub fn text_to_string(text: &Text) -> String {
 //     text_to_lines(text).join("\n")
 // }

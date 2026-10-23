@@ -180,28 +180,26 @@ impl<A: ActionExt> BindMap<A> {
                 }
             }
 
-            if has_aliases {
-                if let Some(mut modes) = common_modes {
-                    // Remove default mode as it's already handled
-                    modes.remove("");
-                    // Remove modes that already have a definition for this trigger
-                    modes.retain(|m| {
-                        !self.contains_key(&Trigger {
-                            kind: trigger.kind.clone(),
-                            mode: m.clone(),
-                        })
-                    });
+            if has_aliases && let Some(mut modes) = common_modes {
+                // Remove default mode as it's already handled
+                modes.remove("");
+                // Remove modes that already have a definition for this trigger
+                modes.retain(|m| {
+                    !self.contains_key(&Trigger {
+                        kind: trigger.kind.clone(),
+                        mode: m.clone(),
+                    })
+                });
 
-                    for mode in modes {
-                        if let Some(resolved) = self.resolve_actions(actions, &mode) {
-                            new_binds.insert(
-                                Trigger {
-                                    kind: trigger.kind.clone(),
-                                    mode,
-                                },
-                                resolved,
-                            );
-                        }
+                for mode in modes {
+                    if let Some(resolved) = self.resolve_actions(actions, &mode) {
+                        new_binds.insert(
+                            Trigger {
+                                kind: trigger.kind.clone(),
+                                mode,
+                            },
+                            resolved,
+                        );
                     }
                 }
             }
@@ -228,10 +226,10 @@ impl<A: ActionExt> BindMap<A> {
                     let already_traced = matches!(flat_actions.first(), Some(Action::Trace(_)));
                     if !already_traced {
                         resolved.push(Action::Trace(format!("@@{alias}")));
-                        resolved.extend(flat_actions.into_iter());
+                        resolved.extend(flat_actions);
                         resolved.push(Action::Trace(String::new()));
                     } else {
-                        resolved.extend(flat_actions.into_iter());
+                        resolved.extend(flat_actions);
                     }
                 } else {
                     // If any alias is unresolvable, the whole sequence is invalid

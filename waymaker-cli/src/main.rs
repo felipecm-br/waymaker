@@ -55,15 +55,14 @@ async fn main() {
 
     // Fast-path: Check if invoked with native session subcommands (`wm session`, `wm connect`, `wm last`)
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    if let Some(first_arg) = raw_args.first() {
-        if matches!(
+    if let Some(first_arg) = raw_args.first()
+        && matches!(
             first_arg.as_str(),
             "session" | "sessions" | "connect" | "last"
-        ) {
-            if let Some(code) = session::handle_session_cli(&raw_args).await {
-                exit(code);
-            }
-        }
+        )
+        && let Some(code) = session::handle_session_cli(&raw_args).await
+    {
+        exit(code);
     }
 
     let (cli, config_args) = Cli::get_partitioned_args();
@@ -494,26 +493,27 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
                     return Some(1);
                 }
             };
-            if !ascii && !text_only && waymaker::utils::mermaid::is_kitty_supported() {
-                if let Some(diag) =
+            if !ascii
+                && !text_only
+                && waymaker::utils::mermaid::is_kitty_supported()
+                && let Some(diag) =
                     waymaker::utils::mermaid::render_mermaid_to_unicode_placeholders_with_options(
                         &content, width, theme, bg,
                     )
-                {
-                    print!("{}", diag.transmission);
-                    let mut lines = Vec::with_capacity(diag.lines.len() + 2);
-                    lines.push(ratatui::text::Line::default());
-                    lines.extend(diag.lines);
-                    lines.push(ratatui::text::Line::default());
-                    let text = ratatui::text::Text::from(lines);
-                    let ansi_output = waymaker::utils::text::text_to_ansi(&text);
-                    if ansi_output.ends_with('\n') {
-                        print!("{ansi_output}");
-                    } else {
-                        println!("{ansi_output}");
-                    }
-                    return Some(0);
+            {
+                print!("{}", diag.transmission);
+                let mut lines = Vec::with_capacity(diag.lines.len() + 2);
+                lines.push(ratatui::text::Line::default());
+                lines.extend(diag.lines);
+                lines.push(ratatui::text::Line::default());
+                let text = ratatui::text::Text::from(lines);
+                let ansi_output = waymaker::utils::text::text_to_ansi(&text);
+                if ansi_output.ends_with('\n') {
+                    print!("{ansi_output}");
+                } else {
+                    println!("{ansi_output}");
                 }
+                return Some(0);
             }
             let opts = waymaker::utils::mermaid::MermaidOptions {
                 max_width: width,
@@ -677,12 +677,11 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
 
             let full_query = keywords.join(" ");
             let store = waymaker::frecency::FrecencyStore::open();
-            if !pins_only {
-                if dirs_only {
-                    if let Ok(cwd) = std::env::current_dir() {
-                        let _ = store.add(&cwd.to_string_lossy());
-                    }
-                }
+            if !pins_only
+                && dirs_only
+                && let Ok(cwd) = std::env::current_dir()
+            {
+                let _ = store.add(&cwd.to_string_lossy());
             }
             let pinned_paths = store.list_pins();
             let pins_set: std::collections::HashSet<String> =
@@ -714,7 +713,7 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
                 if matches_all {
                     let ends_with_query = !full_query.is_empty()
                         && (lower_path.ends_with(&full_query)
-                            || keywords.last().map_or(false, |lk| lower_path.ends_with(lk)));
+                            || keywords.last().is_some_and(|lk| lower_path.ends_with(lk)));
                     let path_depth = path_obj.components().count();
                     pinned_matches.push((path.clone(), path_depth, ends_with_query));
                 }
@@ -739,7 +738,7 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
                 if matches_all {
                     let ends_with_query = !full_query.is_empty()
                         && (lower_path.ends_with(&full_query)
-                            || keywords.last().map_or(false, |lk| lower_path.ends_with(lk)));
+                            || keywords.last().is_some_and(|lk| lower_path.ends_with(lk)));
                     let path_depth = path_obj.components().count();
                     matches.push((path, score, path_depth, ends_with_query));
                 }
@@ -834,10 +833,10 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
                 }
             }
             let dir_cache = waymaker::cache::DirCacheStore::open();
-            if let Ok(count) = dir_cache.clean_stale() {
-                if count > 0 {
-                    println!("Cleaned {count} stale entries from directory cache database.");
-                }
+            if let Ok(count) = dir_cache.clean_stale()
+                && count > 0
+            {
+                println!("Cleaned {count} stale entries from directory cache database.");
             }
             Some(0)
         }
@@ -862,7 +861,7 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
 
 fn cache_index(root: &std::path::Path) -> (usize, std::path::PathBuf) {
     let cache_dir = state_dir();
-    let _ = std::fs::create_dir_all(&cache_dir);
+    let _ = std::fs::create_dir_all(cache_dir);
     let cache_file = cache_dir.join("index_cache.txt");
 
     let mut count = 0;
@@ -897,23 +896,22 @@ fn import_zoxide() {
     if let Ok(output) = std::process::Command::new("zoxide")
         .args(["query", "-l", "-s"])
         .output()
+        && output.status.success()
     {
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines() {
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-                let parts: Vec<&str> = trimmed.split_whitespace().collect();
-                if parts.len() >= 2 {
-                    if let Ok(score) = parts[0].parse::<f64>() {
-                        let path = parts[1..].join(" ");
-                        let weight = score.round() as u64;
-                        if store.import_entry(&path, weight).is_ok() {
-                            imported_count += 1;
-                        }
-                    }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            if parts.len() >= 2
+                && let Ok(score) = parts[0].parse::<f64>()
+            {
+                let path = parts[1..].join(" ");
+                let weight = score.round() as u64;
+                if store.import_entry(&path, weight).is_ok() {
+                    imported_count += 1;
                 }
             }
         }
@@ -924,17 +922,17 @@ fn import_zoxide() {
             .map(|d| d.join("zoxide").join("db.zo"))
             .or_else(|| dirs::home_dir().map(|h| h.join(".local/share/zoxide/db.zo")));
 
-        if let Some(db_path) = zoxide_db_path {
-            if db_path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&db_path) {
-                    for line in content.lines() {
-                        let trimmed = line.trim();
-                        if !trimmed.is_empty() && std::path::Path::new(trimmed).exists() {
-                            if store.import_entry(trimmed, 1).is_ok() {
-                                imported_count += 1;
-                            }
-                        }
-                    }
+        if let Some(db_path) = zoxide_db_path
+            && db_path.exists()
+            && let Ok(content) = std::fs::read_to_string(&db_path)
+        {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty()
+                    && std::path::Path::new(trimmed).exists()
+                    && store.import_entry(trimmed, 1).is_ok()
+                {
+                    imported_count += 1;
                 }
             }
         }

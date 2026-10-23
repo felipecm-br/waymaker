@@ -229,7 +229,7 @@ pub fn partial(attr: TokenStream, item: TokenStream) -> TokenStream {
                 let should_recurse =
                     (struct_recurse || field_recurse || recurse_override.is_some())
                         && !matches!(recurse_override, Some(None));
-                let is_same_type = !should_recurse && (field_unwrap == !is_opt);
+                let is_same_type = !should_recurse && field_unwrap != is_opt;
 
                 let mut drop_attr = false;
                 let _ = attr.parse_nested_meta(|meta| {
@@ -555,7 +555,7 @@ pub fn partial(attr: TokenStream, item: TokenStream) -> TokenStream {
                                     let (key, value): (#key_ty, #val_ty) = waymaker_partial::deserialize(&combined)?;
                                     let _ = #target.insert(key, value);
                                 } else {
-                                    let key: #key_ty = waymaker_partial::deserialize(&[key_str.clone()])?;
+                                    let key: #key_ty = waymaker_partial::deserialize(::std::slice::from_ref(&key_str))?;
                                     let item = #target.entry(key).or_insert_with(Default::default);
                                     #set_item_logic
                                 }
@@ -563,7 +563,7 @@ pub fn partial(attr: TokenStream, item: TokenStream) -> TokenStream {
                         } else {
                             quote! {
                                 if rest.is_empty() {
-                                    let key: #key_ty = waymaker_partial::deserialize(&[key_str.clone()])?;
+                                    let key: #key_ty = waymaker_partial::deserialize(::std::slice::from_ref(&key_str))?;
                                     let value: #val_ty = waymaker_partial::deserialize(&val)?;
                                     let _ = #target.insert(key, value);
                                 } else {
@@ -760,9 +760,7 @@ pub fn partial(attr: TokenStream, item: TokenStream) -> TokenStream {
                         // Logic: custom_func expects a Deserializer.
                         // If the field is Option<T>, deserialize_with returns Option<T>, so we assign directly.
                         // If the field is T, deserialize_with returns T, so we must wrap in Some().
-                        let assignment = if field_unwrap {
-                            quote! { self.#field_name = result; }
-                        } else if is_opt {
+                        let assignment = if field_unwrap || is_opt {
                             quote! { self.#field_name = result; }
                         } else {
                             quote! { self.#field_name = Some(result); }

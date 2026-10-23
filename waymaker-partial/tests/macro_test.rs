@@ -1,3 +1,5 @@
+// `vec_!` builds owned Vec<String> args; the call sites borrow them as slices on purpose.
+#![allow(clippy::useless_vec)]
 #![allow(unused)]
 macro_rules! vec_ {
     ($($elem:expr),* $(,)?) => {
@@ -7,10 +9,10 @@ macro_rules! vec_ {
 
 #[cfg(test)]
 mod tests {
-    use waymaker_partial::*;
-    use waymaker_partial_macros::partial;
     use serde::{Deserialize, Serialize};
     use std::collections::{HashMap, HashSet};
+    use waymaker_partial::*;
+    use waymaker_partial_macros::partial;
 
     #[test]
     fn test_make_partial_macro() {

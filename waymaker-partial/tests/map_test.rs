@@ -1,7 +1,10 @@
+// `vec_!` builds owned Vec<String> args; the call sites borrow them as slices on purpose.
+#![allow(clippy::useless_vec)]
+
 use indexmap::{IndexMap, IndexSet};
+use std::collections::HashMap;
 use waymaker_partial::*;
 use waymaker_partial_macros::partial;
-use std::collections::HashMap;
 
 macro_rules! vec_ {
     ($($elem:expr),* $(,)?) => {
@@ -11,6 +14,8 @@ macro_rules! vec_ {
 
 #[test]
 fn test_map_set_path() {
+    // Only the generated PartialMapStruct is exercised.
+    #[allow(dead_code)]
     #[partial(path, unwrap)]
     #[derive(Debug, PartialEq, Default, Clone)]
     struct MapStruct {
@@ -105,6 +110,8 @@ fn test_map_apply_overwrite_vs_extend() {
 
 #[test]
 fn test_indexmap_set_path() {
+    // Only the generated PartialMapStruct is exercised.
+    #[allow(dead_code)]
     #[partial(path, unwrap)]
     #[derive(Debug, PartialEq, Default, Clone)]
     struct MapStruct {

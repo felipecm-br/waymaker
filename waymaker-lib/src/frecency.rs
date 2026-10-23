@@ -135,16 +135,15 @@ impl FrecencySnapshot {
                 buf[..self.home.len()].copy_from_slice(self.home.as_bytes());
                 buf[self.home.len()] = b'/';
                 buf[self.home.len() + 1..needed].copy_from_slice(rest.as_bytes());
-                if let Ok(full_str) = std::str::from_utf8(&buf[..needed]) {
-                    if let Some(&score) = self.scores.get(clean_path(full_str)) {
-                        let is_cwd_child = !self.cwd.is_empty() && full_str.starts_with(&self.cwd);
-                        if is_cwd_child && location_bias > 0 {
-                            return score.saturating_add(
-                                (score as u64 * location_bias as u64 / 100) as u32,
-                            );
-                        }
-                        return score;
+                if let Ok(full_str) = std::str::from_utf8(&buf[..needed])
+                    && let Some(&score) = self.scores.get(clean_path(full_str))
+                {
+                    let is_cwd_child = !self.cwd.is_empty() && full_str.starts_with(&self.cwd);
+                    if is_cwd_child && location_bias > 0 {
+                        return score
+                            .saturating_add((score as u64 * location_bias as u64 / 100) as u32);
                     }
+                    return score;
                 }
             }
         // 3. Resolve relative path against self.cwd and check exact path
@@ -154,15 +153,14 @@ impl FrecencySnapshot {
                 buf[..self.cwd.len()].copy_from_slice(self.cwd.as_bytes());
                 buf[self.cwd.len()] = b'/';
                 buf[self.cwd.len() + 1..needed].copy_from_slice(clean.as_bytes());
-                if let Ok(full_str) = std::str::from_utf8(&buf[..needed]) {
-                    if let Some(&score) = self.scores.get(clean_path(full_str)) {
-                        if location_bias > 0 {
-                            return score.saturating_add(
-                                (score as u64 * location_bias as u64 / 100) as u32,
-                            );
-                        }
-                        return score;
+                if let Ok(full_str) = std::str::from_utf8(&buf[..needed])
+                    && let Some(&score) = self.scores.get(clean_path(full_str))
+                {
+                    if location_bias > 0 {
+                        return score
+                            .saturating_add((score as u64 * location_bias as u64 / 100) as u32);
                     }
+                    return score;
                 }
             }
         }
@@ -278,7 +276,8 @@ impl FrecencyStore {
     /// Default state directory for waymaker frecency DB:
     /// `~/.local/state/waymaker/frecency.redb` (with fallback to `matchmaker/frecency.redb` if existing)
     pub fn default_db_path() -> Option<PathBuf> {
-        if let Ok(p) = std::env::var("WM_FRECENCY_DB").or_else(|_| std::env::var("MM_FRECENCY_DB")) {
+        if let Ok(p) = std::env::var("WM_FRECENCY_DB").or_else(|_| std::env::var("MM_FRECENCY_DB"))
+        {
             return Some(PathBuf::from(p));
         }
         let base = dirs::state_dir().or_else(dirs::data_local_dir)?;
@@ -324,10 +323,10 @@ impl FrecencyStore {
         }
         // If we are currently holding a shadow copy (because another process holds flock),
         // attempt to open the real database now for writing.
-        if let Some(path) = &self.db_path {
-            if let Ok(d) = Database::create(path) {
-                return Some(Arc::new(d));
-            }
+        if let Some(path) = &self.db_path
+            && let Ok(d) = Database::create(path)
+        {
+            return Some(Arc::new(d));
         }
         None
     }
@@ -358,14 +357,14 @@ impl FrecencyStore {
         {
             let mut lock = FRECENCY_DB_INSTANCES.lock().unwrap();
             let map = lock.get_or_insert_with(rustc_hash::FxHashMap::default);
-            if let Some(weak) = map.get(&canonical_path) {
-                if let Some(existing) = weak.upgrade() {
-                    return Ok(Self {
-                        db: Some(existing),
-                        db_path: Some(canonical_path),
-                        _shadow_guard: None,
-                    });
-                }
+            if let Some(weak) = map.get(&canonical_path)
+                && let Some(existing) = weak.upgrade()
+            {
+                return Ok(Self {
+                    db: Some(existing),
+                    db_path: Some(canonical_path),
+                    _shadow_guard: None,
+                });
             }
         }
 
@@ -422,16 +421,16 @@ impl FrecencyStore {
         }
 
         // 4. If primary DB opened, cache it as a Weak reference
-        if let Some(ref d) = db {
-            if shadow_guard.is_none() {
-                let actual_canonical = path
-                    .canonicalize()
-                    .unwrap_or_else(|_| canonical_path.clone());
-                let mut lock = FRECENCY_DB_INSTANCES.lock().unwrap();
-                let map = lock.get_or_insert_with(rustc_hash::FxHashMap::default);
-                map.insert(actual_canonical, Arc::downgrade(d));
-                map.insert(canonical_path.clone(), Arc::downgrade(d));
-            }
+        if let Some(ref d) = db
+            && shadow_guard.is_none()
+        {
+            let actual_canonical = path
+                .canonicalize()
+                .unwrap_or_else(|_| canonical_path.clone());
+            let mut lock = FRECENCY_DB_INSTANCES.lock().unwrap();
+            let map = lock.get_or_insert_with(rustc_hash::FxHashMap::default);
+            map.insert(actual_canonical, Arc::downgrade(d));
+            map.insert(canonical_path.clone(), Arc::downgrade(d));
         }
 
         Ok(Self {
@@ -504,12 +503,11 @@ impl FrecencyStore {
             }
             _ => {
                 let clean = clean_path(raw_path);
-                if clean != key {
-                    if let Ok(Some(guard)) = table.get(clean) {
-                        if let Some(record) = decode_record(guard.value()) {
-                            return record.calculate_score(now);
-                        }
-                    }
+                if clean != key
+                    && let Ok(Some(guard)) = table.get(clean)
+                    && let Some(record) = decode_record(guard.value())
+                {
+                    return record.calculate_score(now);
                 }
                 0
             }
@@ -518,9 +516,7 @@ impl FrecencyStore {
 
     /// Retrieve full FrecencyRecord details for a path.
     pub fn rank(&self, raw_path: &str) -> Option<FrecencyRecord> {
-        let Some(db) = self.db.as_ref() else {
-            return None;
-        };
+        let db = self.db.as_ref()?;
 
         let key_str = normalize_path(raw_path);
         let key = key_str.as_str();
@@ -556,18 +552,17 @@ impl FrecencyStore {
         };
 
         let now = current_unix_secs();
-        if let Ok(read_txn) = db.begin_read() {
-            if let Ok(table) = read_txn.open_table(FRECENCY_TABLE) {
-                if let Ok(iter) = table.iter() {
-                    for entry in iter.flatten() {
-                        let key = entry.0.value();
-                        let bytes = entry.1.value();
-                        if let Some(record) = decode_record(bytes) {
-                            let score = record.calculate_score_with_half_life(now, half_life_days);
-                            if score > 0 {
-                                snapshot.scores.insert(key.to_string(), score);
-                            }
-                        }
+        if let Ok(read_txn) = db.begin_read()
+            && let Ok(table) = read_txn.open_table(FRECENCY_TABLE)
+            && let Ok(iter) = table.iter()
+        {
+            for entry in iter.flatten() {
+                let key = entry.0.value();
+                let bytes = entry.1.value();
+                if let Some(record) = decode_record(bytes) {
+                    let score = record.calculate_score_with_half_life(now, half_life_days);
+                    if score > 0 {
+                        snapshot.scores.insert(key.to_string(), score);
                     }
                 }
             }
@@ -583,14 +578,13 @@ impl FrecencyStore {
         };
 
         let mut records = Vec::new();
-        if let Ok(read_txn) = db.begin_read() {
-            if let Ok(table) = read_txn.open_table(FRECENCY_TABLE) {
-                if let Ok(iter) = table.iter() {
-                    for entry in iter.flatten() {
-                        if let Some(record) = decode_record(entry.1.value()) {
-                            records.push(record);
-                        }
-                    }
+        if let Ok(read_txn) = db.begin_read()
+            && let Ok(table) = read_txn.open_table(FRECENCY_TABLE)
+            && let Ok(iter) = table.iter()
+        {
+            for entry in iter.flatten() {
+                if let Some(record) = decode_record(entry.1.value()) {
+                    records.push(record);
                 }
             }
         }
@@ -637,12 +631,11 @@ impl FrecencyStore {
         let Some(db) = self.db.as_ref() else {
             return true;
         };
-        if let Ok(read_txn) = db.begin_read() {
-            if let Ok(table) = read_txn.open_table(FRECENCY_TABLE) {
-                if let Ok(mut iter) = table.iter() {
-                    return iter.next().is_none();
-                }
-            }
+        if let Ok(read_txn) = db.begin_read()
+            && let Ok(table) = read_txn.open_table(FRECENCY_TABLE)
+            && let Ok(mut iter) = table.iter()
+        {
+            return iter.next().is_none();
         }
         true
     }
@@ -662,39 +655,39 @@ impl FrecencyStore {
             .arg("query")
             .arg("-l")
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let text = String::from_utf8_lossy(&output.stdout);
-                let lines: Vec<&str> = text.lines().collect();
-                let total = lines.len();
-                for (i, line) in lines.iter().enumerate() {
-                    let path = line.trim();
-                    if !path.is_empty() && Path::new(path).is_dir() {
-                        let weight = (total.saturating_sub(i) as u64).clamp(1, 20);
-                        if self.import_entry(path, weight).is_ok() {
-                            count += 1;
-                        }
+            let text = String::from_utf8_lossy(&output.stdout);
+            let lines: Vec<&str> = text.lines().collect();
+            let total = lines.len();
+            for (i, line) in lines.iter().enumerate() {
+                let path = line.trim();
+                if !path.is_empty() && Path::new(path).is_dir() {
+                    let weight = (total.saturating_sub(i) as u64).clamp(1, 20);
+                    if self.import_entry(path, weight).is_ok() {
+                        count += 1;
                     }
                 }
-                if count > 0 {
-                    return count;
-                }
+            }
+            if count > 0 {
+                return count;
             }
         }
 
         // 2. Fallback: Parse ~/.local/share/zoxide/db.zo directly
         if let Some(data_dir) = dirs::data_dir().or_else(dirs::data_local_dir) {
             let db_zo = data_dir.join("zoxide").join("db.zo");
-            if db_zo.exists() {
-                if let Ok(content) = std::fs::read_to_string(&db_zo) {
-                    for line in content.lines() {
-                        if let Some((path, _)) = line.split_once('|') {
-                            let path = path.trim();
-                            if !path.is_empty() && Path::new(path).is_dir() {
-                                if self.import_entry(path, 5).is_ok() {
-                                    count += 1;
-                                }
-                            }
+            if db_zo.exists()
+                && let Ok(content) = std::fs::read_to_string(&db_zo)
+            {
+                for line in content.lines() {
+                    if let Some((path, _)) = line.split_once('|') {
+                        let path = path.trim();
+                        if !path.is_empty()
+                            && Path::new(path).is_dir()
+                            && self.import_entry(path, 5).is_ok()
+                        {
+                            count += 1;
                         }
                     }
                 }
@@ -711,16 +704,15 @@ impl FrecencyStore {
         };
 
         let mut stale_keys = Vec::new();
-        if let Ok(read_txn) = db.begin_read() {
-            if let Ok(table) = read_txn.open_table(FRECENCY_TABLE) {
-                if let Ok(iter) = table.iter() {
-                    for entry in iter.flatten() {
-                        let key = entry.0.value();
-                        let p = Path::new(key);
-                        if !p.is_absolute() || !p.exists() {
-                            stale_keys.push(key.to_string());
-                        }
-                    }
+        if let Ok(read_txn) = db.begin_read()
+            && let Ok(table) = read_txn.open_table(FRECENCY_TABLE)
+            && let Ok(iter) = table.iter()
+        {
+            for entry in iter.flatten() {
+                let key = entry.0.value();
+                let p = Path::new(key);
+                if !p.is_absolute() || !p.exists() {
+                    stale_keys.push(key.to_string());
                 }
             }
         }

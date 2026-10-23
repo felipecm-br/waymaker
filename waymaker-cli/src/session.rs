@@ -18,9 +18,7 @@ pub fn get_tmux_sessions() -> Vec<String> {
         Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
             .lines()
             .map(|s| s.trim().to_string())
-            .filter(|s| {
-                !s.is_empty() && !s.starts_with("_popups") && !s.starts_with("_lazygitrs")
-            })
+            .filter(|s| !s.is_empty() && !s.starts_with("_popups") && !s.starts_with("_lazygitrs"))
             .collect(),
         _ => Vec::new(),
     }
@@ -30,16 +28,18 @@ pub fn get_tmux_sessions() -> Vec<String> {
 pub fn strip_icon(s: &str) -> &str {
     let s = s.trim();
     // Common Nerd Font prefixes used by sesh and waymaker
-    for prefix in [" ", " ", " ", "⚡ ", " ", " ", " ", "⚙️ ", "📁 ", "🔎 "] {
+    for prefix in [
+        " ", " ", " ", "⚡ ", " ", " ", " ", "⚙️ ", "📁 ", "🔎 ",
+    ] {
         if let Some(rest) = s.strip_prefix(prefix) {
             return rest.trim();
         }
     }
     // Generic fallback: if starts with a non-ASCII char followed by space
-    if let Some((first, rest)) = s.split_once(' ') {
-        if first.chars().any(|c| !c.is_ascii()) {
-            return rest.trim();
-        }
+    if let Some((first, rest)) = s.split_once(' ')
+        && !first.is_ascii()
+    {
+        return rest.trim();
     }
     s
 }
@@ -50,10 +50,10 @@ pub fn expand_tilde(path: &str) -> PathBuf {
         if let Some(home) = dirs::home_dir() {
             return home.join(stripped);
         }
-    } else if path == "~" {
-        if let Some(home) = dirs::home_dir() {
-            return home;
-        }
+    } else if path == "~"
+        && let Some(home) = dirs::home_dir()
+    {
+        return home;
     }
     PathBuf::from(path)
 }
@@ -69,17 +69,16 @@ pub fn derive_session_name(path: &Path) -> String {
 
     if let Some(p) = parent {
         // If parent is a git worktree root (.bare) or dotfiles container (.dotfiles)
-        if p.join(".bare").exists()
+        if (p.join(".bare").exists()
             || p.join(".git").exists()
             || p.file_name()
                 .map(|n| n.to_string_lossy().starts_with('.'))
-                .unwrap_or(false)
+                .unwrap_or(false))
+            && let Some(p_name) = p.file_name()
         {
-            if let Some(p_name) = p.file_name() {
-                let p_clean = p_name.to_string_lossy().replace(['.', ':'], "_");
-                let f_clean = file_name.replace(['.', ':'], "_");
-                return format!("{}/{}", p_clean, f_clean);
-            }
+            let p_clean = p_name.to_string_lossy().replace(['.', ':'], "_");
+            let f_clean = file_name.replace(['.', ':'], "_");
+            return format!("{}/{}", p_clean, f_clean);
         }
     }
 
@@ -99,10 +98,10 @@ pub fn get_frecency_dirs(query: Option<&str>) -> Vec<String> {
     // 1. Pinned paths first (if they exist as directories)
     for p in pins {
         if Path::new(&p).is_dir() {
-            if let Some(ref q) = query_lower {
-                if !p.to_lowercase().contains(q) {
-                    continue;
-                }
+            if let Some(ref q) = query_lower
+                && !p.to_lowercase().contains(q)
+            {
+                continue;
             }
             results.push(p);
         }
@@ -118,10 +117,10 @@ pub fn get_frecency_dirs(query: Option<&str>) -> Vec<String> {
         if !p_obj.is_dir() {
             continue;
         }
-        if let Some(ref q) = query_lower {
-            if !path.to_lowercase().contains(q) {
-                continue;
-            }
+        if let Some(ref q) = query_lower
+            && !path.to_lowercase().contains(q)
+        {
+            continue;
         }
         let depth = p_obj.components().count();
         matches.push((path, score, depth));
@@ -204,12 +203,11 @@ pub fn load_session_config() -> SessionConfig {
     }
 
     for path in candidates {
-        if path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(cfg) = toml::from_str::<SessionConfig>(&content) {
-                    return cfg;
-                }
-            }
+        if path.exists()
+            && let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(cfg) = toml::from_str::<SessionConfig>(&content)
+        {
+            return cfg;
         }
     }
 
@@ -246,17 +244,16 @@ pub fn find_startup_command(
     for s in &config.session {
         let expanded = expand_tilde(&s.path);
         let s_canonical = expanded.canonicalize().unwrap_or(expanded.clone());
-        if s_canonical == canonical || expanded == path || s.path == path.to_string_lossy() {
-            if let Some(ref cmd) = s.startup_command {
-                return Some(cmd.clone());
-            }
+        if (s_canonical == canonical || expanded == path || s.path == path.to_string_lossy())
+            && let Some(ref cmd) = s.startup_command
+        {
+            return Some(cmd.clone());
         }
-        if let Some(t) = target_name {
-            if strip_icon(t) == strip_icon(&s.name) || t == s.name {
-                if let Some(ref cmd) = s.startup_command {
-                    return Some(cmd.clone());
-                }
-            }
+        if let Some(t) = target_name
+            && (strip_icon(t) == strip_icon(&s.name) || t == s.name)
+            && let Some(ref cmd) = s.startup_command
+        {
+            return Some(cmd.clone());
         }
     }
 
@@ -270,14 +267,13 @@ pub fn find_startup_command(
                 require_literal_separator: false,
                 require_literal_leading_dot: false,
             };
-            if pattern.matches_path(&canonical)
+            if (pattern.matches_path(&canonical)
                 || pattern.matches_path_with(&canonical, opts)
                 || pattern.matches_path(path)
-                || pattern.matches_path_with(path, opts)
+                || pattern.matches_path_with(path, opts))
+                && let Some(ref cmd) = w.startup_command
             {
-                if let Some(ref cmd) = w.startup_command {
-                    return Some(cmd.clone());
-                }
+                return Some(cmd.clone());
             }
         }
     }
@@ -365,13 +361,11 @@ fn spawn_session_windows(session_name: &str, session_path: &Path, windows: &[Win
             .status()
             .map(|st| st.success())
             .unwrap_or(false);
-        if created {
-            if let Some(ref script) = win.startup_script {
-                let win_target = format!("{}:{}", session_name, win.name);
-                let _ = Command::new("tmux")
-                    .args(["send-keys", "-t", &win_target, script, "Enter"])
-                    .status();
-            }
+        if created && let Some(ref script) = win.startup_script {
+            let win_target = format!("{}:{}", session_name, win.name);
+            let _ = Command::new("tmux")
+                .args(["send-keys", "-t", &win_target, script, "Enter"])
+                .status();
         }
     }
     let _ = Command::new("tmux")
@@ -559,8 +553,8 @@ pub fn list(
     config_only: bool,
     dirs_only: bool,
 ) -> anyhow::Result<()> {
-    let show_all = (tmux_only && config_only && dirs_only)
-        || (!tmux_only && !config_only && !dirs_only);
+    let show_all =
+        (tmux_only && config_only && dirs_only) || (!tmux_only && !config_only && !dirs_only);
     let home = dirs::home_dir();
     let config = load_session_config();
     let mut seen_sessions = std::collections::HashSet::new();
@@ -587,7 +581,12 @@ pub fn list(
                 let expanded = expand_tilde(&s.path);
                 seen_dirs.insert(expanded.to_string_lossy().to_string());
                 if icons {
-                    if s.name.chars().next().map(|c| !c.is_ascii()).unwrap_or(false) {
+                    if s.name
+                        .chars()
+                        .next()
+                        .map(|c| !c.is_ascii())
+                        .unwrap_or(false)
+                    {
                         println!("{}", s.name);
                     } else {
                         println!("⚙️ {}", s.name);
@@ -741,8 +740,8 @@ pub async fn handle_sesh_cli() -> i32 {
                         "--dirs" | "--zoxide" => dirs_only = true,
                         _ => {}
                     }
-                } else if arg.starts_with('-') {
-                    for c in arg[1..].chars() {
+                } else if let Some(flags) = arg.strip_prefix('-') {
+                    for c in flags.chars() {
                         match c {
                             'i' => icons = true,
                             't' => tmux_only = true,
@@ -858,8 +857,8 @@ pub async fn handle_session_cli(config_args: &[String]) -> Option<i32> {
                                 "--dirs" | "--zoxide" => dirs_only = true,
                                 _ => {}
                             }
-                        } else if arg.starts_with('-') {
-                            for c in arg[1..].chars() {
+                        } else if let Some(flags) = arg.strip_prefix('-') {
+                            for c in flags.chars() {
                                 match c {
                                     'i' => icons = true,
                                     't' => tmux_only = true,
@@ -981,7 +980,12 @@ async fn run_interactive_session_picker() -> i32 {
         if !seen_sessions.contains(clean_name) {
             let expanded = expand_tilde(&s.path);
             seen_dirs.insert(expanded.to_string_lossy().to_string());
-            if s.name.chars().next().map(|c| !c.is_ascii()).unwrap_or(false) {
+            if s.name
+                .chars()
+                .next()
+                .map(|c| !c.is_ascii())
+                .unwrap_or(false)
+            {
                 items.push(s.name.clone());
             } else {
                 items.push(format!("⚙️ {}", s.name));
@@ -1036,11 +1040,11 @@ async fn run_interactive_session_picker() -> i32 {
 
     if output.status.success() {
         let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !selected.is_empty() {
-            if let Err(e) = connect(&selected, false) {
-                eprintln!("Connect error: {}", e);
-                return 1;
-            }
+        if !selected.is_empty()
+            && let Err(e) = connect(&selected, false)
+        {
+            eprintln!("Connect error: {}", e);
+            return 1;
         }
         0
     } else {
@@ -1073,7 +1077,10 @@ startup_command = "wm -o jump"
         assert_eq!(config.session.len(), 1);
         assert_eq!(config.session[0].name, " Downloads");
         assert_eq!(config.session[0].path, "~/Downloads");
-        assert_eq!(config.session[0].startup_command.as_deref(), Some("wm -o jump"));
+        assert_eq!(
+            config.session[0].startup_command.as_deref(),
+            Some("wm -o jump")
+        );
     }
 
     #[test]
@@ -1111,7 +1118,11 @@ startup_command = "wm -o jump"
         assert_eq!(cmd.as_deref(), Some("wm -o jump"));
 
         // 4. By session name
-        let cmd = find_startup_command(&PathBuf::from("/non/existent"), Some(" Downloads"), &config);
+        let cmd = find_startup_command(
+            &PathBuf::from("/non/existent"),
+            Some(" Downloads"),
+            &config,
+        );
         assert_eq!(cmd.as_deref(), Some("wm -o jump"));
 
         // 5. Non matching path
@@ -1146,7 +1157,10 @@ path = "~/Downloads"
         assert_eq!(config.wildcard[0].windows, vec!["server"]);
         assert_eq!(config.wildcard[1].startup_command, None);
         // `startup_command` is accepted as an alias for sesh's `startup_script`.
-        assert_eq!(config.window[1].startup_script.as_deref(), Some("lazygitrs"));
+        assert_eq!(
+            config.window[1].startup_script.as_deref(),
+            Some("lazygitrs")
+        );
     }
 
     #[test]
@@ -1177,7 +1191,10 @@ startup_script = "lazygitrs"
         let w = find_session_windows(&home.join("dev/github/starship-studio/main"), None, &config);
         assert_eq!(w.len(), 1);
         assert_eq!(w[0].name, "server");
-        assert_eq!(w[0].startup_script.as_deref(), Some("npx -y live-server --port=5500"));
+        assert_eq!(
+            w[0].startup_script.as_deref(),
+            Some("npx -y live-server --port=5500")
+        );
 
         // Explicit session match wins; unknown window names are skipped.
         let w = find_session_windows(&home.join("Downloads"), Some("Downloads"), &config);
@@ -1214,9 +1231,18 @@ startup_script = "lazygitrs"
 
     #[test]
     fn test_derive_session_name() {
-        assert_eq!(derive_session_name(Path::new("/home/user/project")), "project");
-        assert_eq!(derive_session_name(Path::new("/home/user/my.cool.app")), "my_cool_app");
-        assert_eq!(derive_session_name(Path::new("/home/user/app:port")), "app_port");
+        assert_eq!(
+            derive_session_name(Path::new("/home/user/project")),
+            "project"
+        );
+        assert_eq!(
+            derive_session_name(Path::new("/home/user/my.cool.app")),
+            "my_cool_app"
+        );
+        assert_eq!(
+            derive_session_name(Path::new("/home/user/app:port")),
+            "app_port"
+        );
     }
 
     #[test]
@@ -1265,7 +1291,8 @@ path = "~/Downloads"
             Some(0)
         );
         assert_eq!(
-            handle_session_cli(&["session".into(), "kill".into(), "non_existent_sess".into()]).await,
+            handle_session_cli(&["session".into(), "kill".into(), "non_existent_sess".into()])
+                .await,
             Some(0)
         );
         // Missing target returns code 1

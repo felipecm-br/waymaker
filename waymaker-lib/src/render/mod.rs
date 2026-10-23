@@ -260,10 +260,7 @@ pub fn quote_live_token(token: &str) -> String {
 }
 
 #[inline]
-fn apply_live_input<A: ActionExt>(
-    buffer: &mut Vec<RenderCommand<A>>,
-    live_input_active: bool,
-) {
+fn apply_live_input<A: ActionExt>(buffer: &mut Vec<RenderCommand<A>>, live_input_active: bool) {
     if !live_input_active {
         return;
     }
@@ -272,7 +269,9 @@ fn apply_live_input<A: ActionExt>(
     let mut current_text_batch = String::new();
     let mut key_batch: Vec<String> = Vec::new();
 
-    let flush_batch = |key_batch: &mut Vec<String>, current_text_batch: &mut String, out: &mut Vec<RenderCommand<A>>| {
+    let flush_batch = |key_batch: &mut Vec<String>,
+                       current_text_batch: &mut String,
+                       out: &mut Vec<RenderCommand<A>>| {
         if !current_text_batch.is_empty() {
             key_batch.push(std::mem::take(current_text_batch));
         }
@@ -399,10 +398,7 @@ fn apply_live_input<A: ActionExt>(
 }
 
 #[inline]
-fn apply_prompt_input<A: ActionExt>(
-    buffer: &mut Vec<RenderCommand<A>>,
-    prompt_input_active: bool,
-) {
+fn apply_prompt_input<A: ActionExt>(buffer: &mut Vec<RenderCommand<A>>, prompt_input_active: bool) {
     if !prompt_input_active {
         return;
     }
@@ -470,10 +466,10 @@ fn get_nav_bind<'a>(
         if let Some(actions) = focus_binds.get("shift-?") {
             return Some(actions);
         }
-    } else if key == "shift-?" {
-        if let Some(actions) = focus_binds.get("?") {
-            return Some(actions);
-        }
+    } else if key == "shift-?"
+        && let Some(actions) = focus_binds.get("?")
+    {
+        return Some(actions);
     }
     // For multi-character keys (e.g. "Esc", "Backspace", "Tab", "Ctrl-l", "Left", "Right"),
     // check case-insensitively since crokey capitalizes key names while config/users often use lowercase.
@@ -1102,12 +1098,14 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
     }
 
     if let Some(ref p) = ui.config.nav.prompt_input {
-        picker_ui.prompt_input.set_prompt(Some(ratatui::text::Line::styled(
-            p.clone(),
-            ratatui::style::Style::default()
-                .fg(ratatui::style::Color::Magenta)
-                .add_modifier(ratatui::style::Modifier::BOLD),
-        )));
+        picker_ui
+            .prompt_input
+            .set_prompt(Some(ratatui::text::Line::styled(
+                p.clone(),
+                ratatui::style::Style::default()
+                    .fg(ratatui::style::Color::Magenta)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            )));
     }
 
     state.refresh_parent_peek_cache();
@@ -1162,18 +1160,18 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     poll_interval
                 };
 
-                if let Some(interval) = effective_interval {
-                    if last_preview_poll.elapsed() >= interval {
-                        last_preview_poll = std::time::Instant::now();
-                        p.view
-                            .image_id
-                            .fetch_add(1, std::sync::atomic::Ordering::Release);
-                        p.view
-                            .changed
-                            .store(true, std::sync::atomic::Ordering::Release);
-                        state.insert(crate::message::Event::PreviewChange);
-                        state.needs_redraw = true;
-                    }
+                if let Some(interval) = effective_interval
+                    && last_preview_poll.elapsed() >= interval
+                {
+                    last_preview_poll = std::time::Instant::now();
+                    p.view
+                        .image_id
+                        .fetch_add(1, std::sync::atomic::Ordering::Release);
+                    p.view
+                        .changed
+                        .store(true, std::sync::atomic::Ordering::Release);
+                    state.insert(crate::message::Event::PreviewChange);
+                    state.needs_redraw = true;
                 }
             }
         }
@@ -1207,7 +1205,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     state.focus,
                     &ui.config.nav.binds,
                     picker_ui.action_visible
-                        || overlay_ui.as_ref().map_or(false, |o| o.index().is_some()),
+                        || overlay_ui.as_ref().is_some_and(|o| o.index().is_some()),
                     &mut state.pending_nav_key,
                     &mut state.sort_menu_active,
                     state.preview_fullscreen,
@@ -1479,50 +1477,47 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         MouseEventKind::Drag(MouseButton::Left) => {
-                            if let Some(start_pos) = state.dragging {
-                                if let Some(p) = preview_ui.as_mut() {
-                                    let side =
-                                        p.setting().map(|s| &s.layout.side).unwrap_or(&Side::Right);
-                                    match side {
-                                        Side::Right => {
-                                            if pos.x < start_pos.x {
-                                                p.expand(start_pos.x - pos.x);
-                                            } else if pos.x > start_pos.x {
-                                                p.shrink(pos.x - start_pos.x);
-                                            }
-                                        }
-                                        Side::Left => {
-                                            if pos.x > start_pos.x {
-                                                p.expand(pos.x - start_pos.x);
-                                            } else if pos.x < start_pos.x {
-                                                p.shrink(start_pos.x - pos.x);
-                                            }
-                                        }
-                                        Side::Bottom => {
-                                            if pos.y < start_pos.y {
-                                                p.expand(start_pos.y - pos.y);
-                                            } else if pos.y > start_pos.y {
-                                                p.shrink(pos.y - start_pos.y);
-                                            }
-                                        }
-                                        Side::Top => {
-                                            if pos.y > start_pos.y {
-                                                p.expand(pos.y - start_pos.y);
-                                            } else if pos.y < start_pos.y {
-                                                p.shrink(start_pos.y - pos.y);
-                                            }
+                            if let Some(start_pos) = state.dragging
+                                && let Some(p) = preview_ui.as_mut()
+                            {
+                                let side =
+                                    p.setting().map(|s| &s.layout.side).unwrap_or(&Side::Right);
+                                match side {
+                                    Side::Right => {
+                                        if pos.x < start_pos.x {
+                                            p.expand(start_pos.x - pos.x);
+                                        } else if pos.x > start_pos.x {
+                                            p.shrink(pos.x - start_pos.x);
                                         }
                                     }
-                                    state.dragging = Some(pos);
-                                    state.needs_redraw = true;
+                                    Side::Left => {
+                                        if pos.x > start_pos.x {
+                                            p.expand(pos.x - start_pos.x);
+                                        } else if pos.x < start_pos.x {
+                                            p.shrink(start_pos.x - pos.x);
+                                        }
+                                    }
+                                    Side::Bottom => {
+                                        if pos.y < start_pos.y {
+                                            p.expand(start_pos.y - pos.y);
+                                        } else if pos.y > start_pos.y {
+                                            p.shrink(pos.y - start_pos.y);
+                                        }
+                                    }
+                                    Side::Top => {
+                                        if pos.y > start_pos.y {
+                                            p.expand(pos.y - start_pos.y);
+                                        } else if pos.y < start_pos.y {
+                                            p.shrink(start_pos.y - pos.y);
+                                        }
+                                    }
                                 }
+                                state.dragging = Some(pos);
+                                state.needs_redraw = true;
                             }
                         }
                         MouseEventKind::Up(MouseButton::Left) => {
-                            if state.dragging.is_some() {
-                                state.dragging = None;
-                                state.needs_redraw = true;
-                            }
+                            state.needs_redraw |= state.dragging.take().is_some();
                         }
                         MouseEventKind::Moved => {
                             let prev_hover = mouse_hover;
@@ -1544,13 +1539,13 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     return Ok(vec![]);
                 }
                 RenderCommand::Action(action) | RenderCommand::KeyAction { action, .. } => {
-                    if let Some(x) = overlay_ui.as_mut() {
-                        if match action {
+                    if let Some(x) = overlay_ui.as_mut()
+                        && match action {
                             Action::Char(c) => x.handle_input(c),
                             _ => x.handle_action(&action),
-                        } {
-                            continue;
                         }
+                    {
+                        continue;
                     }
                     let PickerUI {
                         query,
@@ -1583,7 +1578,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         }
                         Action::Toggle => {
                             if let Some(item) = worker.get_nth(results.index()) {
-                                if selections.contains(&item) {
+                                if selections.contains(item) {
                                     selections.toggle(item);
                                     results.cursor_prev();
                                 } else {
@@ -1744,7 +1739,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             }
                         }
                         Action::HalfPageDown | Action::HalfPageUp => {
-                            let x = (results.height() + 1) / 2;
+                            let x = results.height().div_ceil(2);
                             let next = matches!(action, Action::HalfPageDown) ^ results.reverse();
                             for _ in 0..x.into() {
                                 did_cursor_wrap = if next {
@@ -1828,7 +1823,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         }
                         Action::PreviewHalfPageUp | Action::PreviewHalfPageDown => {
                             if let Some(p) = preview_ui.as_mut() {
-                                let n = (p.area.height + 1) / 2;
+                                let n = p.area.height.div_ceil(2);
 
                                 if matches!(action, Action::PreviewHalfPageUp) {
                                     p.up(n)
@@ -1944,8 +1939,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                             );
                                             sources.get(next_idx).cloned()
                                         });
-                                    if let Some(src) = src_opt {
-                                        if let Some(img) = crate::utils::mermaid::render_mermaid_to_image_with_options(
+                                    if let Some(src) = src_opt
+                                        && let Some(img) = crate::utils::mermaid::render_mermaid_to_image_with_options(
                                             &src,
                                             2.0,
                                             p.config.diagrams.theme,
@@ -1964,7 +1959,6 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                                 std::sync::atomic::Ordering::Release,
                                             );
                                         }
-                                    }
                                 }
                             }
                         }
@@ -2287,10 +2281,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             if let Some(name) = col_name {
                                 if let Some(idx) =
                                     worker.columns.iter().position(|c| *c.name == name)
+                                    && idx < results.hidden_columns.len()
                                 {
-                                    if idx < results.hidden_columns.len() {
-                                        results.hidden_columns[idx] = false;
-                                    }
+                                    results.hidden_columns[idx] = false;
                                 }
                             } else {
                                 for val in results.hidden_columns.iter_mut() {
@@ -2738,7 +2731,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             state.needs_redraw = true;
         }
 
-        if preview_ui.as_ref().map_or(false, |p| p.view.changed()) {
+        if preview_ui.as_ref().is_some_and(|p| p.view.changed()) {
             state.needs_redraw = true;
         }
 
@@ -2800,78 +2793,76 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     let mut is_global_breadcrumb = false;
                     let mut global_breadcrumb_rect = Rect::default();
 
-                    if picker_ui.breadcrumb_config.show {
-                        if let Some(ref cwd) = state.cached_cwd {
-                            let mut components = Vec::new();
-                            let home_dir = std::env::var("HOME").ok().map(std::path::PathBuf::from);
+                    if picker_ui.breadcrumb_config.show
+                        && let Some(ref cwd) = state.cached_cwd
+                    {
+                        let mut components = Vec::new();
+                        let home_dir = std::env::var("HOME").ok().map(std::path::PathBuf::from);
 
-                            if let Some(home) = home_dir {
-                                if let Ok(stripped) = cwd.strip_prefix(&home) {
-                                    components.push("~".to_string());
-                                    for comp in stripped.components() {
-                                        components
-                                            .push(comp.as_os_str().to_string_lossy().to_string());
-                                    }
-                                }
+                        if let Some(home) = home_dir
+                            && let Ok(stripped) = cwd.strip_prefix(&home)
+                        {
+                            components.push("~".to_string());
+                            for comp in stripped.components() {
+                                components.push(comp.as_os_str().to_string_lossy().to_string());
                             }
+                        }
 
-                            if components.is_empty() {
-                                for comp in cwd.components() {
-                                    components.push(comp.as_os_str().to_string_lossy().to_string());
-                                }
+                        if components.is_empty() {
+                            for comp in cwd.components() {
+                                components.push(comp.as_os_str().to_string_lossy().to_string());
                             }
+                        }
 
-                            if picker_ui.breadcrumb_config.current_folder_only
-                                && !components.is_empty()
+                        if picker_ui.breadcrumb_config.current_folder_only && !components.is_empty()
+                        {
+                            let last = components.pop().unwrap();
+                            components.clear();
+                            components.push(last);
+                        }
+
+                        let truncate_len = picker_ui.breadcrumb_config.truncate_length;
+                        let num_components = components.len();
+                        let mut breadcrumb_width = 0;
+
+                        for (i, mut text) in components.into_iter().enumerate() {
+                            if truncate_len > 0
+                                && i < num_components.saturating_sub(1)
+                                && text != "~"
+                                && text.chars().count() > truncate_len
                             {
-                                let last = components.pop().unwrap();
-                                components.clear();
-                                components.push(last);
+                                text = text.chars().take(truncate_len).collect();
                             }
 
-                            let truncate_len = picker_ui.breadcrumb_config.truncate_length;
-                            let num_components = components.len();
-                            let mut breadcrumb_width = 0;
-
-                            for (i, mut text) in components.into_iter().enumerate() {
-                                if truncate_len > 0 && i < num_components.saturating_sub(1) {
-                                    if text != "~" && text.chars().count() > truncate_len {
-                                        text = text.chars().take(truncate_len).collect();
-                                    }
-                                }
-
-                                breadcrumb_width += text.chars().count() as u16;
+                            breadcrumb_width += text.chars().count() as u16;
+                            breadcrumb_spans.push(ratatui::text::Span::styled(
+                                text,
+                                ratatui::style::Style::from(picker_ui.breadcrumb_config.style),
+                            ));
+                            if i < num_components - 1 {
+                                let sep = picker_ui.breadcrumb_config.separator.clone();
+                                breadcrumb_width += sep.chars().count() as u16;
                                 breadcrumb_spans.push(ratatui::text::Span::styled(
-                                    text,
+                                    sep,
                                     ratatui::style::Style::from(
-                                        picker_ui.breadcrumb_config.style.clone(),
+                                        picker_ui.breadcrumb_config.separator_style,
                                     ),
                                 ));
-                                if i < num_components - 1 {
-                                    let sep = picker_ui.breadcrumb_config.separator.clone();
-                                    breadcrumb_width += sep.chars().count() as u16;
-                                    breadcrumb_spans.push(ratatui::text::Span::styled(
-                                        sep,
-                                        ratatui::style::Style::from(
-                                            picker_ui.breadcrumb_config.separator_style.clone(),
-                                        ),
-                                    ));
-                                }
                             }
+                        }
 
-                            // Determine if we need global breadcrumb
-                            let has_preview = preview_ui.as_ref().is_some_and(|p| p.visible());
-                            let picker_w = if has_preview {
-                                let [_, p_area, _] = preview_ui.as_ref().unwrap().split(_area);
-                                p_area.width
-                            } else {
-                                _area.width
-                            };
+                        // Determine if we need global breadcrumb
+                        let has_preview = preview_ui.as_ref().is_some_and(|p| p.visible());
+                        let picker_w = if has_preview {
+                            let [_, p_area, _] = preview_ui.as_ref().unwrap().split(_area);
+                            p_area.width
+                        } else {
+                            _area.width
+                        };
 
-                            if has_preview || breadcrumb_width > picker_w {
-                                is_global_breadcrumb = true;
-                                global_breadcrumb_rect = split(&mut _area, 1, !picker_ui.reverse());
-                            }
+                        if has_preview || breadcrumb_width > picker_w {
+                            is_global_breadcrumb = true;
+                            global_breadcrumb_rect = split(&mut _area, 1, !picker_ui.reverse());
                         }
                     }
 
@@ -2908,7 +2899,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         0
                     };
 
-                    let effective_footer_height = if base_footer_height > 0 && has_footer_separator {
+                    let effective_footer_height = if base_footer_height > 0 && has_footer_separator
+                    {
                         base_footer_height + 1
                     } else {
                         base_footer_height
@@ -3222,7 +3214,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                     ),
                                     ratatui::text::Span::styled(
                                         " exit",
-                                        ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
+                                        ratatui::style::Style::default()
+                                            .fg(ratatui::style::Color::DarkGray),
                                     ),
                                 ])
                             } else {
@@ -3250,7 +3243,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                     ),
                                     ratatui::text::Span::styled(
                                         " exit",
-                                        ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray),
+                                        ratatui::style::Style::default()
+                                            .fg(ratatui::style::Color::DarkGray),
                                     ),
                                 ])
                             };
@@ -3371,9 +3365,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
 
                             let preview_border = preview_ui.as_ref().map(|p| p.border());
 
-                            let preview_border_color = preview_ui
-                                .as_ref()
-                                .and_then(|p| p.effective_border_color());
+                            let preview_border_color =
+                                preview_ui.as_ref().and_then(|p| p.effective_border_color());
 
                             let preview_border_type = preview_border.and_then(|b| b.r#type);
 
@@ -3385,7 +3378,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                                 .unwrap_or(Color::DarkGray);
 
                             let sep_style =
-                                Style::from(footer_ui.config.separator_style.clone()).fg(sep_fg);
+                                Style::from(footer_ui.config.separator_style).fg(sep_fg);
 
                             render_footer_separator(
                                 frame,
@@ -3697,22 +3690,23 @@ fn render_preview(frame: &mut Frame, area: Rect, ui: &mut PreviewUI) {
         && !ui.is_fullscreen();
 
     let render_badge_if_needed = |frame: &mut Frame, area: Rect, ui: &PreviewUI| {
-        if is_diagram_mode && !has_top_border {
-            if let Some(counter) = ui.diagram_counter_spans() {
-                let width = counter.iter().map(|s| s.width()).sum::<usize>() as u16;
-                let scrollbar_pad = if ui.config.scrollbar { 1 } else { 0 };
-                if area.width >= width + scrollbar_pad && area.height > 0 {
-                    let badge_area = Rect::new(
-                        area.right().saturating_sub(width + scrollbar_pad),
-                        area.y,
-                        width,
-                        1,
-                    );
-                    frame.render_widget(
-                        ratatui::widgets::Paragraph::new(ratatui::text::Line::from(counter)),
-                        badge_area,
-                    );
-                }
+        if is_diagram_mode
+            && !has_top_border
+            && let Some(counter) = ui.diagram_counter_spans()
+        {
+            let width = counter.iter().map(|s| s.width()).sum::<usize>() as u16;
+            let scrollbar_pad = if ui.config.scrollbar { 1 } else { 0 };
+            if area.width >= width + scrollbar_pad && area.height > 0 {
+                let badge_area = Rect::new(
+                    area.right().saturating_sub(width + scrollbar_pad),
+                    area.y,
+                    width,
+                    1,
+                );
+                frame.render_widget(
+                    ratatui::widgets::Paragraph::new(ratatui::text::Line::from(counter)),
+                    badge_area,
+                );
             }
         }
     };
@@ -3858,7 +3852,7 @@ fn render_input(
     focus_info: Option<FocusInfo>,
 ) -> Position {
     ui.scroll_to_cursor();
-    let focused = focus_info.as_ref().map_or(true, |f| f.focused);
+    let focused = focus_info.as_ref().is_none_or(|f| f.focused);
     let nav_prompt = focus_info.as_ref().map(|f| f.nav_prompt.as_str());
 
     let active_prompt = ui.active_prompt(focused, nav_prompt);
@@ -3870,36 +3864,36 @@ fn render_input(
     let p = ui.cursor_offset_for_prompt(&area, &active_prompt);
 
     let show_cursor = focused;
-    if let CursorSetting::Default = ui.config.cursor {
-        if show_cursor {
-            frame.set_cursor_position(p)
-        }
+    if let CursorSetting::Default = ui.config.cursor
+        && show_cursor
+    {
+        frame.set_cursor_position(p)
     };
 
     frame.render_widget(widget, area);
 
-    if let Some(fi) = focus_info {
-        if let (Some(border_type), Some(color)) = (fi.bar, fi.indicator_color()) {
-            let mut style = Style::default().fg(color);
-            if fi.bold {
-                style = style.add_modifier(Modifier::BOLD);
-            }
-            if border_type == ratatui::widgets::BorderType::Thick {
-                let indicator_rect = Rect {
-                    x: area.x,
-                    y: area.y,
-                    width: 1,
-                    height: area.height,
-                };
-                let span = Span::styled(fi.nav_char.clone(), style);
-                frame.render_widget(Paragraph::new(span), indicator_rect);
-            } else {
-                let indicator = Block::default()
-                    .borders(Borders::LEFT)
-                    .border_type(border_type)
-                    .border_style(style);
-                frame.render_widget(indicator, area);
-            }
+    if let Some(fi) = focus_info
+        && let (Some(border_type), Some(color)) = (fi.bar, fi.indicator_color())
+    {
+        let mut style = Style::default().fg(color);
+        if fi.bold {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        if border_type == ratatui::widgets::BorderType::Thick {
+            let indicator_rect = Rect {
+                x: area.x,
+                y: area.y,
+                width: 1,
+                height: area.height,
+            };
+            let span = Span::styled(fi.nav_char.clone(), style);
+            frame.render_widget(Paragraph::new(span), indicator_rect);
+        } else {
+            let indicator = Block::default()
+                .borders(Borders::LEFT)
+                .border_type(border_type)
+                .border_style(style);
+            frame.render_widget(indicator, area);
         }
     }
 
@@ -3971,7 +3965,7 @@ fn render_sort_menu(frame: &mut Frame, area: Rect, cfg: &crate::config::SortMenu
 
         for (key, label, color) in SORT_MENU_ITEMS {
             let key_span = Span::styled(
-                format!("{key}"),
+                key.to_string(),
                 Style::default().fg(*color).add_modifier(Modifier::BOLD),
             );
             let label_span = Span::styled(format!(" {label} "), Style::default().fg(Color::White));
@@ -3992,7 +3986,7 @@ fn render_sort_menu(frame: &mut Frame, area: Rect, cfg: &crate::config::SortMenu
             return;
         }
 
-        let num_rows = (SORT_MENU_ITEMS.len() + cols - 1) / cols;
+        let num_rows = SORT_MENU_ITEMS.len().div_ceil(cols);
         let mut lines = Vec::with_capacity(num_rows);
 
         for row in 0..num_rows {
@@ -4160,7 +4154,7 @@ fn render_nav_hints(
             return;
         }
 
-        let num_rows = (hints.len() + cols - 1) / cols;
+        let num_rows = hints.len().div_ceil(cols);
         let mut lines = Vec::with_capacity(num_rows);
 
         for row in 0..num_rows {
@@ -4310,10 +4304,10 @@ fn render_parent_peek(
     let entries = &cache.entries;
 
     let mut selected_idx = 0;
-    if let Some(cur) = current_name {
-        if let Some(pos) = entries.iter().position(|e| e.0 == cur) {
-            selected_idx = pos;
-        }
+    if let Some(cur) = current_name
+        && let Some(pos) = entries.iter().position(|e| e.0 == cur)
+    {
+        selected_idx = pos;
     }
 
     let visible_rows = inner.height as usize;
@@ -5023,8 +5017,7 @@ mod test {
         assert_eq!(footer_ui.content_height(), 1);
         assert_eq!(footer_ui.height(), 2);
 
-        let has_footer_separator =
-            footer_ui.config.separator != HorizontalSeparator::None;
+        let has_footer_separator = footer_ui.config.separator != HorizontalSeparator::None;
         let base_footer_height = footer_ui.content_height();
         let effective_footer_height = if base_footer_height > 0 && has_footer_separator {
             base_footer_height + 1
@@ -5725,7 +5718,10 @@ mod test {
     #[test]
     fn test_get_nav_bind_question_mark() {
         let mut focus_binds = std::collections::HashMap::new();
-        focus_binds.insert("?".to_string(), crate::action::Actions::from(vec![Action::SwitchPreview(Some(1))]));
+        focus_binds.insert(
+            "?".to_string(),
+            crate::action::Actions::from(vec![Action::SwitchPreview(Some(1))]),
+        );
 
         // Key "?" matches directly
         let res = get_nav_bind(&focus_binds, "?");
@@ -5739,7 +5735,10 @@ mod test {
 
         // And vice-versa: binding "shift-?" matches when key is "?"
         let mut focus_binds_shift = std::collections::HashMap::new();
-        focus_binds_shift.insert("shift-?".to_string(), crate::action::Actions::from(vec![Action::Help("".into())]));
+        focus_binds_shift.insert(
+            "shift-?".to_string(),
+            crate::action::Actions::from(vec![Action::Help("".into())]),
+        );
         let res_rev = get_nav_bind(&focus_binds_shift, "?");
         assert!(res_rev.is_some());
         assert_eq!(res_rev.unwrap()[0], Action::Help("".into()));
@@ -5748,79 +5747,71 @@ mod test {
     #[test]
     fn test_apply_prompt_input() {
         // When not active, buffer is untouched
-        let mut buffer = vec![
-            RenderCommand::<NullActionExt>::KeyAction {
-                key: "enter".to_string(),
-                action: Action::Redraw,
-            },
-        ];
+        let mut buffer = vec![RenderCommand::<NullActionExt>::KeyAction {
+            key: "enter".to_string(),
+            action: Action::Redraw,
+        }];
         apply_prompt_input(&mut buffer, false);
         assert_eq!(buffer.len(), 1);
         assert!(matches!(buffer[0], RenderCommand::KeyAction { .. }));
 
         // When active:
         // 1. Enter maps to Action::Accept
-        let mut buffer = vec![
-            RenderCommand::<NullActionExt>::KeyAction {
-                key: "enter".to_string(),
-                action: Action::Redraw,
-            },
-        ];
+        let mut buffer = vec![RenderCommand::<NullActionExt>::KeyAction {
+            key: "enter".to_string(),
+            action: Action::Redraw,
+        }];
         apply_prompt_input(&mut buffer, true);
         assert_eq!(buffer.len(), 1);
         assert!(matches!(buffer[0], RenderCommand::Action(Action::Accept)));
 
         // 2. Esc maps to Action::Cancel
-        let mut buffer = vec![
-            RenderCommand::<NullActionExt>::KeyAction {
-                key: "esc".to_string(),
-                action: Action::Quit(0),
-            },
-        ];
+        let mut buffer = vec![RenderCommand::<NullActionExt>::KeyAction {
+            key: "esc".to_string(),
+            action: Action::Quit(0),
+        }];
         apply_prompt_input(&mut buffer, true);
         assert_eq!(buffer.len(), 1);
         assert!(matches!(buffer[0], RenderCommand::Action(Action::Cancel)));
 
         // 3. Backspace maps to Action::DeleteChar
-        let mut buffer = vec![
-            RenderCommand::<NullActionExt>::KeyAction {
-                key: "backspace".to_string(),
-                action: Action::Redraw,
-            },
-        ];
+        let mut buffer = vec![RenderCommand::<NullActionExt>::KeyAction {
+            key: "backspace".to_string(),
+            action: Action::Redraw,
+        }];
         apply_prompt_input(&mut buffer, true);
         assert_eq!(buffer.len(), 1);
-        assert!(matches!(buffer[0], RenderCommand::Action(Action::DeleteChar)));
+        assert!(matches!(
+            buffer[0],
+            RenderCommand::Action(Action::DeleteChar)
+        ));
 
         // 4. Regular characters pass through as Action(Char(c))
-        let mut buffer = vec![
-            RenderCommand::<NullActionExt>::Action(Action::Char('a')),
-        ];
+        let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char('a'))];
         apply_prompt_input(&mut buffer, true);
         assert_eq!(buffer.len(), 1);
-        assert!(matches!(buffer[0], RenderCommand::Action(Action::Char('a'))));
+        assert!(matches!(
+            buffer[0],
+            RenderCommand::Action(Action::Char('a'))
+        ));
     }
 
     #[test]
     fn test_apply_live_input() {
         // When not active, buffer is untouched
-        let mut buffer = vec![
-            RenderCommand::<NullActionExt>::KeyAction {
-                key: "enter".to_string(),
-                action: Action::Redraw,
-            },
-        ];
+        let mut buffer = vec![RenderCommand::<NullActionExt>::KeyAction {
+            key: "enter".to_string(),
+            action: Action::Redraw,
+        }];
         apply_live_input(&mut buffer, false);
         assert_eq!(buffer.len(), 1);
         assert!(matches!(buffer[0], RenderCommand::KeyAction { .. }));
 
         // 1. Esc exits with Action::Cancel
-        let mut buffer = vec![
-            RenderCommand::<NullActionExt>::KeyAction {
-                key: "esc".to_string(),
-                action: Action::Quit(0),
-            },
-        ];
+        let mut buffer = vec![RenderCommand::<NullActionExt>::KeyAction {
+            key: "esc".to_string(),
+            action: Action::Quit(0),
+        }];
         apply_live_input(&mut buffer, true);
         assert_eq!(buffer.len(), 1);
         assert!(matches!(buffer[0], RenderCommand::Action(Action::Cancel)));
@@ -5889,9 +5880,7 @@ mod test {
         assert!(matches!(buffer[1], RenderCommand::PreviewChange));
 
         // 6. Space character alone maps to "'Space'"
-        let mut buffer = vec![
-            RenderCommand::<NullActionExt>::Action(Action::Char(' ')),
-        ];
+        let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char(' '))];
         apply_live_input(&mut buffer, true);
         assert_eq!(buffer.len(), 1);
         match &buffer[0] {

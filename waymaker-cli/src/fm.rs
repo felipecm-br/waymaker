@@ -7,16 +7,16 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, Paragraph},
+};
 use waymaker::{
     Action,
     event::RenderSender,
     message::RenderCommand,
     ui::{Frame, Overlay, OverlayEffect, Rect, SizeHint},
-};
-use ratatui::{
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
 };
 
 use crate::action::MMAction;
@@ -39,6 +39,10 @@ pub struct FmClipboard {
 pub type Clipboard = Arc<Mutex<Option<FmClipboard>>>;
 
 #[derive(Debug, Clone)]
+#[expect(
+    dead_code,
+    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
+)]
 pub enum UndoAction {
     DeletedFile {
         original: PathBuf,
@@ -200,30 +204,28 @@ pub fn apply_undo(action: &UndoAction) -> std::io::Result<()> {
     match action {
         UndoAction::DeletedFile { original, backup } => {
             move_path(backup, original)?;
-            if let Some(name) = backup.file_name() {
-                if let Some(parent) = backup.parent() {
-                    if let Some(grandparent) = parent.parent() {
-                        let info_file = grandparent
-                            .join("info")
-                            .join(format!("{}.trashinfo", name.to_string_lossy()));
-                        let _ = fs::remove_file(info_file);
-                    }
-                }
+            if let Some(name) = backup.file_name()
+                && let Some(parent) = backup.parent()
+                && let Some(grandparent) = parent.parent()
+            {
+                let info_file = grandparent
+                    .join("info")
+                    .join(format!("{}.trashinfo", name.to_string_lossy()));
+                let _ = fs::remove_file(info_file);
             }
             Ok(())
         }
         UndoAction::DeletedFiles { items } => {
             for (original, backup) in items {
                 let _ = move_path(backup, original);
-                if let Some(name) = backup.file_name() {
-                    if let Some(parent) = backup.parent() {
-                        if let Some(grandparent) = parent.parent() {
-                            let info_file = grandparent
-                                .join("info")
-                                .join(format!("{}.trashinfo", name.to_string_lossy()));
-                            let _ = fs::remove_file(info_file);
-                        }
-                    }
+                if let Some(name) = backup.file_name()
+                    && let Some(parent) = backup.parent()
+                    && let Some(grandparent) = parent.parent()
+                {
+                    let info_file = grandparent
+                        .join("info")
+                        .join(format!("{}.trashinfo", name.to_string_lossy()));
+                    let _ = fs::remove_file(info_file);
                 }
             }
             Ok(())
@@ -314,6 +316,10 @@ pub struct DeleteOverlay {
     undo_stack: UndoStack,
 }
 
+#[expect(
+    dead_code,
+    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
+)]
 impl DeleteOverlay {
     pub fn new(current: CurrentItem, tx: RenderSender<MMAction>, undo_stack: UndoStack) -> Self {
         Self {
@@ -421,6 +427,10 @@ pub struct CreateOverlay {
     undo_stack: UndoStack,
 }
 
+#[expect(
+    dead_code,
+    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
+)]
 impl CreateOverlay {
     pub fn new(tx: RenderSender<MMAction>, undo_stack: UndoStack) -> Self {
         Self {
@@ -439,10 +449,10 @@ impl CreateOverlay {
         let result = if name.ends_with('/') {
             fs::create_dir_all(&name)
         } else {
-            if let Some(parent) = Path::new(&name).parent() {
-                if !parent.as_os_str().is_empty() {
-                    let _ = fs::create_dir_all(parent);
-                }
+            if let Some(parent) = Path::new(&name).parent()
+                && !parent.as_os_str().is_empty()
+            {
+                let _ = fs::create_dir_all(parent);
             }
             fs::File::create(&name).map(|_| ())
         };
@@ -552,6 +562,10 @@ pub struct RenameOverlay {
     undo_stack: UndoStack,
 }
 
+#[expect(
+    dead_code,
+    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
+)]
 impl RenameOverlay {
     pub fn new(current: CurrentItem, tx: RenderSender<MMAction>, undo_stack: UndoStack) -> Self {
         Self {
@@ -680,6 +694,10 @@ pub struct UnzipOverlay {
     tx: RenderSender<MMAction>,
 }
 
+#[expect(
+    dead_code,
+    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
+)]
 impl UnzipOverlay {
     pub fn new(current: CurrentItem, tx: RenderSender<MMAction>) -> Self {
         Self {

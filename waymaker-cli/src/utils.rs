@@ -293,7 +293,7 @@ pub fn guess_editor_cmd() -> &'static str {
                 return cmd;
             }
         }
-        return "echo";
+        "echo"
     }
 
     #[cfg(windows)]

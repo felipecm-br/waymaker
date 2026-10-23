@@ -213,7 +213,7 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
             if !p.exists() {
                 embedded = embedded_preset(&name);
                 if embedded.is_none() {
-                    anyhow::bail!(missing_preset_message(&name, &presets_path()));
+                    anyhow::bail!(missing_preset_message(&name, presets_path()));
                 }
                 log::debug!("Using built-in preset '{name}'");
             }
@@ -623,11 +623,11 @@ pub fn map_reader_batched(
                     line.pop();
                 }
 
-                if let Some(prefix) = &group_prefix {
-                    if line.starts_with(prefix) {
-                        current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
-                        continue;
-                    }
+                if let Some(prefix) = &group_prefix
+                    && line.starts_with(prefix)
+                {
+                    current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
+                    continue;
                 }
 
                 total += 1;
@@ -655,11 +655,11 @@ pub fn map_reader_batched(
                     }
                 }
 
-                if let Some(prefix) = &group_prefix {
-                    if line.starts_with(prefix) {
-                        current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
-                        continue;
-                    }
+                if let Some(prefix) = &group_prefix
+                    && line.starts_with(prefix)
+                {
+                    current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
+                    continue;
                 }
 
                 total += 1;
@@ -971,7 +971,7 @@ pub fn process_envs(mut envs: HashMap<String, EnvValue>) -> HashMap<String, Stri
     let mut processed_envs = HashMap::new();
 
     // todo: lowpri: should we provision this what is the cost of setting more env vars
-    if envs.get("CLIPcmd").is_none() {
+    if !envs.contains_key("CLIPcmd") {
         if let Some(v) = std::env::var("CLIPcmd").ok()
             && !v.is_empty()
         {
@@ -980,10 +980,8 @@ pub fn process_envs(mut envs: HashMap<String, EnvValue>) -> HashMap<String, Stri
             if let Some((clip, paste)) = guess_clip_cmd() {
                 envs.insert("CLIPcmd".to_string(), EnvValue::new(clip));
 
-                if envs.get("PASTEcmd").is_none()
-                    && std::env::var("PASTEcmd")
-                        .ok()
-                        .map_or(true, |x| x.is_empty())
+                if !envs.contains_key("PASTEcmd")
+                    && std::env::var("PASTEcmd").ok().is_none_or(|x| x.is_empty())
                 {
                     envs.insert("PASTEcmd".to_string(), EnvValue::new(paste));
                 }
@@ -991,38 +989,34 @@ pub fn process_envs(mut envs: HashMap<String, EnvValue>) -> HashMap<String, Stri
         }
     }
 
-    if envs.get("PAGER").is_none() && std::env::var("PAGER").ok().map_or(true, |x| x.is_empty()) {
+    if !envs.contains_key("PAGER") && std::env::var("PAGER").ok().is_none_or(|x| x.is_empty()) {
         let ev = EnvValue::new(guess_pager_cmd());
         envs.insert("PAGER".to_string(), ev);
     }
 
-    if envs.get("EDITOR").is_none() && std::env::var("EDITOR").ok().map_or(true, |x| x.is_empty()) {
+    if !envs.contains_key("EDITOR") && std::env::var("EDITOR").ok().is_none_or(|x| x.is_empty()) {
         let ev = EnvValue::new(guess_editor_cmd());
         envs.insert("EDITOR".to_string(), ev);
     }
 
     // First pass: static envs
     for (k, v) in &envs {
-        if !v.value.is_empty() && !v.exec {
-            if v.force || std::env::var_os(k).is_none() {
-                processed_envs.insert(k.clone(), v.value.to_string());
-            }
+        if !v.value.is_empty() && !v.exec && (v.force || std::env::var_os(k).is_none()) {
+            processed_envs.insert(k.clone(), v.value.to_string());
         }
     }
 
     // Second pass: dynamic envs
     for (k, v) in &envs {
-        if !v.value.is_empty() && v.exec {
-            if v.force || std::env::var_os(k).is_none() {
-                if let Some(output) = Command::from_script(&v.value)
-                    .envs(&processed_envs)
-                    .read_to_string()
-                    ._elog()
-                {
-                    processed_envs.insert(k.clone(), output.trim().to_string());
-                } else {
-                    _wbog!("Failed to execute env command for {}: {}", k, v.value);
-                }
+        if !v.value.is_empty() && v.exec && (v.force || std::env::var_os(k).is_none()) {
+            if let Some(output) = Command::from_script(&v.value)
+                .envs(&processed_envs)
+                .read_to_string()
+                ._elog()
+            {
+                processed_envs.insert(k.clone(), output.trim().to_string());
+            } else {
+                _wbog!("Failed to execute env command for {}: {}", k, v.value);
             }
         }
     }
@@ -1095,22 +1089,20 @@ pub async fn start(
     }
 
     // -------- determine command ------------
-    if let Some(first) = additional_commands.first_mut() {
-        if first.is_empty() {
-            *first = command.clone();
-        }
+    if let Some(first) = additional_commands.first_mut()
+        && first.is_empty()
+    {
+        *first = command.clone();
     }
     let additional_commands = additional_commands;
 
     let mut initial_index = 0;
-    if additional_commands.len() > 1 {
-        if let Ok(index_str) = std::env::var("WM_INDEX").or_else(|_| std::env::var("MM_INDEX")) {
-            if let Ok(index) = index_str.parse::<usize>() {
-                if index < additional_commands.len() {
-                    initial_index = index;
-                }
-            }
-        }
+    if additional_commands.len() > 1
+        && let Ok(index_str) = std::env::var("WM_INDEX").or_else(|_| std::env::var("MM_INDEX"))
+        && let Ok(index) = index_str.parse::<usize>()
+        && index < additional_commands.len()
+    {
+        initial_index = index;
     }
 
     let command = if initial_index > 0 {
@@ -1119,9 +1111,11 @@ pub async fn start(
         command
     };
 
-    let initial_cmd = (!command.is_empty() && std::io::stdin().is_terminal() || no_read)
-        .then_some(command.clone())
-        .unwrap_or_default();
+    let initial_cmd = if !command.is_empty() && std::io::stdin().is_terminal() || no_read {
+        command.clone()
+    } else {
+        String::new()
+    };
 
     // -------- set envs/directory -----------
     if !additional_commands.is_empty() {
@@ -1336,13 +1330,13 @@ pub async fn start(
             return;
         }
 
-        if path.starts_with("~/") || path == "~" {
-            if let Ok(home) = std::env::var("HOME") {
-                if path == "~" {
-                    path = home;
-                } else {
-                    path = format!("{home}/{}", &path[2..]);
-                }
+        if (path.starts_with("~/") || path == "~")
+            && let Ok(home) = std::env::var("HOME")
+        {
+            if path == "~" {
+                path = home;
+            } else {
+                path = format!("{home}/{}", &path[2..]);
             }
         }
 
@@ -1364,43 +1358,43 @@ pub async fn start(
         let mut target_to_select = TARGET_ITEM.lock().unwrap().clone();
         if target_to_select.is_none() {
             if target_path == Path::new("..") || path == ".." {
-                if let Ok(cwd) = std::env::current_dir() {
-                    if let Some(name) = cwd.file_name() {
-                        target_to_select = Some(name.to_string_lossy().to_string());
-                    }
+                if let Ok(cwd) = std::env::current_dir()
+                    && let Some(name) = cwd.file_name()
+                {
+                    target_to_select = Some(name.to_string_lossy().to_string());
                 }
-            } else if let Ok(cwd) = std::env::current_dir() {
-                if cwd.parent() == Some(&target_dir) {
-                    if let Some(name) = cwd.file_name() {
-                        target_to_select = Some(name.to_string_lossy().to_string());
-                    }
-                }
+            } else if let Ok(cwd) = std::env::current_dir()
+                && cwd.parent() == Some(&target_dir)
+                && let Some(name) = cwd.file_name()
+            {
+                target_to_select = Some(name.to_string_lossy().to_string());
             }
         }
 
         let mut old_cwd = None;
-        if state.ui.config.nav.active {
-            if let Ok(cwd) = std::env::current_dir() {
-                history.insert(cwd.clone(), state.picker_ui.query.input.clone());
+        if state.ui.config.nav.active
+            && let Ok(cwd) = std::env::current_dir()
+        {
+            history.insert(cwd.clone(), state.picker_ui.query.input.clone());
 
-                // Save old_cwd items in speculative cache so returning to parent is instant
-                let items: Vec<String> = state
-                    .picker_ui
-                    .worker
-                    .raw_results()
-                    .map(|item| state.picker_ui.worker.columns[0].raw(item).into_owned())
-                    .collect();
-                if state.picker_ui.results.mode_index == 0 && !items.is_empty() {
-                    if let Ok(mut c) = spec_cache_chdir.lock() {
-                        if c.len() >= 64 {
-                            c.clear();
-                        }
-                        c.insert(cwd.clone(), items);
-                    }
+            // Save old_cwd items in speculative cache so returning to parent is instant
+            let items: Vec<String> = state
+                .picker_ui
+                .worker
+                .raw_results()
+                .map(|item| state.picker_ui.worker.columns[0].raw(item).into_owned())
+                .collect();
+            if state.picker_ui.results.mode_index == 0
+                && !items.is_empty()
+                && let Ok(mut c) = spec_cache_chdir.lock()
+            {
+                if c.len() >= 64 {
+                    c.clear();
                 }
-
-                old_cwd = Some(cwd);
+                c.insert(cwd.clone(), items);
             }
+
+            old_cwd = Some(cwd);
         }
 
         log::debug!("ChDir: {}", target_dir.display());
@@ -1435,7 +1429,7 @@ pub async fn start(
                     ));
                     let is_parent = old_cwd
                         .as_ref()
-                        .map_or(false, |old| old.starts_with(&new_cwd) && old != &new_cwd);
+                        .is_some_and(|old| old.starts_with(&new_cwd) && old != &new_cwd);
                     if is_parent {
                         if let Some(saved) = history.remove(&new_cwd) {
                             state.picker_ui.query.set(Some(saved), 0);
@@ -1501,19 +1495,16 @@ pub async fn start(
                     }
                     if let Ok(preset_config) =
                         load_type::<PartialConfig, _>(&preset_path, |s| toml::from_str(s))
+                        && let Some(cmd_setting) = preset_config.start.command.default.as_ref()
+                        && !cmd_setting.command.is_empty()
                     {
-                        if let Some(ref cmd_setting) = preset_config.start.command.default.as_ref()
-                        {
-                            if !cmd_setting.command.is_empty() {
-                                active_cmd = cmd_setting.command.clone();
-                            }
-                        }
-                    }
-                }
-                if let Some(ref cmd_setting) = rule.override_config.start.command.default {
-                    if !cmd_setting.command.is_empty() {
                         active_cmd = cmd_setting.command.clone();
                     }
+                }
+                if let Some(ref cmd_setting) = rule.override_config.start.command.default
+                    && !cmd_setting.command.is_empty()
+                {
+                    active_cmd = cmd_setting.command.clone();
                 }
             }
         }
@@ -1557,7 +1548,7 @@ pub async fn start(
                         let text = String::from_utf8_lossy(&out.stdout);
                         let mut l: Vec<String> =
                             text.split(spec_sep).map(|s| s.to_string()).collect();
-                        if l.last().map_or(false, |line| line.is_empty()) {
+                        if l.last().is_some_and(|line| line.is_empty()) {
                             l.pop();
                         }
                         Some(l)
@@ -1565,13 +1556,13 @@ pub async fn start(
                         None
                     };
 
-                    if let Some(lines) = lines {
-                        if let Ok(mut c) = cache_ref.lock() {
-                            if c.len() >= 64 {
-                                c.clear();
-                            }
-                            c.insert(target_dir, lines);
+                    if let Some(lines) = lines
+                        && let Ok(mut c) = cache_ref.lock()
+                    {
+                        if c.len() >= 64 {
+                            c.clear();
                         }
+                        c.insert(target_dir, lines);
                     }
                 });
             }
@@ -1624,7 +1615,7 @@ pub async fn start(
             let injector = state.injector();
             let injector = IndexedInjector::new_globally_indexed(injector);
             let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess.clone());
+            let injector = AnsiInjector::new(injector, preprocess);
 
             let mut push_fn = inject_line(
                 state.picker_ui.header.config.header_lines,
@@ -1651,7 +1642,7 @@ pub async fn start(
             let injector = state.injector();
             let injector = IndexedInjector::new_globally_indexed(injector);
             let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess.clone());
+            let injector = AnsiInjector::new(injector, preprocess);
 
             let mut push_fn = inject_line(
                 state.picker_ui.header.config.header_lines,
@@ -1699,38 +1690,35 @@ pub async fn start(
             state.picker_ui.worker.set_mode_index(0);
             let cwd_str = current_dir.to_string_lossy().to_string();
 
-            if state.payload().is_empty() {
-                if let Ok(mut cache) = spec_cache_reload.lock() {
-                    if let Some(lines) = cache.remove(&current_dir) {
-                        debug!("Speculative Cache HIT for {current_dir:?}");
-                        state.picker_ui.worker.restart(false);
-                        state.reloading = true;
+            if state.payload().is_empty()
+                && let Ok(mut cache) = spec_cache_reload.lock()
+                && let Some(lines) = cache.remove(&current_dir)
+            {
+                debug!("Speculative Cache HIT for {current_dir:?}");
+                state.picker_ui.worker.restart(false);
+                state.reloading = true;
 
-                        let injector = state.injector();
-                        let injector = IndexedInjector::new_globally_indexed(injector);
-                        let injector = SegmentedInjector::new(injector, splitter.clone());
-                        let injector = AnsiInjector::new(injector, preprocess.clone());
+                let injector = state.injector();
+                let injector = IndexedInjector::new_globally_indexed(injector);
+                let injector = SegmentedInjector::new(injector, splitter.clone());
+                let injector = AnsiInjector::new(injector, preprocess);
 
-                        let mut push_fn = inject_line(
-                            state.picker_ui.header.config.header_lines,
-                            reload_render_tx.clone(),
-                            injector,
-                            group_prefix.clone(),
-                        );
+                let mut push_fn = inject_line(
+                    state.picker_ui.header.config.header_lines,
+                    reload_render_tx.clone(),
+                    injector,
+                    group_prefix.clone(),
+                );
 
-                        state.picker_ui.selector.clear();
-                        for line in lines {
-                            let _ = push_fn(line);
-                        }
-
-                        let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                            waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(
-                                vec![],
-                            )),
-                        ));
-                        return;
-                    }
+                state.picker_ui.selector.clear();
+                for line in lines {
+                    let _ = push_fn(line);
                 }
+
+                let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
+                    waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
+                ));
+                return;
             }
 
             let ignored_set: std::collections::HashSet<String> = walker_config_reload
@@ -1757,7 +1745,7 @@ pub async fn start(
                 let injector = state.injector();
                 let injector = IndexedInjector::new_globally_indexed(injector);
                 let injector = SegmentedInjector::new(injector, splitter.clone());
-                let injector = AnsiInjector::new(injector, preprocess.clone());
+                let injector = AnsiInjector::new(injector, preprocess);
 
                 let mut push_fn = inject_line(
                     state.picker_ui.header.config.header_lines,
@@ -1813,7 +1801,7 @@ pub async fn start(
             let injector = state.injector();
             let injector = IndexedInjector::new_globally_indexed(injector);
             let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess.clone());
+            let injector = AnsiInjector::new(injector, preprocess);
 
             let mut push_fn = inject_line(
                 state.picker_ui.header.config.header_lines,
@@ -1874,7 +1862,7 @@ pub async fn start(
             let injector = state.injector();
             let injector = IndexedInjector::new_globally_indexed(injector);
             let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess.clone());
+            let injector = AnsiInjector::new(injector, preprocess);
 
             let push_fn = inject_line(
                 state.picker_ui.header.config.header_lines,
@@ -2217,7 +2205,7 @@ pub async fn start(
             })
         }
     } else if !command.is_empty() {
-        let mut cmd_builder = if let Some(ref sh) = shell.as_ref()
+        let mut cmd_builder = if let Some(sh) = shell.as_ref()
             && !sh.is_empty()
         {
             let mut iter = sh.iter();
@@ -2279,11 +2267,11 @@ fn inject_line(
 
     // For each row, take the first line of each segmented column, building a Vec<Vec<Line>>
     move |line: String| {
-        if let Some(prefix) = &group_prefix {
-            if line.starts_with(prefix) {
-                current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
-                return Ok(());
-            }
+        if let Some(prefix) = &group_prefix
+            && line.starts_with(prefix)
+        {
+            current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
+            return Ok(());
         }
 
         if remaining > 0 {
@@ -2347,9 +2335,9 @@ pub fn is_target_item_match(val: &str, target: &str, is_local_mode: bool) -> boo
     let val_trimmed = val.trim_end_matches('/');
     let val_is_abs = val_trimmed.starts_with('/') || val_trimmed.starts_with('\\');
     let target_is_abs = target_trimmed.starts_with('/') || target_trimmed.starts_with('\\');
-    if val_trimmed == target_trimmed {
-        true
-    } else if val_trimmed.trim_start_matches("./") == target_trimmed.trim_start_matches("./") {
+    if val_trimmed == target_trimmed
+        || val_trimmed.trim_start_matches("./") == target_trimmed.trim_start_matches("./")
+    {
         true
     } else if val_is_abs && target_is_abs {
         false

@@ -174,7 +174,9 @@ pub fn render_markdown_file_with_diagram_offsets(
 /// 1. Explicit `WM_INLINE_IMAGES` (or legacy `MM_INLINE_IMAGES`) environment variable override ("0"/"1", etc.).
 /// 2. `opts_inline_images && is_kitty_terminal_supported()`.
 pub fn is_inline_images_enabled(opts_inline_images: bool) -> bool {
-    if let Ok(val) = std::env::var("WM_INLINE_IMAGES").or_else(|_| std::env::var("MM_INLINE_IMAGES")) {
+    if let Ok(val) =
+        std::env::var("WM_INLINE_IMAGES").or_else(|_| std::env::var("MM_INLINE_IMAGES"))
+    {
         let v = val.trim();
         if v == "0"
             || v.eq_ignore_ascii_case("false")
@@ -222,14 +224,14 @@ fn url_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(hex) = std::str::from_utf8(&bytes[i + 1..i + 3]) {
-                if let Ok(byte) = u8::from_str_radix(hex, 16) {
-                    result.push(byte);
-                    i += 3;
-                    continue;
-                }
-            }
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let Ok(hex) = std::str::from_utf8(&bytes[i + 1..i + 3])
+            && let Ok(byte) = u8::from_str_radix(hex, 16)
+        {
+            result.push(byte);
+            i += 3;
+            continue;
         }
         result.push(bytes[i]);
         i += 1;
@@ -338,9 +340,10 @@ pub fn render_image_to_unicode_placeholders(
 
     // 1. Compute terminal metrics and dimensions
     let (cell_w, cell_h) = match crossterm::terminal::window_size() {
-        Ok(ws) if ws.columns > 0 && ws.rows > 0 && ws.width > 0 && ws.height > 0 => {
-            (ws.width as f32 / ws.columns as f32, ws.height as f32 / ws.rows as f32)
-        }
+        Ok(ws) if ws.columns > 0 && ws.rows > 0 && ws.width > 0 && ws.height > 0 => (
+            ws.width as f32 / ws.columns as f32,
+            ws.height as f32 / ws.rows as f32,
+        ),
         _ => (10.0, 20.0),
     };
     let cell_w = if cell_w > 0.0 { cell_w } else { 10.0 };
@@ -401,12 +404,12 @@ pub fn render_image_to_unicode_placeholders(
     };
 
     // 2. Check LRU cache first
-    if let Ok(mut cache) = IMAGE_PLACEHOLDER_CACHE.lock() {
-        if let Some((_, item)) = cache.shift_remove_entry(&cache_key) {
-            let cloned = item.clone();
-            cache.insert(cache_key, item);
-            return Some(cloned);
-        }
+    if let Ok(mut cache) = IMAGE_PLACEHOLDER_CACHE.lock()
+        && let Some((_, item)) = cache.shift_remove_entry(&cache_key)
+    {
+        let cloned = item.clone();
+        cache.insert(cache_key, item);
+        return Some(cloned);
     }
 
     // 3. Load image
@@ -419,7 +422,9 @@ pub fn render_image_to_unicode_placeholders(
             image::load_from_memory(&bytes).ok()?
         }
     } else {
-        let resolved = resolved_path.as_deref().unwrap_or_else(|| Path::new(&cache_key.path_or_data));
+        let resolved = resolved_path
+            .as_deref()
+            .unwrap_or_else(|| Path::new(&cache_key.path_or_data));
         let is_svg = resolved
             .extension()
             .and_then(|ext| ext.to_str())
@@ -454,7 +459,11 @@ pub fn render_image_to_unicode_placeholders(
     let target_pixel_w = (cols * 24).clamp(64, 1920);
     let target_pixel_h = (rows * 48).clamp(64, 1920);
     let img = if img.width() > target_pixel_w || img.height() > target_pixel_h {
-        img.resize(target_pixel_w, target_pixel_h, image::imageops::FilterType::Triangle)
+        img.resize(
+            target_pixel_w,
+            target_pixel_h,
+            image::imageops::FilterType::Triangle,
+        )
     } else {
         img
     };
@@ -464,26 +473,18 @@ pub fn render_image_to_unicode_placeholders(
     img.write_to(
         &mut std::io::Cursor::new(&mut png_bytes),
         image::ImageFormat::Png,
-    ).ok()?;
+    )
+    .ok()?;
 
     // 6. Generate distinct image ID
     let image_id = crate::utils::mermaid::next_diagram_image_id();
 
     // 7. Build transmission sequence
-    let transmission = crate::utils::mermaid::encode_kitty_unicode_transmission(
-        &png_bytes,
-        image_id,
-        cols,
-        rows,
-    );
+    let transmission =
+        crate::utils::mermaid::encode_kitty_unicode_transmission(&png_bytes, image_id, cols, rows);
 
     // 8. Generate placeholder lines
-    let lines = crate::utils::mermaid::create_unicode_placeholder_lines(
-        image_id,
-        cols,
-        rows,
-        0,
-    );
+    let lines = crate::utils::mermaid::create_unicode_placeholder_lines(image_id, cols, rows, 0);
 
     let result = KittyPlaceholderImage {
         image_id,
@@ -686,54 +687,54 @@ impl<'a> MarkdownRenderer<'a> {
         let spans = std::mem::take(&mut self.current_line);
         let continuation = self.list_continuation_indent;
 
-            if let Some(mw) = self.opts.max_width {
-                let quote_overhead = self.blockquote_depth * 2;
-                let effective_width = mw.saturating_sub(quote_overhead);
-                if effective_width >= 10 {
-                    let wrapped_groups = wrap_spans_to_lines(spans, effective_width, continuation);
-                    for group in wrapped_groups {
-                        if self.blockquote_depth > 0 {
-                            let quote_prefix = Span::styled(
-                                "▌ ".repeat(self.blockquote_depth),
-                                Style::default().fg(Color::Cyan),
-                            );
-                            let mut full = vec![quote_prefix];
-                            full.extend(group);
-                            self.lines.push(Line::from(full));
-                        } else {
-                            self.lines.push(Line::from(group));
-                        }
+        if let Some(mw) = self.opts.max_width {
+            let quote_overhead = self.blockquote_depth * 2;
+            let effective_width = mw.saturating_sub(quote_overhead);
+            if effective_width >= 10 {
+                let wrapped_groups = wrap_spans_to_lines(spans, effective_width, continuation);
+                for group in wrapped_groups {
+                    if self.blockquote_depth > 0 {
+                        let quote_prefix = Span::styled(
+                            "▌ ".repeat(self.blockquote_depth),
+                            Style::default().fg(Color::Cyan),
+                        );
+                        let mut full = vec![quote_prefix];
+                        full.extend(group);
+                        self.lines.push(Line::from(full));
+                    } else {
+                        self.lines.push(Line::from(group));
                     }
-                    return;
                 }
+                return;
             }
+        }
 
+        if self.blockquote_depth > 0 {
+            let quote_prefix = Span::styled(
+                "▌ ".repeat(self.blockquote_depth),
+                Style::default().fg(Color::Cyan),
+            );
+            let mut full_spans = vec![quote_prefix];
+            full_spans.extend(spans);
+            self.lines.push(Line::from(full_spans));
+        } else {
+            self.lines.push(Line::from(spans));
+        }
+    }
+
+    fn ensure_blank_line(&mut self) {
+        self.flush_line();
+        if let Some(last) = self.lines.last()
+            && !is_line_blank(last)
+        {
             if self.blockquote_depth > 0 {
                 let quote_prefix = Span::styled(
                     "▌ ".repeat(self.blockquote_depth),
                     Style::default().fg(Color::Cyan),
                 );
-                let mut full_spans = vec![quote_prefix];
-                full_spans.extend(spans);
-                self.lines.push(Line::from(full_spans));
+                self.lines.push(Line::from(vec![quote_prefix]));
             } else {
-                self.lines.push(Line::from(spans));
-            }
-    }
-
-    fn ensure_blank_line(&mut self) {
-        self.flush_line();
-        if let Some(last) = self.lines.last() {
-            if !is_line_blank(last) {
-                if self.blockquote_depth > 0 {
-                    let quote_prefix = Span::styled(
-                        "▌ ".repeat(self.blockquote_depth),
-                        Style::default().fg(Color::Cyan),
-                    );
-                    self.lines.push(Line::from(vec![quote_prefix]));
-                } else {
-                    self.lines.push(Line::default());
-                }
+                self.lines.push(Line::default());
             }
         }
     }
@@ -875,10 +876,8 @@ impl<'a> MarkdownRenderer<'a> {
 
     fn handle_start_tag(&mut self, tag: Tag) {
         match tag {
-            Tag::Paragraph => {
-                if self.pending_item_prefix.is_none() {
-                    self.ensure_blank_line();
-                }
+            Tag::Paragraph if self.pending_item_prefix.is_none() => {
+                self.ensure_blank_line();
             }
             Tag::Heading { level, .. } => {
                 self.ensure_blank_line();
@@ -1046,53 +1045,53 @@ impl<'a> MarkdownRenderer<'a> {
                 let alt = std::mem::take(&mut self.current_image_alt);
 
                 let use_inline = is_inline_images_enabled(self.opts.inline_images);
-                if use_inline {
-                    if let Some(img) = render_image_to_unicode_placeholders(
+                if use_inline
+                    && let Some(img) = render_image_to_unicode_placeholders(
                         &url,
                         self.opts.base_path.as_deref(),
                         self.opts.max_width,
-                    ) {
-                        self.flush_line();
-                        self.transmissions.push((img.image_id, img.transmission));
-                        self.ensure_blank_line();
+                    )
+                {
+                    self.flush_line();
+                    self.transmissions.push((img.image_id, img.transmission));
+                    self.ensure_blank_line();
 
-                        let opt_pending = self.pending_item_prefix.take();
-                        let depth = self.list_stack.len().saturating_sub(1);
-                        let base_indent = if opt_pending.is_some() || depth > 0 {
-                            depth * 2
-                        } else {
-                            0
-                        };
+                    let opt_pending = self.pending_item_prefix.take();
+                    let depth = self.list_stack.len().saturating_sub(1);
+                    let base_indent = if opt_pending.is_some() || depth > 0 {
+                        depth * 2
+                    } else {
+                        0
+                    };
 
-                        for (idx, line) in img.lines.into_iter().enumerate() {
-                            let mut spans = Vec::new();
-                            if self.blockquote_depth > 0 {
-                                spans.push(Span::styled(
-                                    "▌ ".repeat(self.blockquote_depth),
-                                    Style::default().fg(Color::Cyan),
-                                ));
-                            }
-
-                            if let Some((_, ref bullet)) = opt_pending {
-                                if idx == 0 {
-                                    if base_indent > 0 {
-                                        spans.push(Span::raw(" ".repeat(base_indent)));
-                                    }
-                                    spans.push(bullet.clone());
-                                } else {
-                                    let bullet_w = UnicodeWidthStr::width(bullet.content.as_ref());
-                                    spans.push(Span::raw(" ".repeat(base_indent + bullet_w)));
-                                }
-                            } else if base_indent > 0 {
-                                spans.push(Span::raw(" ".repeat(base_indent)));
-                            }
-
-                            spans.extend(line.spans);
-                            self.lines.push(Line::from(spans));
+                    for (idx, line) in img.lines.into_iter().enumerate() {
+                        let mut spans = Vec::new();
+                        if self.blockquote_depth > 0 {
+                            spans.push(Span::styled(
+                                "▌ ".repeat(self.blockquote_depth),
+                                Style::default().fg(Color::Cyan),
+                            ));
                         }
-                        self.lines.push(Line::default());
-                        return;
+
+                        if let Some((_, ref bullet)) = opt_pending {
+                            if idx == 0 {
+                                if base_indent > 0 {
+                                    spans.push(Span::raw(" ".repeat(base_indent)));
+                                }
+                                spans.push(bullet.clone());
+                            } else {
+                                let bullet_w = UnicodeWidthStr::width(bullet.content.as_ref());
+                                spans.push(Span::raw(" ".repeat(base_indent + bullet_w)));
+                            }
+                        } else if base_indent > 0 {
+                            spans.push(Span::raw(" ".repeat(base_indent)));
+                        }
+
+                        spans.extend(line.spans);
+                        self.lines.push(Line::from(spans));
                     }
+                    self.lines.push(Line::default());
+                    return;
                 }
 
                 self.ensure_pending_prefix();
@@ -1115,22 +1114,22 @@ impl<'a> MarkdownRenderer<'a> {
                 let use_inline = (self.opts.inline_diagrams || self.opts.mermaid_image)
                     && !self.opts.mermaid_ascii
                     && is_kitty_supported();
-                if use_inline {
-                    if let Some(diag) = render_mermaid_to_unicode_placeholders_with_options(
+                if use_inline
+                    && let Some(diag) = render_mermaid_to_unicode_placeholders_with_options(
                         &buffer,
                         self.opts.max_width,
                         self.opts.diagram_theme,
                         self.opts.diagram_background,
-                    ) {
-                        self.transmissions.push((diag.image_id, diag.transmission));
-                        self.ensure_blank_line();
-                        self.diagram_offsets.push(self.lines.len());
-                        for line in diag.lines {
-                            self.lines.push(line);
-                        }
-                        self.lines.push(Line::default());
-                        return;
+                    )
+                {
+                    self.transmissions.push((diag.image_id, diag.transmission));
+                    self.ensure_blank_line();
+                    self.diagram_offsets.push(self.lines.len());
+                    for line in diag.lines {
+                        self.lines.push(line);
                     }
+                    self.lines.push(Line::default());
+                    return;
                 }
                 let mermaid_opts = MermaidOptions {
                     max_width: self.opts.max_width,
@@ -1337,7 +1336,11 @@ impl<'a> MarkdownRenderer<'a> {
 
     fn finish_with_transmissions(mut self) -> (Text<'static>, Vec<usize>, Vec<(u32, String)>) {
         self.flush_line();
-        (Text::from(self.lines), self.diagram_offsets, self.transmissions)
+        (
+            Text::from(self.lines),
+            self.diagram_offsets,
+            self.transmissions,
+        )
     }
 }
 
@@ -1728,16 +1731,26 @@ graph LR
             }
         }
 
-        assert!(!offsets.is_empty(), "Offsets must record the diagram position");
-        assert!(!transmissions.is_empty(), "Transmissions must be emitted for inline diagram");
-        assert!(transmissions[0].1.contains("U=1"), "Transmission must be Kitty Unicode placeholder format");
+        assert!(
+            !offsets.is_empty(),
+            "Offsets must record the diagram position"
+        );
+        assert!(
+            !transmissions.is_empty(),
+            "Transmissions must be emitted for inline diagram"
+        );
+        assert!(
+            transmissions[0].1.contains("U=1"),
+            "Transmission must be Kitty Unicode placeholder format"
+        );
 
         let rendered_str = format!("{text:?}");
         println!("rendered_str = {rendered_str}");
-        let found_in_spans = text
-            .lines
-            .iter()
-            .any(|l| l.spans.iter().any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER)));
+        let found_in_spans = text.lines.iter().any(|l| {
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
+        });
         assert!(
             !rendered_str.contains("inline diagram"),
             "Rendered text must NOT contain artificial inline diagram banner"
@@ -1808,7 +1821,10 @@ graph TD
         }
         img_buf.save(&img_path).unwrap();
 
-        let md = format!("# Document\n\n![Test Image]({})\n\nAfter image", img_path.display());
+        let md = format!(
+            "# Document\n\n![Test Image]({})\n\nAfter image",
+            img_path.display()
+        );
         let opts = MarkdownOptions {
             inline_images: true,
             max_width: Some(60),
@@ -1818,7 +1834,9 @@ graph TD
         let text = render_markdown(&md, &opts);
 
         let found_placeholder = text.lines.iter().any(|l| {
-            l.spans.iter().any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
         });
 
         let ansi = render_markdown_ansi(&md, &opts);
@@ -1882,16 +1900,26 @@ graph TD
         // 1. First render: loads from disk, caches in LRU
         let (text1, _) = render_markdown_file_with_diagram_offsets(&md_file, &opts).unwrap();
         let placeholder1 = text1.lines.iter().find(|l| {
-            l.spans.iter().any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
         });
-        assert!(placeholder1.is_some(), "Relative image must be found and rendered inline");
+        assert!(
+            placeholder1.is_some(),
+            "Relative image must be found and rendered inline"
+        );
 
         // 2. Second render: must hit LRU cache with same image ID
         let (text2, _) = render_markdown_file_with_diagram_offsets(&md_file, &opts).unwrap();
         let placeholder2 = text2.lines.iter().find(|l| {
-            l.spans.iter().any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
         });
-        assert!(placeholder2.is_some(), "Second render must also succeed from LRU cache");
+        assert!(
+            placeholder2.is_some(),
+            "Second render must also succeed from LRU cache"
+        );
 
         unsafe {
             match prev {
@@ -1973,7 +2001,9 @@ graph TD
         };
         let text = render_markdown(md, &opts);
         let has_placeholder = text.lines.iter().any(|l| {
-            l.spans.iter().any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
         });
 
         unsafe {
@@ -2021,7 +2051,9 @@ graph TD
         };
         let text = render_markdown(&md, &opts);
         let has_placeholder = text.lines.iter().any(|l| {
-            l.spans.iter().any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
         });
 
         unsafe {
@@ -2057,7 +2089,10 @@ graph TD
         }
         img_buf.save(&img_path).unwrap();
 
-        let md = format!("![Photo]({})\n\n```mermaid\ngraph TD;\nA-->B;\n```", img_path.display());
+        let md = format!(
+            "![Photo]({})\n\n```mermaid\ngraph TD;\nA-->B;\n```",
+            img_path.display()
+        );
 
         // inline_images = false, inline_diagrams = true
         let opts = MarkdownOptions {
@@ -2092,7 +2127,9 @@ graph TD
         );
         // Diagram MUST still have placeholder lines
         let has_diagram_placeholder = text.lines.iter().any(|l| {
-            l.spans.iter().any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
         });
         assert!(
             has_diagram_placeholder,
@@ -2120,15 +2157,24 @@ graph TD
             std::env::set_var("WM_INLINE_IMAGES", "1");
             std::env::set_var("WM_INLINE_DIAGRAMS", "0");
         }
-        assert!(is_inline_images_enabled(false), "WM_INLINE_IMAGES=1 must force enable images even if opts.inline_images=false");
-        assert!(is_inline_images_enabled(true), "WM_INLINE_IMAGES=1 must force enable images even if WM_INLINE_DIAGRAMS=0");
+        assert!(
+            is_inline_images_enabled(false),
+            "WM_INLINE_IMAGES=1 must force enable images even if opts.inline_images=false"
+        );
+        assert!(
+            is_inline_images_enabled(true),
+            "WM_INLINE_IMAGES=1 must force enable images even if WM_INLINE_DIAGRAMS=0"
+        );
 
         // 2. WM_INLINE_IMAGES=0 forces disabled regardless of opts
         unsafe {
             std::env::set_var("WM_INLINE_IMAGES", "0");
             std::env::set_var("WM_INLINE_DIAGRAMS", "1");
         }
-        assert!(!is_inline_images_enabled(true), "WM_INLINE_IMAGES=0 must force disable images even if opts.inline_images=true and diagrams=1");
+        assert!(
+            !is_inline_images_enabled(true),
+            "WM_INLINE_IMAGES=0 must force disable images even if opts.inline_images=true and diagrams=1"
+        );
 
         // 3. Fallback to MM_INLINE_IMAGES=1
         unsafe {
@@ -2136,7 +2182,10 @@ graph TD
             std::env::set_var("MM_INLINE_IMAGES", "1");
             std::env::set_var("MM_INLINE_DIAGRAMS", "0");
         }
-        assert!(is_inline_images_enabled(false), "MM_INLINE_IMAGES=1 fallback must force enable images");
+        assert!(
+            is_inline_images_enabled(false),
+            "MM_INLINE_IMAGES=1 fallback must force enable images"
+        );
 
         // 4. WM_INLINE_DIAGRAMS=0 must NOT disable images if terminal supports it
         unsafe {
@@ -2144,7 +2193,10 @@ graph TD
             std::env::set_var("WM_INLINE_DIAGRAMS", "0");
         }
         if super::super::mermaid::is_kitty_terminal_supported() {
-            assert!(is_inline_images_enabled(true), "WM_INLINE_DIAGRAMS=0 must not affect inline images when terminal is supported");
+            assert!(
+                is_inline_images_enabled(true),
+                "WM_INLINE_DIAGRAMS=0 must not affect inline images when terminal is supported"
+            );
         }
 
         unsafe {
@@ -2204,7 +2256,10 @@ graph TD
         for line in &text.lines {
             let line_str: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
             let trimmed = line_str.trim();
-            assert_ne!(trimmed, "•", "List item image must not produce an isolated orphan bullet line");
+            assert_ne!(
+                trimmed, "•",
+                "List item image must not produce an isolated orphan bullet line"
+            );
         }
     }
 
@@ -2281,7 +2336,9 @@ graph TD
         };
         let text = render_markdown(&md, &opts);
         let has_placeholder = text.lines.iter().any(|l| {
-            l.spans.iter().any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(super::super::mermaid::PLACEHOLDER))
         });
 
         unsafe {
@@ -2297,4 +2354,3 @@ graph TD
         );
     }
 }
-

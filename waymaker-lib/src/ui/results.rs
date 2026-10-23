@@ -163,7 +163,7 @@ impl ResultsUI {
             let abs_index = self.bottom + self.cursor as u32;
             let end = self.end();
             let index = abs_index.min(end);
-            if index < self.bottom as u32 || index >= self.bottom + self.height as u32 {
+            if index < self.bottom || index >= self.bottom + self.height as u32 {
                 self.bottom = (end + 1).saturating_sub(self.height as u32).min(index);
             }
             self.cursor = (index - self.bottom) as u16;
@@ -273,7 +273,7 @@ impl ResultsUI {
             self.bottom = 0;
             self.cursor = index as u16;
         } else {
-            if index < self.bottom as u32 || index >= self.bottom + self.height as u32 {
+            if index < self.bottom || index >= self.bottom + self.height as u32 {
                 self.bottom = (end + 1)
                     .saturating_sub(self.height as u32) // don't exceed the first item of the last self.height items
                     .min(index);

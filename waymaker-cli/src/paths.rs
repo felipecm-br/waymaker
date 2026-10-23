@@ -22,11 +22,7 @@ fn config_dir_impl() -> Option<PathBuf> {
             p
         } else {
             let legacy = x.join("matchmaker");
-            if legacy.exists() {
-                legacy
-            } else {
-                p
-            }
+            if legacy.exists() { legacy } else { p }
         }
     })
 }
@@ -63,7 +59,7 @@ expr_as_path_fn!(
     presets_path,
     default_config_path()
         .parent()
-        .unwrap_or(&std::path::Path::new(""))
+        .unwrap_or(std::path::Path::new(""))
         .join("presets")
 );
 
@@ -81,7 +77,10 @@ mod tests {
     fn test_paths_resolution() {
         let state = state_dir();
         assert!(!state.as_os_str().is_empty());
-        assert!(state.to_string_lossy().contains(LIBRARY_FULL) || state.to_string_lossy().contains("matchmaker"));
+        assert!(
+            state.to_string_lossy().contains(LIBRARY_FULL)
+                || state.to_string_lossy().contains("matchmaker")
+        );
 
         let last_key = last_key_path();
         assert!(last_key.ends_with("last_key"));

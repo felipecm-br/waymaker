@@ -1,12 +1,12 @@
 use cba::bath::shell_quote_impl;
 use cba::unwrap;
+use std::borrow::Cow;
 use waymaker::nucleo::Indexed;
 use waymaker::render::MMState;
 use waymaker::{ConfigMMInnerItem, ConfigMMItem};
-use std::borrow::Cow;
 
 thread_local! {
-    pub static COLUMN_INDICES: std::cell::RefCell<bool>  = std::cell::RefCell::new(true);
+    pub static COLUMN_INDICES: std::cell::RefCell<bool>  = const { std::cell::RefCell::new(true) };
 }
 
 type ConfigMMState<'a, 'b> = MMState<'a, 'b, ConfigMMItem, ConfigMMInnerItem>;
@@ -17,10 +17,11 @@ fn is_valid_key(s: &str) -> bool {
         return true;
     }
 
-    if let Some(num) = body.strip_prefix('$') {
-        if num.chars().all(|c| c.is_ascii_digit()) && !num.is_empty() {
-            return true;
-        }
+    if let Some(num) = body.strip_prefix('$')
+        && num.chars().all(|c| c.is_ascii_digit())
+        && !num.is_empty()
+    {
+        return true;
     }
 
     body.chars().all(|c| c.is_alphanumeric())
@@ -68,12 +69,12 @@ impl TemplateAST {
 
         'outer: while let Some((_, c)) = chars.next() {
             if c == '\\' {
-                if let Some(&(_, next)) = chars.peek() {
-                    if next == '{' {
-                        chars.next();
-                        cur_literal.push('{');
-                        continue;
-                    }
+                if let Some(&(_, next)) = chars.peek()
+                    && next == '{'
+                {
+                    chars.next();
+                    cur_literal.push('{');
+                    continue;
                 }
                 cur_literal.push('\\');
                 continue;
@@ -368,14 +369,14 @@ fn get_val<'a>(
                 None
             };
 
-            if let Some(idx) = idx {
-                if let Some(col) = state.picker_ui.worker.columns.get(idx) {
-                    let indexed = Indexed {
-                        index: 0,
-                        inner: item.clone(),
-                    };
-                    return Some(col.raw(&indexed).to_string().into());
-                }
+            if let Some(idx) = idx
+                && let Some(col) = state.picker_ui.worker.columns.get(idx)
+            {
+                let indexed = Indexed {
+                    index: 0,
+                    inner: item.clone(),
+                };
+                return Some(col.raw(&indexed).to_string().into());
             }
 
             None
@@ -383,7 +384,7 @@ fn get_val<'a>(
     }
 }
 
-fn handle_range<'a, 'b>(
+fn handle_range(
     key: &str,
     state: &ConfigMMState<'_, '_>,
     quote: bool,
@@ -391,7 +392,7 @@ fn handle_range<'a, 'b>(
     item_override: Option<&ConfigMMInnerItem>,
 ) -> Option<String> {
     let parts: Vec<&str> = key.split("..").collect();
-    let start_key = parts.get(0).copied().unwrap_or("");
+    let start_key = parts.first().copied().unwrap_or("");
     let end_key = parts.get(1).copied().unwrap_or("");
 
     let start_idx = if start_key.is_empty() {
@@ -497,13 +498,13 @@ fn handle_range<'a, 'b>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+    use tokio::sync::mpsc;
     use waymaker::config::{ColumnsConfig, TerminalConfig};
     use waymaker::nucleo::injector::Injector;
     use waymaker::nucleo::nucleo::{Config as NucleoConfig, Matcher};
     use waymaker::render::State;
     use waymaker::ui::UI;
-    use std::sync::Mutex;
-    use tokio::sync::mpsc;
 
     static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
@@ -534,8 +535,7 @@ mod tests {
                 options: Default::default(),
             },
         ];
-        columns_config.split =
-            waymaker::config::Split::Delimiter(regex::Regex::new(",").unwrap());
+        columns_config.split = waymaker::config::Split::Delimiter(regex::Regex::new(",").unwrap());
 
         let (mm, injector, _misc) = waymaker::ConfigMatchmaker::new_from_config(
             Default::default(),
@@ -576,7 +576,7 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
 
         {
-            let mut mm_state = state_obj.dispatcher(
+            let mm_state = state_obj.dispatcher(
                 &mut ui,
                 &mut picker_ui,
                 &mut footer_ui,
@@ -584,19 +584,19 @@ mod tests {
                 &event_tx,
             );
 
-            let result = format_cli(&mut mm_state, "echo {col1} {=col2} {col3}", None);
+            let result = format_cli(&mm_state, "echo {col1} {=col2} {col3}", None);
             assert_eq!(result, "echo 'a' b 'c'");
 
-            let result = format_cli(&mut mm_state, "echo {} {=}", None);
+            let result = format_cli(&mm_state, "echo {} {=}", None);
             assert_eq!(result, "echo 'a,b,c' a,b,c");
 
-            let result = format_cli(&mut mm_state, "echo {{col1}} {{=col2}}", None);
+            let result = format_cli(&mm_state, "echo {{col1}} {{=col2}}", None);
             assert_eq!(result, "echo {'a'} {b}");
 
-            let result = format_cli(&mut mm_state, "echo {col1 } {col1:val}", None);
+            let result = format_cli(&mm_state, "echo {col1 } {col1:val}", None);
             assert_eq!(result, "echo {col1 } {col1:val}");
 
-            let result = format_cli(&mut mm_state, "echo { {} }", None);
+            let result = format_cli(&mm_state, "echo { {} }", None);
             assert_eq!(result, "echo { 'a,b,c' }");
         }
     }
@@ -629,7 +629,7 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
 
         {
-            let mut mm_state = state_obj.dispatcher(
+            let mm_state = state_obj.dispatcher(
                 &mut ui,
                 &mut picker_ui,
                 &mut footer_ui,
@@ -637,11 +637,11 @@ mod tests {
                 &event_tx,
             );
 
-            let result = format_cli(&mut mm_state, "echo {..} {col2..} {..col2}", None);
+            let result = format_cli(&mm_state, "echo {..} {col2..} {..col2}", None);
             // ..col2 is exclusive
             assert_eq!(result, "echo 'a b c' 'b c' 'a'");
 
-            let result = format_cli(&mut mm_state, "echo {=col2..} {-..col2}", None);
+            let result = format_cli(&mm_state, "echo {=col2..} {-..col2}", None);
             // ..col2 is exclusive
             assert_eq!(result, "echo b c a");
         }
@@ -682,7 +682,7 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
 
         {
-            let mut mm_state = state_obj.dispatcher(
+            let mm_state = state_obj.dispatcher(
                 &mut ui,
                 &mut picker_ui,
                 &mut footer_ui,
@@ -694,7 +694,7 @@ mod tests {
             mm_state.picker_ui.query.set(Some("%col2 ".to_string()), 6);
             mm_state.picker_ui.update();
 
-            let result = format_cli(&mut mm_state, "echo {+} {-col1} {-!} {+!}", None);
+            let result = format_cli(&mm_state, "echo {+} {-col1} {-!} {+!}", None);
             dbg!(picker_ui.selector);
             // {+} -> 'a,b,c' '1,2,3'
             // {-col1} -> a 1
@@ -732,7 +732,7 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
 
         {
-            let mut mm_state = state_obj.dispatcher(
+            let mm_state = state_obj.dispatcher(
                 &mut ui,
                 &mut picker_ui,
                 &mut footer_ui,
@@ -740,7 +740,7 @@ mod tests {
                 &event_tx,
             );
 
-            let result = format_cli(&mut mm_state, "echo {missing} {=also_invalid}", None);
+            let result = format_cli(&mm_state, "echo {missing} {=also_invalid}", None);
             assert_eq!(result, "echo {missing} {=also_invalid}");
         }
     }
@@ -780,7 +780,7 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
 
         {
-            let mut mm_state = state_obj.dispatcher(
+            let mm_state = state_obj.dispatcher(
                 &mut ui,
                 &mut picker_ui,
                 &mut footer_ui,
@@ -788,10 +788,10 @@ mod tests {
                 &event_tx,
             );
 
-            let result = format_cli(&mut mm_state, "echo {$0} {=$0}", None);
+            let result = format_cli(&mm_state, "echo {$0} {=$0}", None);
             assert_eq!(result, "echo 'arg1' 'arg with space' arg1 arg with space");
 
-            let result = format_cli(&mut mm_state, "echo {$1} {=$2} {$3}", None);
+            let result = format_cli(&mm_state, "echo {$1} {=$2} {$3}", None);
             assert_eq!(result, "echo 'arg1' arg with space ");
         }
     }
@@ -799,7 +799,9 @@ mod tests {
     #[tokio::test]
     async fn test_format_cli_prompt_input() {
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector.push((None, "1234,agent1,busy".to_string())).unwrap();
+        injector
+            .push((None, "1234,agent1,busy".to_string()))
+            .unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
@@ -825,7 +827,7 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
 
         {
-            let mut mm_state = state_obj.dispatcher(
+            let mm_state = state_obj.dispatcher(
                 &mut ui,
                 &mut picker_ui,
                 &mut footer_ui,
@@ -833,21 +835,10 @@ mod tests {
                 &event_tx,
             );
 
-            let result = format_cli(
-                &mut mm_state,
-                "tmux send-keys -t '{=1}' {input} Enter",
-                None,
-            );
-            assert_eq!(
-                result,
-                "tmux send-keys -t '1234' 'review PR #42' Enter"
-            );
+            let result = format_cli(&mm_state, "tmux send-keys -t '{=1}' {input} Enter", None);
+            assert_eq!(result, "tmux send-keys -t '1234' 'review PR #42' Enter");
 
-            let result_raw = format_cli(
-                &mut mm_state,
-                "echo {=input}",
-                None,
-            );
+            let result_raw = format_cli(&mm_state, "echo {=input}", None);
             assert_eq!(result_raw, "echo review PR #42");
         }
     }
@@ -855,7 +846,9 @@ mod tests {
     #[tokio::test]
     async fn test_format_cli_live_input() {
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector.push((None, "1234,agent1,busy".to_string())).unwrap();
+        injector
+            .push((None, "1234,agent1,busy".to_string()))
+            .unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
@@ -881,7 +874,7 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
 
         {
-            let mut mm_state = state_obj.dispatcher(
+            let mm_state = state_obj.dispatcher(
                 &mut ui,
                 &mut picker_ui,
                 &mut footer_ui,
@@ -890,19 +883,11 @@ mod tests {
             );
 
             // Raw unquoted {=keys} expands directly
-            let result_raw = format_cli(
-                &mut mm_state,
-                "tmux send-keys -t '123' {=keys}",
-                None,
-            );
+            let result_raw = format_cli(&mm_state, "tmux send-keys -t '123' {=keys}", None);
             assert_eq!(result_raw, "tmux send-keys -t '123' Enter");
 
             // Quoted {keys}
-            let result_quoted = format_cli(
-                &mut mm_state,
-                "tmux send-keys -t '123' {keys}",
-                None,
-            );
+            let result_quoted = format_cli(&mm_state, "tmux send-keys -t '123' {keys}", None);
             assert_eq!(result_quoted, "tmux send-keys -t '123' 'Enter'");
         }
     }

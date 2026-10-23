@@ -289,8 +289,9 @@ mod tests {
             let mut partial = PartialConfig::default();
             partial
                 .set(path, std::slice::from_ref(val))
-                .unwrap_or_else(|e| panic!("partial.set failed for alias {alias} (path {path:?}): {e:?}"));
+                .unwrap_or_else(|e| {
+                    panic!("partial.set failed for alias {alias} (path {path:?}): {e:?}")
+                });
         }
     }
 }
-

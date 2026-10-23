@@ -226,10 +226,10 @@ impl ConfigMatchmaker {
                             for (group_idx, col_idx_opt) in
                                 capture_to_idx.iter().enumerate().skip(1)
                             {
-                                if let Some(col_idx) = col_idx_opt {
-                                    if let Some(m) = caps.get(group_idx) {
-                                        ranges[*col_idx] = (m.start() as u32, m.end() as u32);
-                                    }
+                                if let Some(col_idx) = col_idx_opt
+                                    && let Some(m) = caps.get(group_idx)
+                                {
+                                    ranges[*col_idx] = (m.start() as u32, m.end() as u32);
                                 }
                             }
                         }
@@ -841,7 +841,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
         self.register_interrupt_handler(Interrupt::ExecuteSilent, move |state| {
             let template = state.payload();
             if !template.is_empty() {
-                let cmd = use_formatter(&formatter_2, state, &template, None);
+                let cmd = use_formatter(&formatter_2, state, template, None);
                 if cmd.is_empty() {
                     return;
                 }
@@ -883,7 +883,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                 && let template = state.payload()
                 && !template.is_empty()
             {
-                let cmd = use_formatter(&formatter, state, &template, None);
+                let cmd = use_formatter(&formatter, state, template, None);
                 if cmd.is_empty() {
                     return;
                 }
@@ -921,10 +921,10 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                     match child.wait().await {
                         Ok(s) => {
                             info!("Async command [{}] exited with {}", cmd, s);
-                            if require_success || s.success() {
-                                if let Some(closure) = closure_opt {
-                                    closure();
-                                }
+                            if (require_success || s.success())
+                                && let Some(closure) = closure_opt
+                            {
+                                closure();
                             }
                         }
                         Err(e) => {
@@ -971,7 +971,9 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                     {
                         let _ = child.wait().await;
                         tokio::time::sleep(tokio::time::Duration::from_millis(35)).await;
-                        if LIVE_INPUT_GEN.load(Ordering::SeqCst) == my_gen || (my_gen % 4 == 0) {
+                        if LIVE_INPUT_GEN.load(Ordering::SeqCst) == my_gen
+                            || my_gen.is_multiple_of(4)
+                        {
                             let _ = event_ctrl.send(crate::message::Event::PreviewChange);
                         }
                     }
@@ -997,7 +999,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                 && let template = state.payload()
                 && !template.is_empty()
             {
-                let cmd = use_formatter(&formatter_1, state, &template, None);
+                let cmd = use_formatter(&formatter_1, state, template, None);
                 if cmd.is_empty() {
                     return;
                 }
@@ -1081,7 +1083,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                 && let template = state.payload()
                 && !template.is_empty()
             {
-                let cmd = use_formatter(&formatter, state, &template, None);
+                let cmd = use_formatter(&formatter, state, template, None);
                 if cmd.is_empty() {
                     return;
                 }
@@ -1152,13 +1154,13 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                 return;
             }
 
-            if path.starts_with("~/") || path == "~" {
-                if let Ok(home) = std::env::var("HOME") {
-                    if path == "~" {
-                        path = home;
-                    } else {
-                        path = format!("{home}/{}", &path[2..]);
-                    }
+            if (path.starts_with("~/") || path == "~")
+                && let Ok(home) = std::env::var("HOME")
+            {
+                if path == "~" {
+                    path = home;
+                } else {
+                    path = format!("{home}/{}", &path[2..]);
                 }
             }
 
@@ -1282,13 +1284,12 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                     }
                     trimmed = trimmed.trim_matches(|c| c == '\'' || c == '"' || c == '`');
                     // Strip leading icon if present (e.g. nerd font / fontawesome icon prefix)
-                    if let Some(ch) = trimmed.chars().next() {
-                        if (ch as u32) > 127 {
+                    if let Some(ch) = trimmed.chars().next()
+                        && (ch as u32) > 127 {
                             let mut chars = trimmed.chars();
                             chars.next();
                             trimmed = chars.as_str().trim();
                         }
-                    }
 
                     let clean_path = if trimmed.starts_with("~/") || trimmed.starts_with("~\\") {
                         dirs::home_dir().map(|h| h.join(&trimmed[2..]))
@@ -1298,8 +1299,8 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                         Some(std::path::PathBuf::from(trimmed))
                     };
 
-                    if let Some(p) = clean_path && p.is_file() {
-                        if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+                    if let Some(p) = clean_path && p.is_file()
+                        && let Some(ext) = p.extension().and_then(|e| e.to_str()) {
                             let ext_lower = ext.to_lowercase();
                             if media
                                 && matches!(
@@ -1334,7 +1335,6 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                                 msg = Some(PreviewMessage::Markdown(p.to_string_lossy().to_string(), width));
                             }
                         }
-                    }
                 }
 
 
@@ -1368,12 +1368,11 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                     })
                 }));
 
-                if !is_rerun {
-                    if let Some(p) = state.preview_ui {
+                if !is_rerun
+                    && let Some(p) = state.preview_ui {
                         p.set_target(target);
                         p.jump = Default::default();
                     };
-                }
 
             } else if preview_tx.send(PreviewMessage::Stop).is_err() {
                 warn!("Failed to send to preview: stop")

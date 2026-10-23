@@ -128,8 +128,8 @@ impl AsyncWalker {
                     continue;
                 }
                 let ft = entry.file_type();
-                let is_dir = ft.map_or(false, |t| t.is_dir());
-                let is_file = ft.map_or(false, |t| t.is_file());
+                let is_dir = ft.is_some_and(|t| t.is_dir());
+                let is_file = ft.is_some_and(|t| t.is_file());
                 match options.entry_type {
                     EntryType::Files if !is_file => continue,
                     EntryType::Directories if !is_dir => continue,
@@ -170,8 +170,8 @@ impl AsyncWalker {
                         }
 
                         let ft = entry.file_type();
-                        let is_dir = ft.map_or(false, |t| t.is_dir());
-                        let is_file = ft.map_or(false, |t| t.is_file());
+                        let is_dir = ft.is_some_and(|t| t.is_dir());
+                        let is_file = ft.is_some_and(|t| t.is_file());
 
                         match entry_type {
                             EntryType::Files if !is_file => return WalkState::Continue,
@@ -218,8 +218,8 @@ impl AsyncWalker {
                     continue;
                 }
                 let ft = entry.file_type();
-                let is_dir = ft.map_or(false, |t| t.is_dir());
-                let is_file = ft.map_or(false, |t| t.is_file());
+                let is_dir = ft.is_some_and(|t| t.is_dir());
+                let is_file = ft.is_some_and(|t| t.is_file());
                 match options.entry_type {
                     EntryType::Files if !is_file => continue,
                     EntryType::Directories if !is_dir => continue,
@@ -233,10 +233,8 @@ impl AsyncWalker {
                 );
                 shallow_batch.push((None, formatted));
             }
-            if !shallow_batch.is_empty() {
-                if injector.extend(shallow_batch.into_iter()).is_err() {
-                    return;
-                }
+            if !shallow_batch.is_empty() && injector.extend(shallow_batch.into_iter()).is_err() {
+                return;
             }
 
             // Pass 2: Deep parallel walk for rest of directory tree (depth > 1)
@@ -287,8 +285,8 @@ impl AsyncWalker {
                     }
 
                     let ft = entry.file_type();
-                    let is_dir = ft.map_or(false, |t| t.is_dir());
-                    let is_file = ft.map_or(false, |t| t.is_file());
+                    let is_dir = ft.is_some_and(|t| t.is_dir());
+                    let is_file = ft.is_some_and(|t| t.is_file());
 
                     match entry_type {
                         EntryType::Files if !is_file => return WalkState::Continue,
@@ -329,8 +327,8 @@ impl AsyncWalker {
             }
 
             let ft = entry.file_type();
-            let is_dir = ft.map_or(false, |t| t.is_dir());
-            let is_file = ft.map_or(false, |t| t.is_file());
+            let is_dir = ft.is_some_and(|t| t.is_dir());
+            let is_file = ft.is_some_and(|t| t.is_file());
 
             match self.options.entry_type {
                 EntryType::Files if !is_file => continue,

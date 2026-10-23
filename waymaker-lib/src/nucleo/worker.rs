@@ -22,7 +22,7 @@ use crate::{
     utils::text::{truncation_indicator, wrap_text, wrapping_indicator},
 };
 
-fn get_item_tier_and_clean_path<'a>(raw_str: &'a str, dir_first: bool) -> (u8, &'a str) {
+fn get_item_tier_and_clean_path(raw_str: &str, dir_first: bool) -> (u8, &str) {
     if !dir_first {
         return (2, raw_str);
     }
@@ -32,12 +32,12 @@ fn get_item_tier_and_clean_path<'a>(raw_str: &'a str, dir_first: bool) -> (u8, &
         let clean = if trimmed == "/" || trimmed == "\\" {
             trimmed
         } else {
-            trimmed.trim_end_matches(|c| c == '/' || c == '\\')
+            trimmed.trim_end_matches(['/', '\\'])
         };
         return (2, clean);
     }
 
-    let clean = trimmed.trim_end_matches(|c| c == '/' || c == '\\');
+    let clean = trimmed.trim_end_matches(['/', '\\']);
     let slash_count = clean.bytes().filter(|&b| b == b'/' || b == b'\\').count();
 
     if slash_count == 0 && !clean.is_empty() {
@@ -468,7 +468,6 @@ impl<T: SSS> Worker<T> {
         }
     }
 
-
     fn get_sorted_decorated<'a>(
         &'a self,
         snapshot: &'a nucleo::Snapshot<T>,
@@ -523,7 +522,7 @@ impl<T: SSS> Worker<T> {
             for (idx, item) in snapshot.matched_items(total_sort..scan_end).enumerate() {
                 let raw_path = col0.raw(item.data);
                 let has_frecency =
-                    snapshot_ref.map_or(false, |snap| snap.has_bonus_fast(raw_path.as_ref()));
+                    snapshot_ref.is_some_and(|snap| snap.has_bonus_fast(raw_path.as_ref()));
                 let is_direct = if effective_dir_first {
                     let (tier, _) = get_item_tier_and_clean_path(raw_path.as_ref(), true);
                     tier < 2
@@ -596,8 +595,7 @@ impl<T: SSS> Worker<T> {
                             .extension()
                             .and_then(|e| e.to_str());
                         let range = ext.map(|e| {
-                            let start =
-                                e.as_ptr() as usize - raw_path.as_ref().as_ptr() as usize;
+                            let start = e.as_ptr() as usize - raw_path.as_ref().as_ptr() as usize;
                             (start, start + e.len())
                         });
                         (None, None, None, range)
@@ -632,10 +630,8 @@ impl<T: SSS> Worker<T> {
                         cmp_ascii_case_insensitive(b.clean(), a.clean())
                             .then_with(|| b.clean().cmp(a.clean()))
                     }
-                    SortOrder::Natural => {
-                        crate::utils::string::natural_cmp(a.clean(), b.clean())
-                            .then_with(|| a.clean().cmp(b.clean()))
-                    }
+                    SortOrder::Natural => crate::utils::string::natural_cmp(a.clean(), b.clean())
+                        .then_with(|| a.clean().cmp(b.clean())),
                     SortOrder::NaturalReverse => {
                         crate::utils::string::natural_cmp(b.clean(), a.clean())
                             .then_with(|| b.clean().cmp(a.clean()))
@@ -643,44 +639,44 @@ impl<T: SSS> Worker<T> {
                     SortOrder::Modified => {
                         let a_time = a.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                         let b_time = b.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                        a_time.cmp(&b_time).then_with(|| {
-                            crate::utils::string::natural_cmp(a.clean(), b.clean())
-                        })
+                        a_time
+                            .cmp(&b_time)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
                     }
                     SortOrder::ModifiedReverse => {
                         let a_time = a.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                         let b_time = b.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                        b_time.cmp(&a_time).then_with(|| {
-                            crate::utils::string::natural_cmp(a.clean(), b.clean())
-                        })
+                        b_time
+                            .cmp(&a_time)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
                     }
                     SortOrder::Created => {
                         let a_time = a.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                         let b_time = b.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                        a_time.cmp(&b_time).then_with(|| {
-                            crate::utils::string::natural_cmp(a.clean(), b.clean())
-                        })
+                        a_time
+                            .cmp(&b_time)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
                     }
                     SortOrder::CreatedReverse => {
                         let a_time = a.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                         let b_time = b.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                        b_time.cmp(&a_time).then_with(|| {
-                            crate::utils::string::natural_cmp(a.clean(), b.clean())
-                        })
+                        b_time
+                            .cmp(&a_time)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
                     }
                     SortOrder::Size => {
                         let a_size = a.size.unwrap_or(0);
                         let b_size = b.size.unwrap_or(0);
-                        a_size.cmp(&b_size).then_with(|| {
-                            crate::utils::string::natural_cmp(a.clean(), b.clean())
-                        })
+                        a_size
+                            .cmp(&b_size)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
                     }
                     SortOrder::SizeReverse => {
                         let a_size = a.size.unwrap_or(0);
                         let b_size = b.size.unwrap_or(0);
-                        b_size.cmp(&a_size).then_with(|| {
-                            crate::utils::string::natural_cmp(a.clean(), b.clean())
-                        })
+                        b_size
+                            .cmp(&a_size)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
                     }
                     SortOrder::Extension => cmp_ascii_case_insensitive(a.ext(), b.ext())
                         .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean())),
@@ -734,7 +730,7 @@ impl<T: SSS> Worker<T> {
         let query_str = self.query.primary_column_query().unwrap_or_default();
         let is_query_empty = query_str.is_empty();
 
-        if let Some(decorated) = self.get_sorted_decorated(&snapshot) {
+        if let Some(decorated) = self.get_sorted_decorated(snapshot) {
             decorated.get(n as usize).map(|d| d.item.data).or_else(|| {
                 if is_query_empty && self.mode_index != 0 {
                     snapshot.get_item(n).map(|item| item.data)
@@ -759,10 +755,10 @@ impl<T: SSS> Worker<T> {
             let snapshot = self.nucleo.snapshot();
             let cache = self.frizbee_cache.lock().unwrap();
             for (pos, &(idx, _)) in cache.ranked_indices.iter().enumerate() {
-                if let Some(item) = snapshot.get_item(idx) {
-                    if predicate(item.data) {
-                        return Some(pos);
-                    }
+                if let Some(item) = snapshot.get_item(idx)
+                    && predicate(item.data)
+                {
+                    return Some(pos);
                 }
             }
             return None;
@@ -777,7 +773,7 @@ impl<T: SSS> Worker<T> {
         let query_str = self.query.primary_column_query().unwrap_or_default();
         let is_query_empty = query_str.is_empty();
 
-        if let Some(decorated) = self.get_sorted_decorated(&snapshot) {
+        if let Some(decorated) = self.get_sorted_decorated(snapshot) {
             for (idx, d) in decorated.iter().enumerate() {
                 if predicate(d.item.data) {
                     return Some(idx);
@@ -786,18 +782,18 @@ impl<T: SSS> Worker<T> {
             if is_query_empty && self.mode_index != 0 {
                 let item_count = snapshot.item_count() as usize;
                 for idx in decorated.len()..item_count {
-                    if let Some(item) = snapshot.get_item(idx as u32) {
-                        if predicate(item.data) {
-                            return Some(idx);
-                        }
+                    if let Some(item) = snapshot.get_item(idx as u32)
+                        && predicate(item.data)
+                    {
+                        return Some(idx);
                     }
                 }
             } else {
                 for idx in decorated.len()..total as usize {
-                    if let Some(item) = snapshot.get_matched_item(idx as u32) {
-                        if predicate(item.data) {
-                            return Some(idx);
-                        }
+                    if let Some(item) = snapshot.get_matched_item(idx as u32)
+                        && predicate(item.data)
+                    {
+                        return Some(idx);
                     }
                 }
             }
@@ -805,19 +801,19 @@ impl<T: SSS> Worker<T> {
         } else if is_query_empty && self.mode_index != 0 {
             let item_count = snapshot.item_count() as usize;
             for idx in 0..item_count {
-                if let Some(item) = snapshot.get_item(idx as u32) {
-                    if predicate(item.data) {
-                        return Some(idx);
-                    }
+                if let Some(item) = snapshot.get_item(idx as u32)
+                    && predicate(item.data)
+                {
+                    return Some(idx);
                 }
             }
             None
         } else {
             for idx in 0..total as usize {
-                if let Some(item) = snapshot.get_matched_item(idx as u32) {
-                    if predicate(item.data) {
-                        return Some(idx);
-                    }
+                if let Some(item) = snapshot.get_matched_item(idx as u32)
+                    && predicate(item.data)
+                {
+                    return Some(idx);
                 }
             }
             None
@@ -825,7 +821,7 @@ impl<T: SSS> Worker<T> {
     }
 
     /// Retrieve all currently matched items in exact ranked (sorted) order.
-    pub fn get_all_sorted<'a>(&'a self) -> Vec<&'a T> {
+    pub fn get_all_sorted(&self) -> Vec<&T> {
         #[cfg(feature = "frizbee")]
         if self.engine == crate::config::MatcherEngineType::Frizbee {
             self.ensure_frizbee_cache();
@@ -848,7 +844,7 @@ impl<T: SSS> Worker<T> {
         let is_query_empty = query_str.is_empty();
 
         let mut res = Vec::with_capacity(total as usize);
-        if let Some(decorated) = self.get_sorted_decorated(&snapshot) {
+        if let Some(decorated) = self.get_sorted_decorated(snapshot) {
             for d in decorated {
                 res.push(d.item.data);
             }
@@ -934,7 +930,8 @@ impl<T: SSS> Worker<T> {
                 .filter_map(|idx| {
                     snapshot.get_item(idx).map(|item| {
                         let raw = col0.raw(item.data);
-                        let (tier, _) = get_item_tier_and_clean_path(raw.as_ref(), effective_dir_first);
+                        let (tier, _) =
+                            get_item_tier_and_clean_path(raw.as_ref(), effective_dir_first);
                         (idx, tier, raw)
                     })
                 })
@@ -985,7 +982,10 @@ impl<T: SSS> Worker<T> {
             cache.snapshot_item_count = item_count;
             cache.mode_index = self.mode_index;
             cache.sort_order = self.sort_order;
-            cache.ranked_indices = items.into_iter().map(|(idx, tier, _)| (idx, tier)).collect();
+            cache.ranked_indices = items
+                .into_iter()
+                .map(|(idx, tier, _)| (idx, tier))
+                .collect();
             return true;
         }
 
@@ -999,7 +999,11 @@ impl<T: SSS> Worker<T> {
         }
 
         let frizbee_config = frizbee::Config {
-            max_typos: if self.typo_tolerance { Some(1) } else { Some(0) },
+            max_typos: if self.typo_tolerance {
+                Some(1)
+            } else {
+                Some(0)
+            },
             ..frizbee::Config::default()
         };
         let mut matcher = frizbee::Matcher::new(query_str, &frizbee_config);
@@ -1080,7 +1084,10 @@ impl<T: SSS> Worker<T> {
         cache.snapshot_item_count = item_count;
         cache.mode_index = self.mode_index;
         cache.sort_order = self.sort_order;
-        cache.ranked_indices = scored.into_iter().map(|s| (s.snapshot_idx, s.tier)).collect();
+        cache.ranked_indices = scored
+            .into_iter()
+            .map(|s| (s.snapshot_idx, s.tier))
+            .collect();
         true
     }
 
@@ -1128,7 +1135,6 @@ fn compute_frizbee_highlights(query: &str, haystack: &str, typo_tolerance: bool)
 }
 
 impl<T: SSS> Worker<T> {
-
     pub fn new_snapshot(nucleo: &mut nucleo::Nucleo<T>) -> (&nucleo::Snapshot<T>, Status) {
         let nucleo::Status { changed, running } = nucleo.tick(10);
         let snapshot = nucleo.snapshot();
@@ -1293,13 +1299,18 @@ impl<T: SSS> Worker<T> {
             || effective_dir_first;
 
         #[cfg(feature = "frizbee")]
-        let (items_buf, initial_prev_tier) = if self.engine == crate::config::MatcherEngineType::Frizbee {
+        let (items_buf, initial_prev_tier) = if self.engine
+            == crate::config::MatcherEngineType::Frizbee
+        {
             let cache = self.frizbee_cache.lock().unwrap();
             let total = cache.ranked_indices.len();
             let range_start = (start as usize).min(total);
             let range_end = (end as usize).min(total);
             let prev_tier = if range_start > 0 && range_start <= total {
-                cache.ranked_indices.get(range_start - 1).map(|&(_, tier)| tier)
+                cache
+                    .ranked_indices
+                    .get(range_start - 1)
+                    .map(|&(_, tier)| tier)
             } else {
                 None
             };
@@ -1335,7 +1346,7 @@ impl<T: SSS> Worker<T> {
                 for (idx, item) in snapshot.matched_items(total_sort..scan_end).enumerate() {
                     let raw_path = col0.raw(item.data);
                     let has_frecency =
-                        snapshot_ref.map_or(false, |snap| snap.has_bonus_fast(raw_path.as_ref()));
+                        snapshot_ref.is_some_and(|snap| snap.has_bonus_fast(raw_path.as_ref()));
                     let is_direct = if effective_dir_first {
                         let (tier, _) = get_item_tier_and_clean_path(raw_path.as_ref(), true);
                         tier < 2
@@ -1650,9 +1661,16 @@ impl<T: SSS> Worker<T> {
                         (Default::default(), 0)
                     } else if column.filter {
                         #[cfg(feature = "frizbee")]
-                        let custom_indices = if engine == crate::config::MatcherEngineType::Frizbee && !query_str.is_empty() {
-                            let query_col = query.get(&column.name).map(|s| &**s).unwrap_or(query_str);
-                            Some(compute_frizbee_highlights(query_col, column.raw(item.data).as_ref(), typo_tolerance))
+                        let custom_indices = if engine == crate::config::MatcherEngineType::Frizbee
+                            && !query_str.is_empty()
+                        {
+                            let query_col =
+                                query.get(&column.name).map(|s| &**s).unwrap_or(query_str);
+                            Some(compute_frizbee_highlights(
+                                query_col,
+                                column.raw(item.data).as_ref(),
+                                typo_tolerance,
+                            ))
                         } else {
                             None
                         };
@@ -1704,10 +1722,10 @@ impl<T: SSS> Worker<T> {
                     last_emitted_group = Some(group);
                 }
             } else if effective_dir_first {
-                if let Some(last) = last_tier {
-                    if *item_tier != last {
-                        header_to_emit = Some(GroupHeader::TierSeparator);
-                    }
+                if let Some(last) = last_tier
+                    && *item_tier != last
+                {
+                    header_to_emit = Some(GroupHeader::TierSeparator);
                 }
                 last_tier = Some(*item_tier);
             }
@@ -2025,7 +2043,7 @@ fn render_cell_inner<T: SSS>(
                         current_spans.push(Span::styled(take(&mut current_span), current_style));
                         current_style = style;
                     };
-                    while let Some((grapheme2, style2)) = graphemes.next() {
+                    for (grapheme2, style2) in graphemes.by_ref() {
                         if grapheme2.width() == 0 {
                             new.push_str(grapheme2);
                         } else {
@@ -2144,7 +2162,7 @@ mod tests {
         let (result_text, width) = render_cell(
             cell,
             0,
-            &snapshot,
+            snapshot,
             &item,
             &mut matcher,
             highlight,
@@ -2175,7 +2193,7 @@ mod tests {
         let (result_text, _) = render_cell(
             cell,
             0,
-            &snapshot,
+            snapshot,
             &item,
             &mut matcher,
             highlight,
@@ -2220,7 +2238,7 @@ mod tests {
         let (result_text, width) = render_cell(
             cell,
             0,
-            &snapshot,
+            snapshot,
             &item,
             &mut matcher,
             highlight,
@@ -2265,7 +2283,7 @@ mod tests {
         let (result_text, width) = render_cell(
             cell,
             0,
-            &snapshot,
+            snapshot,
             &item,
             &mut matcher,
             highlight,
@@ -2298,7 +2316,7 @@ mod tests {
         let (result_text, width) = render_cell(
             cell,
             0,
-            &snapshot,
+            snapshot,
             &item,
             &mut matcher,
             highlight,
@@ -2330,7 +2348,7 @@ mod tests {
         let (result_text, width) = render_cell(
             cell,
             0,
-            &snapshot,
+            snapshot,
             &item,
             &mut matcher,
             highlight,
@@ -2362,7 +2380,7 @@ mod tests {
         let (result_text, width) = render_cell(
             cell,
             0,
-            &snapshot,
+            snapshot,
             &item,
             &mut matcher,
             highlight,
@@ -2395,7 +2413,7 @@ mod tests {
         let (result_text, width) = render_cell(
             cell,
             0,
-            &snapshot,
+            snapshot,
             &item,
             &mut matcher,
             highlight,
@@ -2959,7 +2977,13 @@ mod tests {
         let all_sorted: Vec<&String> = worker.get_all_sorted();
         assert_eq!(
             all_sorted,
-            vec!["docs/", "src/", "Cargo.toml", "README.md", "src/sub/deep.rs"]
+            vec![
+                "docs/",
+                "src/",
+                "Cargo.toml",
+                "README.md",
+                "src/sub/deep.rs"
+            ]
         );
     }
 
@@ -3074,4 +3098,3 @@ mod tests {
         assert_eq!(*all_filtered[0], "oi.md");
     }
 }
-

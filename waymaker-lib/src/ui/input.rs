@@ -302,9 +302,8 @@ impl InputUI {
 
         let start_byte = self.byte_index(self.before);
         let end_byte = self.byte_index(end_idx);
-        let visible_input = &self.input[start_byte..end_byte];
 
-        visible_input
+        (&self.input[start_byte..end_byte]) as _
     }
 
     pub fn cursor_rel_offset(&self) -> u16 {
@@ -427,7 +426,7 @@ impl QueryUI {
             };
             Line::styled(prompt_text.to_string(), style)
         } else {
-            let np = nav_prompt.unwrap();
+            let np = nav_prompt.unwrap_or_default();
             Line::styled(np.to_string(), self.config.prompt_style)
         }
     }

@@ -115,7 +115,9 @@ impl Default for WorkerFrecencyConfig {
     }
 }
 
-pub fn deserialize_worker_frecency<'de, D>(deserializer: D) -> Result<WorkerFrecencyConfig, D::Error>
+pub fn deserialize_worker_frecency<'de, D>(
+    deserializer: D,
+) -> Result<WorkerFrecencyConfig, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -750,7 +752,7 @@ impl NavConfig {
         if cols <= 1 {
             1
         } else {
-            let rows = (item_count + cols - 1) / cols;
+            let rows = item_count.div_ceil(cols);
             rows.max(1) as u16
         }
     }
@@ -1222,7 +1224,7 @@ impl SortMenuConfig {
         if self.columns <= 1 {
             1
         } else {
-            let rows = (item_count + self.columns - 1) / self.columns;
+            let rows = item_count.div_ceil(self.columns);
             rows.max(1) as u16
         }
     }
@@ -1289,26 +1291,24 @@ impl FolderRule {
         if let (Ok(c_rule), Ok(c_dir)) = (
             std::fs::canonicalize(&expanded_pattern),
             std::fs::canonicalize(dir),
-        ) {
-            if c_rule == c_dir {
-                return true;
-            }
+        ) && c_rule == c_dir
+        {
+            return true;
         }
 
         // 3. Glob matching against full expanded path
-        if let Ok(pattern) = glob::Pattern::new(rule_path_str) {
-            if pattern.matches(dir_path_str) {
-                return true;
-            }
+        if let Ok(pattern) = glob::Pattern::new(rule_path_str)
+            && pattern.matches(dir_path_str)
+        {
+            return true;
         }
 
         // 4. Glob matching against folder name (basename)
-        if let Ok(pattern) = glob::Pattern::new(&self.path) {
-            if let Some(file_name) = dir.file_name().and_then(|f| f.to_str()) {
-                if pattern.matches(file_name) {
-                    return true;
-                }
-            }
+        if let Ok(pattern) = glob::Pattern::new(&self.path)
+            && let Some(file_name) = dir.file_name().and_then(|f| f.to_str())
+            && pattern.matches(file_name)
+        {
+            return true;
         }
 
         false
@@ -1422,7 +1422,9 @@ impl Default for ResultsSymlinkConfig {
     }
 }
 
-pub fn deserialize_results_symlink<'de, D>(deserializer: D) -> Result<ResultsSymlinkConfig, D::Error>
+pub fn deserialize_results_symlink<'de, D>(
+    deserializer: D,
+) -> Result<ResultsSymlinkConfig, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -1898,31 +1900,33 @@ where
         } else {
             HorizontalSeparator::None
         }),
-        SeparatorHelper::String(s) => match s.to_lowercase().replace(['-', '_', ' '], "").as_str() {
-            "none" | "false" | "" => Ok(HorizontalSeparator::None),
-            "empty" => Ok(HorizontalSeparator::Empty),
-            "light" | "normal" | "true" => Ok(HorizontalSeparator::Light),
-            "heavy" | "thick" | "bold" => Ok(HorizontalSeparator::Heavy),
-            "dashed" => Ok(HorizontalSeparator::Dashed),
-            "top" | "upper" | "upperblock" => Ok(HorizontalSeparator::Top),
-            "bottom" | "lower" | "lowerblock" => Ok(HorizontalSeparator::Bottom),
-            "underline" | "underlined" => Ok(HorizontalSeparator::Underline),
-            other => Err(serde::de::Error::unknown_variant(
-                other,
-                &[
-                    "none",
-                    "light",
-                    "normal",
-                    "heavy",
-                    "dashed",
-                    "top",
-                    "bottom",
-                    "underline",
-                    "true",
-                    "false",
-                ],
-            )),
-        },
+        SeparatorHelper::String(s) => {
+            match s.to_lowercase().replace(['-', '_', ' '], "").as_str() {
+                "none" | "false" | "" => Ok(HorizontalSeparator::None),
+                "empty" => Ok(HorizontalSeparator::Empty),
+                "light" | "normal" | "true" => Ok(HorizontalSeparator::Light),
+                "heavy" | "thick" | "bold" => Ok(HorizontalSeparator::Heavy),
+                "dashed" => Ok(HorizontalSeparator::Dashed),
+                "top" | "upper" | "upperblock" => Ok(HorizontalSeparator::Top),
+                "bottom" | "lower" | "lowerblock" => Ok(HorizontalSeparator::Bottom),
+                "underline" | "underlined" => Ok(HorizontalSeparator::Underline),
+                other => Err(serde::de::Error::unknown_variant(
+                    other,
+                    &[
+                        "none",
+                        "light",
+                        "normal",
+                        "heavy",
+                        "dashed",
+                        "top",
+                        "bottom",
+                        "underline",
+                        "true",
+                        "false",
+                    ],
+                )),
+            }
+        }
     }
 }
 
@@ -2021,6 +2025,7 @@ impl Default for DisplayConfig {
 #[partial(path, derive(Debug, Clone, PartialEq, Deserialize, Serialize))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct PreviewMediaConfig {
     /// Whether to enable native media previews using ratatui-image
     #[partial(alias = "m")]
@@ -2037,18 +2042,6 @@ pub struct PreviewMediaConfig {
     /// Resize/fit mode for media previews: "crop", "fit", or "scale" (default: "crop")
     #[serde(alias = "media_fit")]
     pub fit: Option<String>,
-}
-
-impl Default for PreviewMediaConfig {
-    fn default() -> Self {
-        Self {
-            active: false,
-            protocol: None,
-            size: None,
-            zoom: None,
-            fit: None,
-        }
-    }
 }
 
 pub fn deserialize_preview_media<'de, D>(deserializer: D) -> Result<PreviewMediaConfig, D::Error>
@@ -2081,16 +2074,41 @@ pub struct PreviewDiagramsConfig {
     #[serde(alias = "markdown_diagrams", alias = "diagrams", alias = "mermaid")]
     pub active: bool,
     /// Whether to render embedded Mermaid diagrams inline using Kitty Unicode Placeholders. Default: true
-    #[partial(alias = "inline_diag", alias = "inline_diagram", alias = "inline_mermaid")]
-    #[serde(alias = "inline_diagrams", alias = "inline_diag", alias = "inline_diagram", alias = "inline_mermaid", alias = "kitty_diagrams")]
+    #[partial(
+        alias = "inline_diag",
+        alias = "inline_diagram",
+        alias = "inline_mermaid"
+    )]
+    #[serde(
+        alias = "inline_diagrams",
+        alias = "inline_diag",
+        alias = "inline_diagram",
+        alias = "inline_mermaid",
+        alias = "kitty_diagrams"
+    )]
     pub inline: bool,
     /// Mermaid diagram theme: "auto" (detects system/terminal theme), "dark", or "light". Default: "auto"
     #[partial(alias = "diagram_theme", alias = "diag_theme", alias = "theme_diag")]
-    #[serde(alias = "diagram_theme", alias = "diagrams_theme", alias = "mermaid_theme", alias = "theme_diagram")]
+    #[serde(
+        alias = "diagram_theme",
+        alias = "diagrams_theme",
+        alias = "mermaid_theme",
+        alias = "theme_diagram"
+    )]
     pub theme: DiagramTheme,
     /// Mermaid diagram background mode: "transparent" (inherits terminal background) or "solid". Default: "transparent"
-    #[partial(alias = "diagram_background", alias = "diag_bg", alias = "diag_background")]
-    #[serde(alias = "diagram_background", alias = "diagrams_background", alias = "mermaid_background", alias = "diagram_bg", alias = "diagrams_bg")]
+    #[partial(
+        alias = "diagram_background",
+        alias = "diag_bg",
+        alias = "diag_background"
+    )]
+    #[serde(
+        alias = "diagram_background",
+        alias = "diagrams_background",
+        alias = "mermaid_background",
+        alias = "diagram_bg",
+        alias = "diagrams_bg"
+    )]
     pub background: DiagramBackground,
 }
 
@@ -2105,7 +2123,9 @@ impl Default for PreviewDiagramsConfig {
     }
 }
 
-pub fn deserialize_preview_diagrams<'de, D>(deserializer: D) -> Result<PreviewDiagramsConfig, D::Error>
+pub fn deserialize_preview_diagrams<'de, D>(
+    deserializer: D,
+) -> Result<PreviewDiagramsConfig, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -2183,7 +2203,13 @@ pub struct PreviewConfig {
     /// Preview auto-refresh / polling interval in milliseconds.
     /// When set, periodically re-runs the preview command to stream live output.
     #[partial(alias = "poll")]
-    #[serde(default, alias = "poll_interval", alias = "poll_interval_ms", alias = "refresh_ms", alias = "interval_ms")]
+    #[serde(
+        default,
+        alias = "poll_interval",
+        alias = "poll_interval_ms",
+        alias = "refresh_ms",
+        alias = "interval_ms"
+    )]
     pub poll_ms: Option<u64>,
 }
 
@@ -2607,7 +2633,13 @@ pub struct PreviewSetting {
     pub initial: PartialPreviewInitialSetting,
 
     /// Preview auto-refresh / polling interval in milliseconds for this layout.
-    #[serde(default, alias = "poll_interval", alias = "poll_interval_ms", alias = "refresh_ms", alias = "interval_ms")]
+    #[serde(
+        default,
+        alias = "poll_interval",
+        alias = "poll_interval_ms",
+        alias = "refresh_ms",
+        alias = "interval_ms"
+    )]
     pub poll_ms: Option<u64>,
 }
 
@@ -2669,7 +2701,7 @@ pub struct ColumnsConfig {
 
 impl ColumnsConfig {
     pub fn max_cols(&self) -> usize {
-        self.max_columns.min(16).max(1)
+        self.max_columns.clamp(1, 16)
     }
 }
 
@@ -2777,7 +2809,10 @@ mod tests {
     fn test_preview_config_diagram_options_toml() {
         let default_cfg: PreviewConfig = toml::from_str("").unwrap();
         assert_eq!(default_cfg.diagrams.theme, DiagramTheme::Auto);
-        assert_eq!(default_cfg.diagrams.background, DiagramBackground::Transparent);
+        assert_eq!(
+            default_cfg.diagrams.background,
+            DiagramBackground::Transparent
+        );
 
         let toml_str = r#"
             [diagrams]
@@ -2796,7 +2831,10 @@ mod tests {
         "#;
         let config_alias: PreviewConfig = toml::from_str(toml_alias).unwrap();
         assert_eq!(config_alias.diagrams.theme, DiagramTheme::Light);
-        assert_eq!(config_alias.diagrams.background, DiagramBackground::Transparent);
+        assert_eq!(
+            config_alias.diagrams.background,
+            DiagramBackground::Transparent
+        );
     }
 
     #[test]
@@ -2809,10 +2847,7 @@ mod tests {
         "#;
         let config: ResultsConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.tier.separator, HorizontalSeparator::Dashed);
-        assert_eq!(
-            config.tier.style.fg,
-            Some(ratatui::style::Color::Cyan)
-        );
+        assert_eq!(config.tier.style.fg, Some(ratatui::style::Color::Cyan));
 
         let toml_top = r#"
             [tier]

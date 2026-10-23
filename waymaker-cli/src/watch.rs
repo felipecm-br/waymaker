@@ -32,7 +32,7 @@ pub fn get_sync_update_delimiters() -> (&'static str, &'static str) {
 pub fn reset_terminal() {
     let mut stdout = std::io::stdout().lock();
     use std::io::Write;
-    let _ = write!(stdout, "\x1b[0m\x1b[?25h\x1b[?1049l\n");
+    let _ = writeln!(stdout, "\x1b[0m\x1b[?25h\x1b[?1049l");
     let _ = stdout.flush();
 }
 
@@ -140,9 +140,9 @@ mod linux {
                 .ok_or_else(|| anyhow::anyhow!("Path has no filename: {}", real_path.display()))?
                 .to_os_string();
 
-            let real_parent_dir = real_path
-                .parent()
-                .ok_or_else(|| anyhow::anyhow!("Path has no parent directory: {}", real_path.display()))?;
+            let real_parent_dir = real_path.parent().ok_or_else(|| {
+                anyhow::anyhow!("Path has no parent directory: {}", real_path.display())
+            })?;
 
             let real_file_c_str = std::ffi::CString::new(real_path.as_os_str().as_bytes())?;
             let real_parent_c_str = std::ffi::CString::new(real_parent_dir.as_os_str().as_bytes())?;
@@ -155,21 +155,22 @@ mod linux {
                 ));
             }
 
-            let dir_mask = (libc::IN_CLOSE_WRITE
+            let dir_mask = libc::IN_CLOSE_WRITE
                 | libc::IN_MOVED_TO
                 | libc::IN_MOVED_FROM
                 | libc::IN_MODIFY
                 | libc::IN_ATTRIB
                 | libc::IN_CREATE
-                | libc::IN_DELETE) as u32;
+                | libc::IN_DELETE;
 
-            let file_mask = (libc::IN_CLOSE_WRITE
+            let file_mask = libc::IN_CLOSE_WRITE
                 | libc::IN_MODIFY
                 | libc::IN_ATTRIB
                 | libc::IN_MOVE_SELF
-                | libc::IN_DELETE_SELF) as u32;
+                | libc::IN_DELETE_SELF;
 
-            let dir_wd = unsafe { libc::inotify_add_watch(fd, real_parent_c_str.as_ptr(), dir_mask) };
+            let dir_wd =
+                unsafe { libc::inotify_add_watch(fd, real_parent_c_str.as_ptr(), dir_mask) };
             if dir_wd < 0 {
                 unsafe { libc::close(fd) };
                 return Err(anyhow::anyhow!(
@@ -179,13 +180,20 @@ mod linux {
                 ));
             }
 
-            let file_wd = unsafe { libc::inotify_add_watch(fd, real_file_c_str.as_ptr(), file_mask) };
+            let file_wd =
+                unsafe { libc::inotify_add_watch(fd, real_file_c_str.as_ptr(), file_mask) };
 
             let (symlink_dir_wd, symlink_file_name) = if abs_path != real_path {
-                if let (Some(sym_parent), Some(sym_name)) = (abs_path.parent(), abs_path.file_name()) {
+                if let (Some(sym_parent), Some(sym_name)) =
+                    (abs_path.parent(), abs_path.file_name())
+                {
                     if sym_parent != real_parent_dir {
-                        if let Ok(sym_parent_c_str) = std::ffi::CString::new(sym_parent.as_os_str().as_bytes()) {
-                            let swd = unsafe { libc::inotify_add_watch(fd, sym_parent_c_str.as_ptr(), dir_mask) };
+                        if let Ok(sym_parent_c_str) =
+                            std::ffi::CString::new(sym_parent.as_os_str().as_bytes())
+                        {
+                            let swd = unsafe {
+                                libc::inotify_add_watch(fd, sym_parent_c_str.as_ptr(), dir_mask)
+                            };
                             (swd, Some(sym_name.to_os_string()))
                         } else {
                             (-1, None)
@@ -224,11 +232,7 @@ mod linux {
 
             loop {
                 let n = unsafe {
-                    libc::read(
-                        self.fd(),
-                        buf.as_mut_ptr() as *mut libc::c_void,
-                        buf.len(),
-                    )
+                    libc::read(self.fd(), buf.as_mut_ptr() as *mut libc::c_void, buf.len())
                 };
 
                 if n < 0 {
@@ -253,16 +257,20 @@ mod linux {
                         )
                     };
                     let event_len = event.len as usize;
-                    let next_offset = offset + std::mem::size_of::<libc::inotify_event>() + event_len;
+                    let next_offset =
+                        offset + std::mem::size_of::<libc::inotify_event>() + event_len;
                     if next_offset > total {
                         break;
                     }
 
-                    if (event.mask & libc::IN_Q_OVERFLOW as u32) != 0 {
+                    if (event.mask & libc::IN_Q_OVERFLOW) != 0 {
                         target_changed = true;
                     } else if self.file_wd >= 0 && event.wd == self.file_wd {
                         target_changed = true;
-                        if (event.mask & (libc::IN_IGNORED | libc::IN_DELETE_SELF | libc::IN_MOVE_SELF) as u32) != 0 {
+                        if (event.mask
+                            & (libc::IN_IGNORED | libc::IN_DELETE_SELF | libc::IN_MOVE_SELF))
+                            != 0
+                        {
                             self.file_wd = -1;
                         }
                     } else if event.wd == self.dir_wd && event_len > 0 {
@@ -276,7 +284,10 @@ mod linux {
                         if event_name == self.real_file_name {
                             target_changed = true;
                         }
-                    } else if self.symlink_dir_wd >= 0 && event.wd == self.symlink_dir_wd && event_len > 0 {
+                    } else if self.symlink_dir_wd >= 0
+                        && event.wd == self.symlink_dir_wd
+                        && event_len > 0
+                    {
                         let name_start = offset + std::mem::size_of::<libc::inotify_event>();
                         let name_bytes = &buf[name_start..name_start + event_len];
                         let nul_pos = name_bytes
@@ -557,7 +568,10 @@ mod tests {
             .await
             .expect("timeout waiting for initial render")
             .expect("render channel closed");
-        assert!(init.contains("Initial Header"), "initial render must contain header");
+        assert!(
+            init.contains("Initial Header"),
+            "initial render must contain header"
+        );
 
         // Now modify the file directly
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -568,7 +582,10 @@ mod tests {
             .await
             .expect("timeout waiting for live reload render")
             .expect("render channel closed");
-        assert!(update.contains("Updated Header"), "re-rendered content must have updated header");
+        assert!(
+            update.contains("Updated Header"),
+            "re-rendered content must have updated header"
+        );
 
         // Send cancel signal
         let _ = cancel_tx.send(());
@@ -727,14 +744,8 @@ mod tests {
 
         let md_clone = md_path.clone();
         let handle = tokio::spawn(async move {
-            watch_markdown_with_controls(
-                &md_clone,
-                opts,
-                false,
-                Some(cancel_rx),
-                Some(render_tx),
-            )
-            .await
+            watch_markdown_with_controls(&md_clone, opts, false, Some(cancel_rx), Some(render_tx))
+                .await
         });
 
         let _ = render_rx.recv().await.unwrap();
@@ -754,8 +765,12 @@ mod tests {
         assert!(update.contains("Rapid Burst"));
 
         // Confirm no delayed extra render arrives within 100ms
-        let extra = tokio::time::timeout(std::time::Duration::from_millis(100), render_rx.recv()).await;
-        assert!(extra.is_err(), "debounce window should coalesce rapid bursts into 1 render");
+        let extra =
+            tokio::time::timeout(std::time::Duration::from_millis(100), render_rx.recv()).await;
+        assert!(
+            extra.is_err(),
+            "debounce window should coalesce rapid bursts into 1 render"
+        );
 
         let _ = cancel_tx.send(());
         let _ = handle.await;
@@ -807,7 +822,10 @@ mod tests {
         // Verify no render event arrives for unrelated file
         let timeout_res =
             tokio::time::timeout(std::time::Duration::from_millis(200), render_rx.recv()).await;
-        assert!(timeout_res.is_err(), "should timeout with no render for unrelated file");
+        assert!(
+            timeout_res.is_err(),
+            "should timeout with no render for unrelated file"
+        );
 
         let _ = cancel_tx.send(());
         let _ = handle.await;
@@ -860,10 +878,11 @@ mod tests {
         std::fs::write(&md_path, "# Recreated\n").unwrap();
 
         // The delete triggers an event (reporting error/deletion), and recreation triggers the recreated render
-        let mut update = tokio::time::timeout(std::time::Duration::from_millis(1500), render_rx.recv())
-            .await
-            .expect("timeout waiting for event")
-            .expect("render channel closed");
+        let mut update =
+            tokio::time::timeout(std::time::Duration::from_millis(1500), render_rx.recv())
+                .await
+                .expect("timeout waiting for event")
+                .expect("render channel closed");
         if !update.contains("Recreated") {
             update = tokio::time::timeout(std::time::Duration::from_millis(1500), render_rx.recv())
                 .await
@@ -890,14 +909,14 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         std::fs::write(&md_path, "# Poll V2\n").unwrap();
 
-        let change_result = tokio::time::timeout(
+        tokio::time::timeout(
             std::time::Duration::from_millis(1500),
             watcher.wait_for_change(),
         )
         .await
         .expect("timeout waiting for polling watcher")
         .expect("watcher error");
-        assert_eq!(change_result, ());
+        assert_eq!((), ());
 
         // Atomic rename
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -905,14 +924,14 @@ mod tests {
         std::fs::write(&tmp, "# Poll V3 via atomic rename\n").unwrap();
         std::fs::rename(&tmp, &md_path).unwrap();
 
-        let change_result2 = tokio::time::timeout(
+        tokio::time::timeout(
             std::time::Duration::from_millis(1500),
             watcher.wait_for_change(),
         )
         .await
         .expect("timeout waiting for polling watcher atomic rename")
         .expect("watcher error");
-        assert_eq!(change_result2, ());
+        assert_eq!((), ());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

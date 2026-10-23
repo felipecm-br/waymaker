@@ -195,8 +195,8 @@ impl PickerQuery {
             .to_string()
     }
 
-    /// Finds the index of the column which the cursor is 'within' in the last parse.
-    /// Returns the primary column index if no specific column is active at the cursor.
+    // Finds the index of the column which the cursor is 'within' in the last parse.
+    // Returns the primary column index if no specific column is active at the cursor.
     // pub fn active_column_index(&mut self, input: &str) -> usize {
     //     self.trial_parse(input);
     //     self.column_ranges

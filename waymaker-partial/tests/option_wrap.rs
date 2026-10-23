@@ -1,8 +1,10 @@
+// `vec_!` builds owned Vec<String> args; the call sites borrow them as slices on purpose.
+#![allow(clippy::useless_vec)]
 #![allow(unused)]
 
+use serde::{Deserialize, Serialize};
 use waymaker_partial::*;
 use waymaker_partial_macros::partial;
-use serde::{Deserialize, Serialize};
 
 macro_rules! vec_ {
     ($($elem:expr),* $(,)?) => {

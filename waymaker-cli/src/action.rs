@@ -181,11 +181,11 @@ pub fn action_handler(
         last_cwd,
     }: &mut ActionContext,
 ) {
-    if let Ok(cwd) = std::env::current_dir() {
-        if last_cwd.as_ref() != Some(&cwd) {
-            *last_cwd = Some(cwd);
-            mode_history.clear();
-        }
+    if let Ok(cwd) = std::env::current_dir()
+        && last_cwd.as_ref() != Some(&cwd)
+    {
+        *last_cwd = Some(cwd);
+        mode_history.clear();
     }
     match a {
         MMAction::Accept => {
@@ -347,7 +347,9 @@ pub fn action_handler(
             if state.ui.config.nav.active {
                 let focus_to_set = if let Some(saved) = mode_history.get(&index) {
                     saved.focus
-                } else if index == 1 && state.ui.config.nav.focus_on_start != waymaker::config::NavFocus::Picker {
+                } else if index == 1
+                    && state.ui.config.nav.focus_on_start != waymaker::config::NavFocus::Picker
+                {
                     waymaker::render::Focus::Input
                 } else {
                     waymaker::render::Focus::Results
@@ -371,13 +373,12 @@ pub fn action_handler(
                 .and_then(|s| s.focused_item.as_ref())
                 .is_some()
                 || crate::start::TARGET_ITEM.lock().unwrap().is_some();
-            if !has_target {
-                if let Some(pos) = mode_history.get(&index).map(|s| s.results_index) {
-                    if pos > 0 {
-                        let _ = render_tx.send(RenderCommand::Action(Action::Pos(pos as i32)));
-                        state.picker_ui.results.cursor_jump(pos);
-                    }
-                }
+            if !has_target
+                && let Some(pos) = mode_history.get(&index).map(|s| s.results_index)
+                && pos > 0
+            {
+                let _ = render_tx.send(RenderCommand::Action(Action::Pos(pos as i32)));
+                state.picker_ui.results.cursor_jump(pos);
             }
         }
 
@@ -443,7 +444,9 @@ pub fn action_handler(
             if state.ui.config.nav.active {
                 let focus_to_set = if let Some(saved) = mode_history.get(&index) {
                     saved.focus
-                } else if index == 1 && state.ui.config.nav.focus_on_start != waymaker::config::NavFocus::Picker {
+                } else if index == 1
+                    && state.ui.config.nav.focus_on_start != waymaker::config::NavFocus::Picker
+                {
                     waymaker::render::Focus::Input
                 } else {
                     waymaker::render::Focus::Results
@@ -467,13 +470,12 @@ pub fn action_handler(
                 .and_then(|s| s.focused_item.as_ref())
                 .is_some()
                 || crate::start::TARGET_ITEM.lock().unwrap().is_some();
-            if !has_target {
-                if let Some(pos) = mode_history.get(&index).map(|s| s.results_index) {
-                    if pos > 0 {
-                        let _ = render_tx.send(RenderCommand::Action(Action::Pos(pos as i32)));
-                        state.picker_ui.results.cursor_jump(pos);
-                    }
-                }
+            if !has_target
+                && let Some(pos) = mode_history.get(&index).map(|s| s.results_index)
+                && pos > 0
+            {
+                let _ = render_tx.send(RenderCommand::Action(Action::Pos(pos as i32)));
+                state.picker_ui.results.cursor_jump(pos);
             }
         }
 
@@ -517,9 +519,11 @@ pub fn action_handler(
                         if count > 0 {
                             if let Some(ref item_str) = prev_item {
                                 let col0 = &state.picker_ui.worker.columns[0];
-                                if let Some(i) = state.picker_ui.worker.find_item_index(|raw| {
-                                    col0.raw(raw) == item_str.as_str()
-                                }) {
+                                if let Some(i) = state
+                                    .picker_ui
+                                    .worker
+                                    .find_item_index(|raw| col0.raw(raw) == item_str.as_str())
+                                {
                                     state.picker_ui.results.cursor_jump(i as u32);
                                     restored = true;
                                 }
@@ -1015,18 +1019,18 @@ pub fn action_handler(
                     }
                 }
 
-                if !pasted_items.is_empty() {
-                    if let Ok(mut u) = undo_stack.lock() {
-                        u.push(crate::fm::UndoAction::Paste {
-                            op: clip.op,
-                            items: pasted_items.clone(),
-                            saved_clipboard: Some(clip.clone()),
-                            saved_yank_paths: state.picker_ui.results.yank_paths.clone(),
-                            saved_cut_paths: state.picker_ui.results.cut_paths.clone(),
-                            previous_dir: None,
-                            target_dir: None,
-                        });
-                    }
+                if !pasted_items.is_empty()
+                    && let Ok(mut u) = undo_stack.lock()
+                {
+                    u.push(crate::fm::UndoAction::Paste {
+                        op: clip.op,
+                        items: pasted_items.clone(),
+                        saved_clipboard: Some(clip.clone()),
+                        saved_yank_paths: state.picker_ui.results.yank_paths.clone(),
+                        saved_cut_paths: state.picker_ui.results.cut_paths.clone(),
+                        previous_dir: None,
+                        target_dir: None,
+                    });
                 }
 
                 if !had_error {
@@ -1122,26 +1126,26 @@ pub fn action_handler(
                     }
                 }
 
-                if !pasted_items.is_empty() {
-                    if let Ok(mut u) = undo_stack.lock() {
-                        u.push(crate::fm::UndoAction::Paste {
-                            op: clip.op,
-                            items: pasted_items.clone(),
-                            saved_clipboard: Some(clip.clone()),
-                            saved_yank_paths: state.picker_ui.results.yank_paths.clone(),
-                            saved_cut_paths: state.picker_ui.results.cut_paths.clone(),
-                            previous_dir: if is_subfolder {
-                                Some(cwd.clone())
-                            } else {
-                                None
-                            },
-                            target_dir: if is_subfolder {
-                                Some(dest_dir.clone())
-                            } else {
-                                None
-                            },
-                        });
-                    }
+                if !pasted_items.is_empty()
+                    && let Ok(mut u) = undo_stack.lock()
+                {
+                    u.push(crate::fm::UndoAction::Paste {
+                        op: clip.op,
+                        items: pasted_items.clone(),
+                        saved_clipboard: Some(clip.clone()),
+                        saved_yank_paths: state.picker_ui.results.yank_paths.clone(),
+                        saved_cut_paths: state.picker_ui.results.cut_paths.clone(),
+                        previous_dir: if is_subfolder {
+                            Some(cwd.clone())
+                        } else {
+                            None
+                        },
+                        target_dir: if is_subfolder {
+                            Some(dest_dir.clone())
+                        } else {
+                            None
+                        },
+                    });
                 }
 
                 if !had_error {
@@ -1193,11 +1197,11 @@ pub fn action_handler(
                 show_styled_info_box(state, &msg);
 
                 if is_subfolder && !pasted_items.is_empty() {
-                    if let Some((_, dest)) = pasted_items.first() {
-                        if let Some(item_name) = dest.file_name() {
-                            let name = item_name.to_string_lossy().to_string();
-                            *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
-                        }
+                    if let Some((_, dest)) = pasted_items.first()
+                        && let Some(item_name) = dest.file_name()
+                    {
+                        let name = item_name.to_string_lossy().to_string();
+                        *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
                     }
                     let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
                         dest_dir.to_string_lossy().to_string(),
@@ -1236,11 +1240,11 @@ pub fn action_handler(
                         MMAction::FmSetCutPaths(cuts.join("\n")),
                     )));
                     if let Some(prev) = previous_dir {
-                        if let Some(target) = target_dir {
-                            if let Some(target_name) = target.file_name() {
-                                let name = target_name.to_string_lossy().to_string();
-                                *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
-                            }
+                        if let Some(target) = target_dir
+                            && let Some(target_name) = target.file_name()
+                        {
+                            let name = target_name.to_string_lossy().to_string();
+                            *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
                         }
                         let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
                             prev.to_string_lossy().to_string(),
@@ -1323,11 +1327,11 @@ pub fn action_handler(
                         MMAction::FmSetCutPaths(String::new()),
                     )));
                     if let Some(target) = target_dir {
-                        if let Some((_, dest)) = items.first() {
-                            if let Some(item_name) = dest.file_name() {
-                                let name = item_name.to_string_lossy().to_string();
-                                *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
-                            }
+                        if let Some((_, dest)) = items.first()
+                            && let Some(item_name) = dest.file_name()
+                        {
+                            let name = item_name.to_string_lossy().to_string();
+                            *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
                         }
                         let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
                             target.to_string_lossy().to_string(),
@@ -1370,10 +1374,10 @@ pub fn action_handler(
         }
         MMAction::FmTogglePin => {
             let mut paths = fm_current_items(state);
-            if paths.is_empty() {
-                if let Ok(cwd) = std::env::current_dir() {
-                    paths.push(cwd.to_string_lossy().to_string());
-                }
+            if paths.is_empty()
+                && let Ok(cwd) = std::env::current_dir()
+            {
+                paths.push(cwd.to_string_lossy().to_string());
             }
             if !paths.is_empty() {
                 let store = waymaker::frecency::FrecencyStore::open();
@@ -1741,12 +1745,12 @@ fn commit_fm_action(
                     Err(e) => error!("fm delete '{}': {e}", path),
                 }
             }
-            if !deleted_items.is_empty() {
-                if let Ok(mut stack) = undo_stack.lock() {
-                    stack.push(crate::fm::UndoAction::DeletedFiles {
-                        items: deleted_items,
-                    });
-                }
+            if !deleted_items.is_empty()
+                && let Ok(mut stack) = undo_stack.lock()
+            {
+                stack.push(crate::fm::UndoAction::DeletedFiles {
+                    items: deleted_items,
+                });
             }
             close_action_box(state, fm_action);
             if fm_notify && !deleted_names.is_empty() {
@@ -1919,12 +1923,12 @@ mod tests {
 
     #[test]
     fn test_reload_next_and_prev_query_preservation() {
+        use std::sync::{Arc, Mutex};
         use waymaker::Selector;
         use waymaker::config::*;
         use waymaker::nucleo::Worker;
         use waymaker::render::State;
         use waymaker::ui::{DisplayUI, PickerUI, UI};
-        use std::sync::{Arc, Mutex};
 
         let (bind_tx, _) = tokio::sync::mpsc::unbounded_channel();
         let (render_tx, _) = tokio::sync::mpsc::unbounded_channel();
@@ -2071,12 +2075,12 @@ mod tests {
 
     #[test]
     fn test_fm_toggle_pin() {
+        use std::sync::{Arc, Mutex};
         use waymaker::Selector;
         use waymaker::config::*;
         use waymaker::nucleo::Worker;
         use waymaker::render::State;
         use waymaker::ui::{DisplayUI, PickerUI, UI};
-        use std::sync::{Arc, Mutex};
 
         let (bind_tx, _) = tokio::sync::mpsc::unbounded_channel();
         let (render_tx, _) = tokio::sync::mpsc::unbounded_channel();
@@ -2165,12 +2169,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_paste_into_and_flash() {
+        use std::sync::{Arc, Mutex};
+        use tokio::sync::mpsc;
         use waymaker::nucleo::injector::Injector;
         use waymaker::preview::AppendOnly;
         use waymaker::render::State;
         use waymaker::ui::UI;
-        use std::sync::{Arc, Mutex};
-        use tokio::sync::mpsc;
 
         let (mut mm, injector, _guard) = waymaker::ConfigMatchmaker::new_from_config(
             Default::default(),
@@ -2342,12 +2346,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_batch_paste_and_undo_clipboard_restoration() {
+        use std::sync::{Arc, Mutex};
+        use tokio::sync::mpsc;
         use waymaker::nucleo::injector::Injector;
         use waymaker::preview::AppendOnly;
         use waymaker::render::State;
         use waymaker::ui::UI;
-        use std::sync::{Arc, Mutex};
-        use tokio::sync::mpsc;
 
         let (mut mm, injector, _guard) = waymaker::ConfigMatchmaker::new_from_config(
             Default::default(),
@@ -2482,14 +2486,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_paste_into_chdir_and_undo_return_and_redo() {
+        use std::sync::{Arc, Mutex};
+        use tokio::sync::mpsc;
         use waymaker::action::Action;
         use waymaker::message::RenderCommand;
         use waymaker::nucleo::injector::Injector;
         use waymaker::preview::AppendOnly;
         use waymaker::render::State;
         use waymaker::ui::UI;
-        use std::sync::{Arc, Mutex};
-        use tokio::sync::mpsc;
 
         let (mut mm, injector, _guard) = waymaker::ConfigMatchmaker::new_from_config(
             Default::default(),
@@ -2609,10 +2613,10 @@ mod tests {
         // Drain render_rx and check that ChDir to dest_folder was sent
         let mut chdir_dest_found = false;
         while let Ok(cmd) = render_rx.try_recv() {
-            if let RenderCommand::Action(Action::ChDir(dir)) = cmd {
-                if dir == dest_folder.to_string_lossy().to_string() {
-                    chdir_dest_found = true;
-                }
+            if let RenderCommand::Action(Action::ChDir(dir)) = cmd
+                && dir == dest_folder.to_string_lossy()
+            {
+                chdir_dest_found = true;
             }
         }
         assert!(
@@ -2645,10 +2649,10 @@ mod tests {
         // Drain render_rx and check that ChDir to previous_dir (cwd) was sent
         let mut chdir_prev_found = false;
         while let Ok(cmd) = render_rx.try_recv() {
-            if let RenderCommand::Action(Action::ChDir(dir)) = cmd {
-                if dir == cwd.to_string_lossy().to_string() {
-                    chdir_prev_found = true;
-                }
+            if let RenderCommand::Action(Action::ChDir(dir)) = cmd
+                && dir == cwd.to_string_lossy()
+            {
+                chdir_prev_found = true;
             }
         }
         assert!(
@@ -2680,10 +2684,10 @@ mod tests {
 
         let mut chdir_redo_found = false;
         while let Ok(cmd) = render_rx.try_recv() {
-            if let RenderCommand::Action(Action::ChDir(dir)) = cmd {
-                if dir == dest_folder.to_string_lossy().to_string() {
-                    chdir_redo_found = true;
-                }
+            if let RenderCommand::Action(Action::ChDir(dir)) = cmd
+                && dir == dest_folder.to_string_lossy()
+            {
+                chdir_redo_found = true;
             }
         }
         assert!(
@@ -2702,14 +2706,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_paste_into_cut_and_undo_return_and_redo() {
+        use std::sync::{Arc, Mutex};
+        use tokio::sync::mpsc;
         use waymaker::action::Action;
         use waymaker::message::RenderCommand;
         use waymaker::nucleo::injector::Injector;
         use waymaker::preview::AppendOnly;
         use waymaker::render::State;
         use waymaker::ui::UI;
-        use std::sync::{Arc, Mutex};
-        use tokio::sync::mpsc;
 
         let (mut mm, injector, _guard) = waymaker::ConfigMatchmaker::new_from_config(
             Default::default(),
@@ -2805,10 +2809,10 @@ mod tests {
         // Drain render_rx and check that ChDir to dest_folder was sent
         let mut chdir_dest_found = false;
         while let Ok(cmd) = render_rx.try_recv() {
-            if let RenderCommand::Action(Action::ChDir(dir)) = cmd {
-                if dir == dest_folder.to_string_lossy().to_string() {
-                    chdir_dest_found = true;
-                }
+            if let RenderCommand::Action(Action::ChDir(dir)) = cmd
+                && dir == dest_folder.to_string_lossy()
+            {
+                chdir_dest_found = true;
             }
         }
         assert!(
@@ -2834,10 +2838,10 @@ mod tests {
 
         let mut chdir_prev_found = false;
         while let Ok(cmd) = render_rx.try_recv() {
-            if let RenderCommand::Action(Action::ChDir(dir)) = cmd {
-                if dir == cwd.to_string_lossy().to_string() {
-                    chdir_prev_found = true;
-                }
+            if let RenderCommand::Action(Action::ChDir(dir)) = cmd
+                && dir == cwd.to_string_lossy()
+            {
+                chdir_prev_found = true;
             }
         }
         assert!(
@@ -2863,10 +2867,10 @@ mod tests {
 
         let mut chdir_redo_found = false;
         while let Ok(cmd) = render_rx.try_recv() {
-            if let RenderCommand::Action(Action::ChDir(dir)) = cmd {
-                if dir == dest_folder.to_string_lossy().to_string() {
-                    chdir_redo_found = true;
-                }
+            if let RenderCommand::Action(Action::ChDir(dir)) = cmd
+                && dir == dest_folder.to_string_lossy()
+            {
+                chdir_redo_found = true;
             }
         }
         assert!(
