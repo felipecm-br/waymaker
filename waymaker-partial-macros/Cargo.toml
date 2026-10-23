@@ -2,8 +2,8 @@
 name = "waymaker-partial-macros"
 version = "0.0.30"
 edition = "2024"
-license = "MIT"
-repository = "https://github.com/Squirreljetpack/matchmaker"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/fcmiranda/waymaker"
 description = "Derive macros for the waymaker-partial crate"
 
 [features]

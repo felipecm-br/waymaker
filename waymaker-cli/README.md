@@ -420,4 +420,4 @@ Waymaker stands on the shoulders of remarkable terminal software:
 
 ## 📄 License
 
-Waymaker is open-source software licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See the [LICENSE](waymaker-cli/LICENSE) file for details.
+Waymaker is open-source software licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See the [LICENSE](LICENSE) file for details.

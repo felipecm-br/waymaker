@@ -4,8 +4,8 @@ version = "0.3.2"
 categories = ["command-line-utilities", "rust-patterns"]
 edition = "2024"
 keywords = ["fuzzy", "finder", "tui", "nucleo", "fzf"]
-license = "MIT"
-repository = "https://github.com/Squirreljetpack/matchmaker"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/fcmiranda/waymaker"
 description = "A fuzzy finder for the terminal, powered by nucleo"
 exclude = ["assets/"]
 
