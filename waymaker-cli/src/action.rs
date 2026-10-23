@@ -1264,9 +1264,6 @@ pub fn action_handler(
                             "{{yellow:󰕌 Undone {op_word} of {count} {item_word} (clipboard restored)}}"
                         )
                     }
-                    crate::fm::UndoAction::DeletedFile { original, .. } => {
-                        format!("{{yellow:󰕌 Restored: {}}}", original.display())
-                    }
                     crate::fm::UndoAction::DeletedFiles { items } => {
                         let count = items.len();
                         let item_word = if count == 1 { "item" } else { "items" };
@@ -1278,16 +1275,6 @@ pub fn action_handler(
                     crate::fm::UndoAction::Renamed { from, to } => {
                         format!(
                             "{{yellow:󰕌 Reverted rename: {} -> {}}}",
-                            to.display(),
-                            from.display()
-                        )
-                    }
-                    crate::fm::UndoAction::Copied { dest } => {
-                        format!("{{yellow:󰕌 Removed copy: {}}}", dest.display())
-                    }
-                    crate::fm::UndoAction::Moved { from, to } => {
-                        format!(
-                            "{{yellow:󰕌 Moved back: {} -> {}}}",
                             to.display(),
                             from.display()
                         )

@@ -1,4 +1,4 @@
-//! File-manager overlays and clipboard state for navigation mode.
+//! File-manager clipboard, undo/redo and filesystem helpers for navigation mode.
 
 use std::{
     fs,
@@ -6,23 +6,6 @@ use std::{
     process::Command,
     sync::{Arc, Mutex},
 };
-
-use ratatui::{
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
-};
-use waymaker::{
-    Action,
-    event::RenderSender,
-    message::RenderCommand,
-    ui::{Frame, Overlay, OverlayEffect, Rect, SizeHint},
-};
-
-use crate::action::MMAction;
-
-/// The name of the item currently under the cursor (first column only).
-pub type CurrentItem = Arc<Mutex<Option<String>>>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClipOp {
@@ -39,15 +22,7 @@ pub struct FmClipboard {
 pub type Clipboard = Arc<Mutex<Option<FmClipboard>>>;
 
 #[derive(Debug, Clone)]
-#[expect(
-    dead_code,
-    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
-)]
 pub enum UndoAction {
-    DeletedFile {
-        original: PathBuf,
-        backup: PathBuf,
-    },
     DeletedFiles {
         items: Vec<(PathBuf, PathBuf)>,
     },
@@ -55,13 +30,6 @@ pub enum UndoAction {
         path: PathBuf,
     },
     Renamed {
-        from: PathBuf,
-        to: PathBuf,
-    },
-    Copied {
-        dest: PathBuf,
-    },
-    Moved {
         from: PathBuf,
         to: PathBuf,
     },
@@ -202,19 +170,6 @@ pub fn copy_path(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 pub fn apply_undo(action: &UndoAction) -> std::io::Result<()> {
     match action {
-        UndoAction::DeletedFile { original, backup } => {
-            move_path(backup, original)?;
-            if let Some(name) = backup.file_name()
-                && let Some(parent) = backup.parent()
-                && let Some(grandparent) = parent.parent()
-            {
-                let info_file = grandparent
-                    .join("info")
-                    .join(format!("{}.trashinfo", name.to_string_lossy()));
-                let _ = fs::remove_file(info_file);
-            }
-            Ok(())
-        }
         UndoAction::DeletedFiles { items } => {
             for (original, backup) in items {
                 let _ = move_path(backup, original);
@@ -238,14 +193,6 @@ pub fn apply_undo(action: &UndoAction) -> std::io::Result<()> {
             }
         }
         UndoAction::Renamed { from, to } => move_path(to, from),
-        UndoAction::Copied { dest } => {
-            if dest.is_dir() {
-                fs::remove_dir_all(dest)
-            } else {
-                fs::remove_file(dest)
-            }
-        }
-        UndoAction::Moved { from, to } => move_path(to, from),
         UndoAction::Paste { op, items, .. } => {
             for (_src, dest) in items {
                 match op {
@@ -268,10 +215,6 @@ pub fn apply_undo(action: &UndoAction) -> std::io::Result<()> {
 
 pub fn apply_redo(action: &UndoAction) -> std::io::Result<()> {
     match action {
-        UndoAction::DeletedFile { original, .. } => {
-            let _ = move_to_trash(original)?;
-            Ok(())
-        }
         UndoAction::DeletedFiles { items } => {
             for (original, _) in items {
                 let _ = move_to_trash(original);
@@ -291,8 +234,6 @@ pub fn apply_redo(action: &UndoAction) -> std::io::Result<()> {
             }
         }
         UndoAction::Renamed { from, to } => move_path(from, to),
-        UndoAction::Copied { dest: _ } => Ok(()),
-        UndoAction::Moved { from, to } => move_path(from, to),
         UndoAction::Paste { op, items, .. } => {
             for (src, dest) in items {
                 match op {
@@ -306,515 +247,6 @@ pub fn apply_redo(action: &UndoAction) -> std::io::Result<()> {
             }
             Ok(())
         }
-    }
-}
-
-pub struct DeleteOverlay {
-    current: CurrentItem,
-    name: String,
-    tx: RenderSender<MMAction>,
-    undo_stack: UndoStack,
-}
-
-#[expect(
-    dead_code,
-    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
-)]
-impl DeleteOverlay {
-    pub fn new(current: CurrentItem, tx: RenderSender<MMAction>, undo_stack: UndoStack) -> Self {
-        Self {
-            current,
-            name: String::new(),
-            tx,
-            undo_stack,
-        }
-    }
-
-    fn do_delete(&mut self) -> OverlayEffect {
-        let path = PathBuf::from(&self.name);
-        match move_to_trash(&path) {
-            Ok(backup) => {
-                if let Ok(mut stack) = self.undo_stack.lock() {
-                    stack.push(UndoAction::DeletedFile {
-                        original: path,
-                        backup,
-                    });
-                }
-            }
-            Err(e) => log::error!("fm delete '{}': {e}", path.display()),
-        }
-        let _ = self
-            .tx
-            .send(RenderCommand::Action(Action::Reload(String::new())));
-        OverlayEffect::Disable
-    }
-}
-
-impl Overlay for DeleteOverlay {
-    type A = MMAction;
-
-    fn on_enable(&mut self, _area: &Rect) {
-        self.name = self
-            .current
-            .lock()
-            .ok()
-            .and_then(|g| g.clone())
-            .unwrap_or_default();
-    }
-
-    fn handle_input(&mut self, c: char) -> OverlayEffect {
-        match c {
-            'y' | 'Y' => self.do_delete(),
-            _ => OverlayEffect::Disable,
-        }
-    }
-
-    fn handle_action(&mut self, action: &Action<MMAction>) -> OverlayEffect {
-        match action {
-            Action::Accept | Action::Custom(MMAction::Accept) => self.do_delete(),
-            Action::Quit(_)
-            | Action::Cancel
-            | Action::ToggleFocus
-            | Action::FocusFilter
-            | Action::FocusNav => OverlayEffect::Disable,
-            _ => OverlayEffect::None,
-        }
-    }
-
-    fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        let label = format!("  '{}' ? [y/N] ", self.name);
-        let para = Paragraph::new(Line::from(vec![
-            Span::styled(
-                "  ",
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw("'"),
-            Span::styled(&self.name, Style::default().fg(Color::Yellow)),
-            Span::raw("'"),
-            Span::styled(" ? [y/N] ", Style::default().fg(Color::DarkGray)),
-        ]))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Red))
-                .title(Span::styled(
-                    "  ",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                )),
-        );
-        let _ = label;
-        frame.render_widget(Clear, area);
-        frame.render_widget(para, area);
-    }
-
-    fn area(&mut self, ui_area: &Rect) -> Result<Rect, [SizeHint; 2]> {
-        let w = (self.name.len() as u16 + 20)
-            .max(30)
-            .min(ui_area.width.saturating_sub(2));
-        Ok(Rect {
-            x: ui_area.x + (ui_area.width.saturating_sub(w)) / 2,
-            y: ui_area.y + ui_area.height.saturating_sub(3),
-            width: w,
-            height: 3,
-        })
-    }
-}
-
-pub struct CreateOverlay {
-    input: String,
-    dialog_width: u16,
-    tx: RenderSender<MMAction>,
-    undo_stack: UndoStack,
-}
-
-#[expect(
-    dead_code,
-    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
-)]
-impl CreateOverlay {
-    pub fn new(tx: RenderSender<MMAction>, undo_stack: UndoStack) -> Self {
-        Self {
-            input: String::new(),
-            dialog_width: 40,
-            tx,
-            undo_stack,
-        }
-    }
-
-    fn commit(&mut self) -> OverlayEffect {
-        let name = self.input.trim().to_string();
-        if name.is_empty() {
-            return OverlayEffect::Disable;
-        }
-        let result = if name.ends_with('/') {
-            fs::create_dir_all(&name)
-        } else {
-            if let Some(parent) = Path::new(&name).parent()
-                && !parent.as_os_str().is_empty()
-            {
-                let _ = fs::create_dir_all(parent);
-            }
-            fs::File::create(&name).map(|_| ())
-        };
-        if let Err(e) = result {
-            log::error!("fm create '{name}': {e}");
-        } else if let Ok(mut stack) = self.undo_stack.lock() {
-            stack.push(UndoAction::CreatedFile {
-                path: PathBuf::from(&name),
-            });
-        }
-        let _ = self
-            .tx
-            .send(RenderCommand::Action(Action::Reload(String::new())));
-        OverlayEffect::Disable
-    }
-}
-
-impl Overlay for CreateOverlay {
-    type A = MMAction;
-
-    fn on_enable(&mut self, area: &Rect) {
-        self.input.clear();
-        self.dialog_width = (area.width / 2).max(40).min(area.width.saturating_sub(4));
-    }
-
-    fn handle_input(&mut self, c: char) -> OverlayEffect {
-        self.input.push(c);
-        OverlayEffect::None
-    }
-
-    fn handle_action(&mut self, action: &Action<MMAction>) -> OverlayEffect {
-        match action {
-            Action::Accept | Action::Custom(MMAction::Accept) => self.commit(),
-            Action::DeleteChar => {
-                self.input.pop();
-                OverlayEffect::None
-            }
-            Action::DeleteWord => {
-                let trimmed = self.input.trim_end();
-                let last_space = trimmed.rfind(' ').map(|i| i + 1).unwrap_or(0);
-                self.input.truncate(last_space);
-                OverlayEffect::None
-            }
-            Action::Cancel
-            | Action::Quit(_)
-            | Action::ToggleFocus
-            | Action::FocusFilter
-            | Action::FocusNav => OverlayEffect::Disable,
-            _ => OverlayEffect::None,
-        }
-    }
-
-    fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        let hint = if self.input.ends_with('/') {
-            " (folder)"
-        } else {
-            " (file)"
-        };
-        const PROMPT: &str = "  ";
-        let inner_w = (area.width.saturating_sub(2 + PROMPT.len() as u16)) as usize;
-        let visible = visible_suffix(&self.input, inner_w);
-        let para = Paragraph::new(Line::from(vec![
-            Span::styled(
-                PROMPT,
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(visible.to_string(), Style::default().fg(Color::White)),
-            Span::styled(hint, Style::default().fg(Color::DarkGray)),
-        ]))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Green))
-                .title(Span::styled(
-                    "  ",
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                )),
-        );
-        frame.render_widget(Clear, area);
-        frame.render_widget(para, area);
-    }
-
-    fn area(&mut self, ui_area: &Rect) -> Result<Rect, [SizeHint; 2]> {
-        let w = self
-            .dialog_width
-            .max(30)
-            .min(ui_area.width.saturating_sub(2));
-        Ok(Rect {
-            x: ui_area.x + (ui_area.width.saturating_sub(w)) / 2,
-            y: ui_area.y + ui_area.height.saturating_sub(3),
-            width: w,
-            height: 3,
-        })
-    }
-}
-
-pub struct RenameOverlay {
-    current: CurrentItem,
-    original: String,
-    input: String,
-    dialog_width: u16,
-    tx: RenderSender<MMAction>,
-    undo_stack: UndoStack,
-}
-
-#[expect(
-    dead_code,
-    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
-)]
-impl RenameOverlay {
-    pub fn new(current: CurrentItem, tx: RenderSender<MMAction>, undo_stack: UndoStack) -> Self {
-        Self {
-            current,
-            original: String::new(),
-            input: String::new(),
-            dialog_width: 40,
-            tx,
-            undo_stack,
-        }
-    }
-
-    fn commit(&mut self) -> OverlayEffect {
-        let new_name = self.input.trim().to_string();
-        if new_name.is_empty() || new_name == self.original {
-            return OverlayEffect::Disable;
-        }
-        if let Err(e) = move_path(Path::new(&self.original), Path::new(&new_name)) {
-            log::error!("fm rename '{}' -> '{new_name}': {e}", self.original);
-        } else if let Ok(mut stack) = self.undo_stack.lock() {
-            stack.push(UndoAction::Renamed {
-                from: PathBuf::from(&self.original),
-                to: PathBuf::from(&new_name),
-            });
-        }
-        let _ = self
-            .tx
-            .send(RenderCommand::Action(Action::Reload(String::new())));
-        OverlayEffect::Disable
-    }
-}
-
-impl Overlay for RenameOverlay {
-    type A = MMAction;
-
-    fn on_enable(&mut self, area: &Rect) {
-        self.original = self
-            .current
-            .lock()
-            .ok()
-            .and_then(|g| g.clone())
-            .unwrap_or_default();
-        self.input = self.original.trim_end_matches('/').to_string();
-        let for_initial = input_width(&self.input);
-        let half = area.width / 2;
-        self.dialog_width = for_initial
-            .max(half)
-            .max(40)
-            .min(area.width.saturating_sub(4));
-    }
-
-    fn handle_input(&mut self, c: char) -> OverlayEffect {
-        self.input.push(c);
-        OverlayEffect::None
-    }
-
-    fn handle_action(&mut self, action: &Action<MMAction>) -> OverlayEffect {
-        match action {
-            Action::Accept | Action::Custom(MMAction::Accept) => self.commit(),
-            Action::DeleteChar => {
-                self.input.pop();
-                OverlayEffect::None
-            }
-            Action::DeleteWord => {
-                let trimmed = self.input.trim_end();
-                let last_space = trimmed.rfind(' ').map(|i| i + 1).unwrap_or(0);
-                self.input.truncate(last_space);
-                OverlayEffect::None
-            }
-            Action::Cancel
-            | Action::Quit(_)
-            | Action::ToggleFocus
-            | Action::FocusFilter
-            | Action::FocusNav => OverlayEffect::Disable,
-            _ => OverlayEffect::None,
-        }
-    }
-
-    fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        const PROMPT: &str = " 󰑕 ";
-        let inner_w = (area.width.saturating_sub(2 + PROMPT.len() as u16)) as usize;
-        let visible = visible_suffix(&self.input, inner_w);
-        let para = Paragraph::new(Line::from(vec![
-            Span::styled(
-                PROMPT,
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(visible.to_string(), Style::default().fg(Color::White)),
-        ]))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan))
-                .title(Span::styled(
-                    " 󰑕 ",
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                )),
-        );
-        frame.render_widget(Clear, area);
-        frame.render_widget(para, area);
-    }
-
-    fn area(&mut self, ui_area: &Rect) -> Result<Rect, [SizeHint; 2]> {
-        let w = self
-            .dialog_width
-            .max(30)
-            .min(ui_area.width.saturating_sub(2));
-        Ok(Rect {
-            x: ui_area.x + (ui_area.width.saturating_sub(w)) / 2,
-            y: ui_area.y + ui_area.height.saturating_sub(3),
-            width: w,
-            height: 3,
-        })
-    }
-}
-
-pub struct UnzipOverlay {
-    current: CurrentItem,
-    src: String,
-    dest: String,
-    dialog_width: u16,
-    tx: RenderSender<MMAction>,
-}
-
-#[expect(
-    dead_code,
-    reason = "superseded by the action-box flows in action.rs; kept pending a delete-or-revive decision"
-)]
-impl UnzipOverlay {
-    pub fn new(current: CurrentItem, tx: RenderSender<MMAction>) -> Self {
-        Self {
-            current,
-            src: String::new(),
-            dest: String::new(),
-            dialog_width: 50,
-            tx,
-        }
-    }
-
-    fn commit(&mut self) -> OverlayEffect {
-        let dest = self.dest.trim().to_string();
-        if dest.is_empty() || self.src.is_empty() {
-            return OverlayEffect::Disable;
-        }
-        if let Err(e) = fs::create_dir_all(&dest) {
-            log::error!("fm unzip: create dir '{dest}': {e}");
-            return OverlayEffect::Disable;
-        }
-        let src = &self.src;
-        let result = extract_archive(src, &dest);
-        if let Err(e) = result {
-            log::error!("fm unzip '{src}' -> '{dest}': {e}");
-        }
-        let _ = self
-            .tx
-            .send(RenderCommand::Action(Action::Reload(String::new())));
-        OverlayEffect::Disable
-    }
-}
-
-impl Overlay for UnzipOverlay {
-    type A = MMAction;
-
-    fn on_enable(&mut self, area: &Rect) {
-        self.src = self
-            .current
-            .lock()
-            .ok()
-            .and_then(|g| g.clone())
-            .unwrap_or_default();
-        self.dest = archive_stem(&self.src).to_string();
-        let for_initial = input_width(&self.dest);
-        let half = area.width / 2;
-        self.dialog_width = for_initial
-            .max(half)
-            .max(40)
-            .min(area.width.saturating_sub(4));
-    }
-
-    fn handle_input(&mut self, c: char) -> OverlayEffect {
-        self.dest.push(c);
-        OverlayEffect::None
-    }
-
-    fn handle_action(&mut self, action: &Action<MMAction>) -> OverlayEffect {
-        match action {
-            Action::Accept | Action::Custom(MMAction::Accept) => self.commit(),
-            Action::DeleteChar => {
-                self.dest.pop();
-                OverlayEffect::None
-            }
-            Action::DeleteWord => {
-                let trimmed = self.dest.trim_end();
-                let last_space = trimmed.rfind(' ').map(|i| i + 1).unwrap_or(0);
-                self.dest.truncate(last_space);
-                OverlayEffect::None
-            }
-            Action::Cancel
-            | Action::Quit(_)
-            | Action::ToggleFocus
-            | Action::FocusFilter
-            | Action::FocusNav => OverlayEffect::Disable,
-            _ => OverlayEffect::None,
-        }
-    }
-
-    fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        const PROMPT: &str = " 󰋺 ";
-        let inner_w = (area.width.saturating_sub(2 + PROMPT.len() as u16)) as usize;
-        let visible_dest = visible_suffix(&self.dest, inner_w);
-        let para = Paragraph::new(Line::from(vec![
-            Span::styled(
-                PROMPT,
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(visible_dest.to_string(), Style::default().fg(Color::White)),
-        ]))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow))
-                .title(Span::styled(
-                    format!(" 󰋺 {} ", self.src),
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                )),
-        );
-        frame.render_widget(Clear, area);
-        frame.render_widget(para, area);
-    }
-
-    fn area(&mut self, ui_area: &Rect) -> Result<Rect, [SizeHint; 2]> {
-        let w = self
-            .dialog_width
-            .max(30)
-            .min(ui_area.width.saturating_sub(2));
-        Ok(Rect {
-            x: ui_area.x + (ui_area.width.saturating_sub(w)) / 2,
-            y: ui_area.y + ui_area.height.saturating_sub(3),
-            width: w,
-            height: 3,
-        })
     }
 }
 
@@ -1018,19 +450,4 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
-}
-
-fn input_width(s: &str) -> u16 {
-    (s.len() as u16 + 20).max(30)
-}
-
-fn visible_suffix(s: &str, max_cols: usize) -> &str {
-    if s.len() <= max_cols {
-        return s;
-    }
-    let byte_start = s.len() - max_cols;
-    let start = (byte_start..=s.len())
-        .find(|&i| s.is_char_boundary(i))
-        .unwrap_or(s.len());
-    &s[start..]
 }
