@@ -2,7 +2,7 @@
 
 use std::io::Write;
 
-use super::{Focus, State, get_current};
+use super::{Flow, Focus, State, get_current};
 use crate::action::{Action, ActionExt};
 use crate::config::ExitConfig;
 use crate::event::{BindSender, EventSender};
@@ -10,16 +10,6 @@ use crate::message::{Interrupt, RenderCommand};
 use crate::tui::Tui;
 use crate::ui::{DisplayUI, OverlayUI, PickerUI, PreviewUI, UI};
 use crate::{ActionExtHandler, MatchError, SSS, Selection};
-
-/// What the render loop does after an action has been applied.
-pub(super) enum Flow<S> {
-    /// Go straight to the next event, skipping interrupt handling.
-    Continue,
-    /// Fall through to interrupt handling for this event.
-    Proceed,
-    /// Leave the render loop with this result.
-    Exit(Result<Vec<S>, MatchError>),
-}
 
 /// The render loop's state that action handling reads or mutates.
 pub(super) struct ActionCtx<'r, 'a, W: Write, T: SSS, S: Selection, A: ActionExt> {
@@ -1020,13 +1010,7 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             if let Some(handler) = ext_handler {
                 handler(
                     e,
-                    &mut state.dispatcher(
-                        ui,
-                        picker_ui,
-                        footer_ui,
-                        preview_ui,
-                        controller_tx,
-                    ),
+                    &mut state.dispatcher(ui, picker_ui, footer_ui, preview_ui, controller_tx),
                 );
             }
         }
