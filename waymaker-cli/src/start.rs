@@ -69,6 +69,45 @@ fn apply_border_gradient_env(border: &mut waymaker::config::BorderSetting) {
     }
 }
 
+/// Top-level presets in `dir`: `<name>.toml` files and `<name>/main.toml` folders.
+fn available_presets(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.is_dir() {
+                path.join("main.toml")
+                    .exists()
+                    .then(|| entry.file_name().to_string_lossy().into_owned())
+            } else if path.extension().is_some_and(|ext| ext == "toml") {
+                path.file_stem().map(|s| s.to_string_lossy().into_owned())
+            } else {
+                None
+            }
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+fn missing_preset_message(name: &str, dir: &Path) -> String {
+    let available = available_presets(dir);
+    if available.is_empty() {
+        format!(
+            "Preset '{name}' not found: no presets are installed in {}.\nRun `wm --download` to install the bundled presets.",
+            dir.display()
+        )
+    } else {
+        format!(
+            "Preset '{name}' not found in {}.\nAvailable: {}\nRun `wm --download` to install or update the bundled presets.",
+            dir.display(),
+            available.join(", ")
+        )
+    }
+}
+
 pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     if cli.test_keys {
         super::crokey::main();
@@ -123,12 +162,16 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     // apply overrides
     for mut p in cli.r#override {
         if p.is_relative() && p.extension().is_none() {
+            let name = p.to_string_lossy().into_owned();
             let main_p = presets_path().join(&p).join("main.toml");
             p = if !main_p.exists() {
                 presets_path().join(p.with_extension("toml"))
             } else {
                 main_p
             };
+            if !p.exists() {
+                anyhow::bail!(missing_preset_message(&name, &presets_path()));
+            }
         }
         // no recursion because tail bad
         let o: PartialConfig = load_type(&p, |s| toml::from_str(s))?;
@@ -2617,6 +2660,28 @@ mod tests {
         apply_media_props(&["size:1280".to_string()], &mut config);
         assert_eq!(config.previewer.media_size, 1280);
         assert_eq!(config.render.preview.media.size, Some(1280));
+    }
+
+    #[test]
+    fn test_missing_preset_message_lists_available() {
+        let dir = std::env::temp_dir().join(format!("wm_presets_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("git")).unwrap();
+        std::fs::create_dir_all(dir.join("docker")).unwrap();
+        std::fs::write(dir.join("rg.toml"), "").unwrap();
+        std::fs::write(dir.join("jump.toml"), "").unwrap();
+        std::fs::write(dir.join("notes.md"), "").unwrap();
+        std::fs::write(dir.join("docker/main.toml"), "").unwrap();
+
+        // `git` has no main.toml, so it is not a preset on its own.
+        assert_eq!(available_presets(&dir), vec!["docker", "jump", "rg"]);
+        let msg = missing_preset_message("jmp", &dir);
+        assert!(msg.contains("Preset 'jmp' not found"));
+        assert!(msg.contains("Available: docker, jump, rg"));
+
+        let empty = dir.join("git");
+        assert!(missing_preset_message("jump", &empty).contains("no presets are installed"));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[tokio::test]
