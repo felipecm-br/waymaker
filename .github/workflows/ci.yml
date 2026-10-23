@@ -22,6 +22,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    # A hung test should fail with its log kept, not run until cancelled.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust Toolchain
@@ -34,6 +36,7 @@ jobs:
 
   clippy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust Toolchain
