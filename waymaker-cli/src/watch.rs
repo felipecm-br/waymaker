@@ -231,6 +231,7 @@ mod linux {
             let mut buf = [0u8; 4096];
 
             loop {
+                // SAFETY: writes at most `buf.len()` bytes into `buf`.
                 let n = unsafe {
                     libc::read(self.fd(), buf.as_mut_ptr() as *mut libc::c_void, buf.len())
                 };
@@ -251,6 +252,8 @@ mod linux {
                 let mut offset = 0;
                 let total = n as usize;
                 while offset + std::mem::size_of::<libc::inotify_event>() <= total {
+                    // SAFETY: the loop condition keeps a whole header inside the
+                    // `total` bytes read; `read_unaligned` needs no alignment.
                     let event: libc::inotify_event = unsafe {
                         std::ptr::read_unaligned(
                             buf[offset..].as_ptr() as *const libc::inotify_event

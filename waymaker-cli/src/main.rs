@@ -35,13 +35,36 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
-async fn main() {
+fn main() {
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL)
     };
+    mark_tmux_term_program();
 
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("failed to start the tokio runtime")
+        .block_on(async_main());
+}
+
+/// ratatui-image only wraps image escapes for tmux passthrough when `TERM` or
+/// `TERM_PROGRAM` says tmux; `TMUX` alone is not enough. Mark it here, before
+/// the runtime spawns threads, since changing the environment while other
+/// threads may read it is undefined behavior. The previewer has the same
+/// fallback for library users, which this makes a no-op.
+fn mark_tmux_term_program() {
+    let in_tmux = std::env::var_os("TMUX").is_some()
+        || std::env::var("TERM").is_ok_and(|t| t.starts_with("tmux"));
+    if in_tmux && std::env::var("TERM_PROGRAM").map_or(true, |v| v != "tmux") {
+        // SAFETY: called at the top of `main`, before any other thread exists.
+        unsafe { std::env::set_var("TERM_PROGRAM", "tmux") };
+    }
+}
+
+async fn async_main() {
     // Fast-path: Check if invoked via `sesh` symlink
     let prog_name = std::env::args().next().unwrap_or_default();
     if std::path::Path::new(&prog_name)

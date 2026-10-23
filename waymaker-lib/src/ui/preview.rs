@@ -156,6 +156,10 @@ impl PreviewUI {
                     .map(|v| v != "tmux")
                     .unwrap_or(true)
             {
+                // ratatui-image only detects tmux from TERM/TERM_PROGRAM.
+                // SAFETY: not sound if another thread reads the environment
+                // concurrently. Callers should set TERM_PROGRAM before starting
+                // threads (the wm binary does, making this a no-op there).
                 #[allow(unused_unsafe)]
                 unsafe {
                     std::env::set_var("TERM_PROGRAM", "tmux");
@@ -1643,6 +1647,8 @@ fn query_tty_picker(timeout: std::time::Duration) -> anyhow::Result<ratatui_imag
     }
     impl Drop for TtyGuard {
         fn drop(&mut self) {
+            // SAFETY: the guard is declared after `tty` and dropped before it,
+            // so the descriptor is still open here.
             let borrowed = unsafe { std::os::fd::BorrowedFd::borrow_raw(self.fd) };
             let _ = tcflush(borrowed, FlushArg::TCIFLUSH);
             if let Some(ref orig) = self.orig {
