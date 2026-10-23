@@ -92,20 +92,60 @@ fn available_presets(dir: &Path) -> Vec<String> {
     names
 }
 
+/// Names of the presets compiled into the binary; see [`embedded_preset`].
+const EMBEDDED_PRESETS: &[&str] = &[
+    "cargo-rx",
+    "csv",
+    "downloads",
+    "ftb",
+    "jump",
+    "kill",
+    "man",
+    "memory",
+    "nvim",
+    "pr",
+    "ps",
+    "rg",
+    "session-picker",
+    "workspace",
+];
+
+/// Core presets compiled into the binary. They are used when no preset of that
+/// name is installed, so `wm -o jump` works before `install.sh` or
+/// `wm --download` has run; an installed file always takes precedence.
+fn embedded_preset(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "cargo-rx" => include_str!("../assets/presets/cargo-rx.toml"),
+        "csv" => include_str!("../assets/presets/csv.toml"),
+        "downloads" => include_str!("../assets/presets/downloads.toml"),
+        "ftb" => include_str!("../assets/presets/ftb.toml"),
+        "jump" => include_str!("../assets/presets/jump.toml"),
+        "kill" => include_str!("../assets/presets/kill.toml"),
+        "man" => include_str!("../assets/presets/man.toml"),
+        "memory" => include_str!("../assets/presets/memory.toml"),
+        "nvim" => include_str!("../assets/presets/nvim.toml"),
+        "pr" => include_str!("../assets/presets/pr.toml"),
+        "ps" => include_str!("../assets/presets/ps.toml"),
+        "rg" if cfg!(windows) => include_str!("../assets/presets/win.rg.toml"),
+        "rg" => include_str!("../assets/presets/rg.toml"),
+        "session-picker" => include_str!("../assets/presets/session-picker.toml"),
+        "workspace" => include_str!("../assets/presets/workspace.toml"),
+        _ => return None,
+    })
+}
+
 fn missing_preset_message(name: &str, dir: &Path) -> String {
-    let available = available_presets(dir);
-    if available.is_empty() {
-        format!(
-            "Preset '{name}' not found: no presets are installed in {}.\nRun `wm --download` to install the bundled presets.",
-            dir.display()
-        )
+    let installed = available_presets(dir);
+    let installed = if installed.is_empty() {
+        "none".to_string()
     } else {
-        format!(
-            "Preset '{name}' not found in {}.\nAvailable: {}\nRun `wm --download` to install or update the bundled presets.",
-            dir.display(),
-            available.join(", ")
-        )
-    }
+        installed.join(", ")
+    };
+    format!(
+        "Preset '{name}' not found.\nInstalled in {}: {installed}\nBuilt in: {}\nRun `wm --download` to install or update the bundled presets.",
+        dir.display(),
+        EMBEDDED_PRESETS.join(", ")
+    )
 }
 
 pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
@@ -161,6 +201,7 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
 
     // apply overrides
     for mut p in cli.r#override {
+        let mut embedded = None;
         if p.is_relative() && p.extension().is_none() {
             let name = p.to_string_lossy().into_owned();
             let main_p = presets_path().join(&p).join("main.toml");
@@ -170,11 +211,19 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
                 main_p
             };
             if !p.exists() {
-                anyhow::bail!(missing_preset_message(&name, &presets_path()));
+                embedded = embedded_preset(&name);
+                if embedded.is_none() {
+                    anyhow::bail!(missing_preset_message(&name, &presets_path()));
+                }
+                log::debug!("Using built-in preset '{name}'");
             }
         }
         // no recursion because tail bad
-        let o: PartialConfig = load_type(&p, |s| toml::from_str(s))?;
+        let o: PartialConfig = match embedded {
+            Some(src) => toml::from_str(src)
+                .map_err(|e| anyhow::anyhow!("Failed to parse built-in preset: {e}"))?,
+            None => load_type(&p, |s| toml::from_str(s))?,
+        };
 
         if let Some(q) = &o.source {
             let source = p.parent().as_ref().unwrap().join(q);
@@ -2689,11 +2738,22 @@ mod tests {
         assert_eq!(available_presets(&dir), vec!["docker", "jump", "rg"]);
         let msg = missing_preset_message("jmp", &dir);
         assert!(msg.contains("Preset 'jmp' not found"));
-        assert!(msg.contains("Available: docker, jump, rg"));
+        assert!(msg.contains(": docker, jump, rg\n"));
+        assert!(msg.contains("Built in: cargo-rx, csv"));
 
         let empty = dir.join("git");
-        assert!(missing_preset_message("jump", &empty).contains("no presets are installed"));
+        assert!(missing_preset_message("jump", &empty).contains(": none\n"));
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn test_embedded_presets_parse() {
+        for name in EMBEDDED_PRESETS {
+            let src = embedded_preset(name).unwrap_or_else(|| panic!("{name} is not embedded"));
+            let parsed: Result<PartialConfig, _> = toml::from_str(src);
+            assert!(parsed.is_ok(), "built-in preset {name}: {:?}", parsed.err());
+        }
+        assert!(embedded_preset("nope").is_none());
     }
 
     #[tokio::test]
