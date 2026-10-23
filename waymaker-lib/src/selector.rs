@@ -183,54 +183,10 @@ impl<T, S: Selection> Selector<T, S> {
         let selections = selections.clone();
 
         #[cfg(feature = "parallelism")]
-        tokio::task::spawn_blocking(move || {
-            let mut set_guard = selections.set.lock().unwrap();
-
-            let mut all = true;
-            let mut seen = 0;
-            for (i, (k, _)) in results.iter().enumerate() {
-                if !set_guard.contains_key(k) {
-                    all = false;
-                    seen = i;
-                    break;
-                }
-            }
-
-            if all {
-                for (k, _) in results {
-                    set_guard.swap_remove(&k);
-                }
-            } else {
-                for (k, v) in results.into_iter().skip(seen) {
-                    set_guard.insert(k, v);
-                }
-            }
-        });
+        tokio::task::spawn_blocking(move || toggle_all(&selections, results));
 
         #[cfg(not(feature = "parallelism"))]
-        {
-            let mut set_guard = selections.set.lock().unwrap();
-
-            let mut all = true;
-            let mut seen = 0;
-            for (i, (k, _)) in results.iter().enumerate() {
-                if !set_guard.contains_key(k) {
-                    all = false;
-                    seen = i;
-                    break;
-                }
-            }
-
-            if all {
-                for (k, _) in results {
-                    set_guard.swap_remove(&k);
-                }
-            } else {
-                for (k, v) in results.into_iter().skip(seen) {
-                    set_guard.insert(k, v);
-                }
-            }
-        }
+        toggle_all(&selections, results);
     }
 
     // ---------- wrappers (?) -----------
@@ -241,6 +197,31 @@ impl<T, S: Selection> Selector<T, S> {
     //     };
     //     selections.insert(k, v)
     // }
+}
+
+/// Selects all of `results`, or deselects them all if every one is already selected.
+fn toggle_all<K: Eq + Hash, S>(selections: &SelectorImpl<K, S>, results: Vec<(K, S)>) {
+    let mut set_guard = selections.set.lock().unwrap();
+
+    let mut all = true;
+    let mut seen = 0;
+    for (i, (k, _)) in results.iter().enumerate() {
+        if !set_guard.contains_key(k) {
+            all = false;
+            seen = i;
+            break;
+        }
+    }
+
+    if all {
+        for (k, _) in results {
+            set_guard.swap_remove(&k);
+        }
+    } else {
+        for (k, v) in results.into_iter().skip(seen) {
+            set_guard.insert(k, v);
+        }
+    }
 }
 
 // ---------- Selection Set ---------------
@@ -424,8 +405,19 @@ mod tests {
         assert!(!sel.contains(&invalid));
     }
 
-    #[test]
-    fn test_selector_cycle_all() {
+    /// `cycle_all_bg` runs on a blocking task under `parallelism`, so poll for its effect.
+    async fn wait_until(cond: impl Fn() -> bool) {
+        for _ in 0..400 {
+            if cond() {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+        panic!("condition not reached within 2s");
+    }
+
+    #[tokio::test]
+    async fn test_selector_cycle_all() {
         let sel = Selector::new(|(id, s): &(u32, String)| (*id, s.clone()));
         let items = vec![
             (1u32, "one".to_string()),
@@ -435,13 +427,13 @@ mod tests {
 
         // None are selected -> cycle_all selects all
         sel.cycle_all_bg(&items);
-        assert_eq!(sel.len(), 3);
+        wait_until(|| sel.len() == 3).await;
         assert!(sel.contains(&items[0]));
         assert!(sel.contains(&items[1]));
         assert!(sel.contains(&items[2]));
 
         // All are selected -> cycle_all deselects all
         sel.cycle_all_bg(&items);
-        assert_eq!(sel.len(), 0);
+        wait_until(|| sel.is_empty()).await;
     }
 }
