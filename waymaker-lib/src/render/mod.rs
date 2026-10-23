@@ -3536,6 +3536,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     if let Some(x) = overlay_ui_ref {
                         x.draw(frame);
                     }
+                    if crate::ui::no_color() {
+                        crate::ui::strip_colors(frame.buffer_mut());
+                    }
                 })
                 .map_err(|e| MatchError::TUIError(e.to_string()))?;
             state.needs_redraw = false;

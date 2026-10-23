@@ -1,11 +1,13 @@
 mod display;
 pub mod gradient;
 mod input;
+mod no_color;
 mod overlay;
 mod preview;
 pub mod results;
 pub use display::*;
 pub use input::*;
+pub use no_color::*;
 pub use overlay::*;
 pub use preview::*;
 pub use results::*;
