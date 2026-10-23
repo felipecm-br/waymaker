@@ -91,7 +91,7 @@ impl Spinner {
     pub fn current_frame(&self) -> &'static str {
         let ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default() // clock before 1970: treat as 0
             .as_millis() as u64;
         let ms_per_frame = 1000 / (self.fps as u64);
         let current_frame = (ms / ms_per_frame) % (self.frames.len() as u64);

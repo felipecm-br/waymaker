@@ -582,7 +582,7 @@ async fn cleanup_tmp_files(path: &Path) -> Result<()> {
 pub async fn write_to_file(path: PathBuf, content: String) -> Result<()> {
     let suffix = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default() // clock before 1970: treat as 0
         .as_nanos();
 
     let tmp_path = path.with_file_name(format!("{}.{}.tmp", path.filename()?, suffix));

@@ -5,6 +5,12 @@ use std::{
     process::{Command, exit},
 };
 
+/// Reports a failed download step and exits, like the curl/unzip failures do.
+fn die(msg: String) -> ! {
+    ebog!("{msg}");
+    exit(1)
+}
+
 pub fn handle_download(cli: &crate::clap::Cli) {
     let Some(subfolder) = &cli.download else {
         return;
@@ -16,7 +22,8 @@ pub fn handle_download(cli: &crate::clap::Cli) {
     if temp_dir.exists() {
         fs::remove_dir_all(&temp_dir).ok();
     }
-    fs::create_dir_all(&temp_dir).unwrap();
+    fs::create_dir_all(&temp_dir)
+        .unwrap_or_else(|e| die(format!("Could not create {}: {e}", temp_dir.display())));
 
     ibog!("Downloading presets from GitHub...");
     let zip_path = temp_dir.join("waymaker.zip");
@@ -96,9 +103,16 @@ pub fn handle_download(cli: &crate::clap::Cli) {
             {
                 if win_path.is_file() {
                     if !dest.exists() {
-                        fs::create_dir_all(&dest).unwrap();
+                        fs::create_dir_all(&dest).unwrap_or_else(|e| {
+                            die(format!("Could not create {}: {e}", dest.display()))
+                        });
                     }
-                    fs::copy(&win_path, dest.join(subfolder)).unwrap();
+                    fs::copy(&win_path, dest.join(subfolder)).unwrap_or_else(|e| {
+                        die(format!(
+                            "Could not write {}: {e}",
+                            dest.join(subfolder).display()
+                        ))
+                    });
                     ibog!(
                         "Preset file successfully downloaded to: {}",
                         dest.join(subfolder).display()
@@ -117,9 +131,16 @@ pub fn handle_download(cli: &crate::clap::Cli) {
             {
                 if plain_path.is_file() {
                     if !dest.exists() {
-                        fs::create_dir_all(&dest).unwrap();
+                        fs::create_dir_all(&dest).unwrap_or_else(|e| {
+                            die(format!("Could not create {}: {e}", dest.display()))
+                        });
                     }
-                    fs::copy(&plain_path, dest.join(subfolder)).unwrap();
+                    fs::copy(&plain_path, dest.join(subfolder)).unwrap_or_else(|e| {
+                        die(format!(
+                            "Could not write {}: {e}",
+                            dest.join(subfolder).display()
+                        ))
+                    });
                     ibog!(
                         "Preset file successfully downloaded to: {}",
                         dest.join(subfolder).display()
@@ -170,7 +191,8 @@ pub fn handle_download(cli: &crate::clap::Cli) {
         }
     }
 
-    let count = copy_and_process(&source, &dest);
+    let count = copy_and_process(&source, &dest)
+        .unwrap_or_else(|e| die(format!("Could not copy presets to {}: {e}", dest.display())));
     if count == 0 {
         ebog!("Source is not available for your platform.");
         exit(1);
@@ -181,39 +203,39 @@ pub fn handle_download(cli: &crate::clap::Cli) {
     exit(0);
 }
 
-fn copy_and_process(src: &Path, dst: &Path) -> usize {
+fn copy_and_process(src: &Path, dst: &Path) -> std::io::Result<usize> {
     if !dst.exists() {
-        fs::create_dir_all(dst).unwrap();
+        fs::create_dir_all(dst)?;
     }
 
     let mut count = 0;
-    for entry in fs::read_dir(src).unwrap() {
-        let entry = entry.unwrap();
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
         let path = entry.path();
-        let name_os = path.file_name().unwrap();
+        let name_os = entry.file_name();
         let name = name_os.to_string_lossy();
 
         if path.is_dir() {
-            count += copy_and_process(&path, &dst.join(name_os));
+            count += copy_and_process(&path, &dst.join(&name_os))?;
             continue;
         }
 
         #[cfg(windows)]
         {
             if let Some(stripped) = name.strip_prefix("win.") {
-                fs::copy(&path, dst.join(stripped)).unwrap();
+                fs::copy(&path, dst.join(stripped))?;
                 count += 1;
             }
         }
         #[cfg(not(windows))]
         {
             if !name.starts_with("win.") {
-                fs::copy(&path, dst.join(name.as_ref())).unwrap();
+                fs::copy(&path, dst.join(name.as_ref()))?;
                 count += 1;
             }
         }
     }
-    count
+    Ok(count)
 }
 
 pub fn expand_tilde(path: PathBuf) -> PathBuf {
