@@ -912,6 +912,12 @@ fn current_unix_nanos() -> u128 {
 mod tests {
     use super::*;
 
+    /// A scratch dir under the canonical temp dir. On macOS `temp_dir()` is a
+    /// `/var` symlink to `/private/var`, and stored paths are canonicalized.
+    fn test_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().canonicalize().unwrap().join(name)
+    }
+
     #[test]
     fn test_clean_path() {
         assert_eq!(clean_path("/home/user/project/"), "/home/user/project");
@@ -937,7 +943,7 @@ mod tests {
 
     #[test]
     fn test_store_open_add_rank() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("mm_test_frecency");
+        let temp_dir = test_dir("mm_test_frecency");
         let _ = fs::remove_dir_all(&temp_dir);
         fs::create_dir_all(&temp_dir)?;
         let test_file = temp_dir.join("file.rs");
@@ -968,7 +974,7 @@ mod tests {
 
     #[test]
     fn test_store_import_and_clean_stale() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("mm_test_frecency_clean");
+        let temp_dir = test_dir("mm_test_frecency_clean");
         let _ = fs::remove_dir_all(&temp_dir);
         fs::create_dir_all(&temp_dir)?;
         let db_path = temp_dir.join("test.redb");
@@ -995,7 +1001,7 @@ mod tests {
 
     #[test]
     fn test_store_remove() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("mm_test_frecency_remove");
+        let temp_dir = test_dir("mm_test_frecency_remove");
         let _ = fs::remove_dir_all(&temp_dir);
         fs::create_dir_all(&temp_dir)?;
         let test_file = temp_dir.join("remove_target");
@@ -1021,7 +1027,7 @@ mod tests {
 
     #[test]
     fn test_snapshot_relative_path_lookup() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("mm_test_frecency_relative");
+        let temp_dir = test_dir("mm_test_frecency_relative");
         let _ = fs::remove_dir_all(&temp_dir);
         let db_path = temp_dir.join("test.redb");
 
@@ -1053,7 +1059,7 @@ mod tests {
 
     #[test]
     fn test_exact_path_outranks_generic_basename() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("mm_test_frecency_ranking");
+        let temp_dir = test_dir("mm_test_frecency_ranking");
         let _ = fs::remove_dir_all(&temp_dir);
         let db_path = temp_dir.join("test.redb");
 
@@ -1107,7 +1113,7 @@ mod tests {
 
     #[test]
     fn test_location_bias_boost() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("mm_test_location_bias");
+        let temp_dir = test_dir("mm_test_location_bias");
         let _ = fs::remove_dir_all(&temp_dir);
         let db_path = temp_dir.join("test.redb");
 
@@ -1149,7 +1155,7 @@ mod tests {
 
     #[test]
     fn test_pins_crud_and_toggle() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("mm_test_pins_crud");
+        let temp_dir = test_dir("mm_test_pins_crud");
         let _ = fs::remove_dir_all(&temp_dir);
         let db_path = temp_dir.join("test_pins.redb");
 
@@ -1194,7 +1200,7 @@ mod tests {
 
     #[test]
     fn test_shadow_copy_fallback_on_locked_database() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("mm_test_shadow_fallback");
+        let temp_dir = test_dir("mm_test_shadow_fallback");
         let _ = fs::remove_dir_all(&temp_dir);
         fs::create_dir_all(&temp_dir)?;
         let db_path = temp_dir.join("primary.redb");
