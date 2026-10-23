@@ -555,7 +555,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
 
         let hidden_columns = vec![false, false, false];
@@ -604,7 +608,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
 
         let hidden_columns = vec![false, false, false];
@@ -647,7 +655,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
 
         let hidden_columns = vec![false, false, false];
@@ -699,7 +711,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
 
         let hidden_columns = vec![false, false, false];
@@ -743,7 +759,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
 
         let hidden_columns = vec![false, false, false];
@@ -784,7 +804,11 @@ mod tests {
 
         let mut state_obj = State::new();
         state_obj.prompt_input_value = Some("review PR #42".to_string());
-        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
 
         let hidden_columns = vec![false, false, false];
@@ -836,7 +860,11 @@ mod tests {
 
         let mut state_obj = State::new();
         state_obj.live_input_key = Some("Enter".to_string());
-        let mut tui = waymaker::tui::Tui::new(TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher = Matcher::new(NucleoConfig::DEFAULT);
 
         let hidden_columns = vec![false, false, false];

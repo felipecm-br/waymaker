@@ -2623,13 +2623,13 @@ mod tests {
     async fn test_start_filter_headless() {
         let mut config = Config::default();
         config.start.command.default.command = "printf 'apple\\nbanana\\ncherry\\n'".to_string();
-        let code = start_filter(config, "ban", false, None).await;
+        let code = start_filter(config, "ban", true, None).await;
         assert_eq!(code, 0);
 
         let mut config_nomatch = Config::default();
         config_nomatch.start.command.default.command =
             "printf 'apple\\nbanana\\ncherry\\n'".to_string();
-        let code_nomatch = start_filter(config_nomatch, "xyz", false, None).await;
+        let code_nomatch = start_filter(config_nomatch, "xyz", true, None).await;
         assert_eq!(code_nomatch, 1);
     }
 

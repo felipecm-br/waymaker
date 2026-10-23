@@ -343,6 +343,23 @@ impl Tui<Box<dyn Write + Send>> {
         let tui = Self::new_with_writer(writer, config)?;
         Ok(tui)
     }
+
+    /// Build a [`Tui`] that renders into a sink over a fixed `area`, without
+    /// touching the terminal (no stream detection, raw mode or cursor queries).
+    /// Lets tests construct UI state where no TTY is available, such as CI.
+    pub fn headless(config: TerminalConfig, area: Rect) -> Result<Self> {
+        let writer: Box<dyn Write + Send> = Box::new(io::sink());
+        let options = TerminalOptions {
+            viewport: Viewport::Fixed(area),
+        };
+        let terminal = Terminal::with_options(CrosstermBackend::new(writer), options)?;
+        Ok(Self {
+            terminal,
+            config,
+            area,
+            in_execute: false,
+        })
+    }
 }
 
 impl<W> Drop for Tui<W>

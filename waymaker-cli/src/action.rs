@@ -2231,8 +2231,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui =
-            waymaker::tui::Tui::new(waymaker::config::TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            waymaker::config::TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher =
             waymaker::nucleo::nucleo::Matcher::new(waymaker::nucleo::nucleo::Config::DEFAULT);
 
@@ -2409,8 +2412,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui =
-            waymaker::tui::Tui::new(waymaker::config::TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            waymaker::config::TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher =
             waymaker::nucleo::nucleo::Matcher::new(waymaker::nucleo::nucleo::Config::DEFAULT);
 
@@ -2548,8 +2554,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui =
-            waymaker::tui::Tui::new(waymaker::config::TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            waymaker::config::TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher =
             waymaker::nucleo::nucleo::Matcher::new(waymaker::nucleo::nucleo::Config::DEFAULT);
 
@@ -2765,8 +2774,11 @@ mod tests {
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
-        let mut tui =
-            waymaker::tui::Tui::new(waymaker::config::TerminalConfig::default()).unwrap();
+        let mut tui = waymaker::tui::Tui::headless(
+            waymaker::config::TerminalConfig::default(),
+            ratatui::layout::Rect::new(0, 0, 80, 24),
+        )
+        .unwrap();
         let mut matcher =
             waymaker::nucleo::nucleo::Matcher::new(waymaker::nucleo::nucleo::Config::DEFAULT);
 
