@@ -1885,6 +1885,10 @@ mod tests {
     use super::*;
     use waymaker::Action;
 
+    /// Serializes tests that drive actions writing the process-wide
+    /// `start::TARGET_ITEM`; run in parallel they overwrite each other's value.
+    static TARGET_ITEM_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     #[test]
     fn test_parse_actions() {
         assert!(Action::<MMAction>::from_str("Unbind(QueryChange)").is_ok());
@@ -1923,6 +1927,7 @@ mod tests {
 
     #[test]
     fn test_reload_next_and_prev_query_preservation() {
+        let _target_guard = TARGET_ITEM_TEST_LOCK.blocking_lock();
         use std::sync::{Arc, Mutex};
         use waymaker::Selector;
         use waymaker::config::*;
@@ -2169,6 +2174,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_paste_into_and_flash() {
+        let _target_guard = TARGET_ITEM_TEST_LOCK.lock().await;
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
         use waymaker::nucleo::injector::Injector;
@@ -2346,6 +2352,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_batch_paste_and_undo_clipboard_restoration() {
+        let _target_guard = TARGET_ITEM_TEST_LOCK.lock().await;
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
         use waymaker::nucleo::injector::Injector;
@@ -2486,6 +2493,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_paste_into_chdir_and_undo_return_and_redo() {
+        let _target_guard = TARGET_ITEM_TEST_LOCK.lock().await;
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
         use waymaker::action::Action;
@@ -2706,6 +2714,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_paste_into_cut_and_undo_return_and_redo() {
+        let _target_guard = TARGET_ITEM_TEST_LOCK.lock().await;
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
         use waymaker::action::Action;
