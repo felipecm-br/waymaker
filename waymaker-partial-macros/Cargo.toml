@@ -3,7 +3,7 @@ name = "waymaker-partial-macros"
 version = "0.0.30"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/fcmiranda/waymaker"
+repository = "https://github.com/felipecm-br/waymaker"
 description = "Derive macros for the waymaker-partial crate"
 
 [features]

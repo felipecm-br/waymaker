@@ -5,10 +5,10 @@ authors = ["Squirreljetpack"]
 categories = ["command-line-utilities"]
 edition = "2024"
 exclude = ["assets/completions", "assets/presets"]
-homepage = "https://github.com/fcmiranda/waymaker"
+homepage = "https://github.com/felipecm-br/waymaker"
 keywords = ["fuzzy", "finder", "tui", "nucleo", "fzf"]
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/fcmiranda/waymaker"
+repository = "https://github.com/felipecm-br/waymaker"
 description = "Command-line interface for the waymaker fuzzy finder"
 
 [package.metadata.dist]

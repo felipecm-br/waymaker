@@ -68,6 +68,13 @@ async fn main() {
 
     let (cli, config_args) = Cli::get_partitioned_args();
 
+    // `wm help` would otherwise be parsed as a config override with no value.
+    if config_args.len() == 1 && config_args[0] == "help" {
+        use ::clap::CommandFactory;
+        Cli::command().print_help().ok();
+        exit(0);
+    }
+
     init_logger(
         [cli.quiet, cli.verbose],
         &state_dir().join(format!("{BINARY_SHORT}.log")),

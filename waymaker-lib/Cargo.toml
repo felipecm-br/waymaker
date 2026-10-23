@@ -5,7 +5,7 @@ categories = ["command-line-utilities", "rust-patterns"]
 edition = "2024"
 keywords = ["fuzzy", "finder", "tui", "nucleo", "fzf"]
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/fcmiranda/waymaker"
+repository = "https://github.com/felipecm-br/waymaker"
 description = "A fuzzy finder for the terminal, powered by nucleo"
 exclude = ["assets/"]
 

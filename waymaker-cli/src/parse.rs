@@ -5,7 +5,10 @@ use thiserror::Error;
 pub enum ParseError {
     #[error("Invalid path component '{component}' in path '{path}'")]
     InvalidPath { path: String, component: String },
-    #[error("Missing value for path '{path}'")]
+    #[error(
+        "'{path}' is not a known option, or is a config override missing its value \
+         (use key=value or `key value`; see `wm --help` and `wm -d options`)"
+    )]
     MissingValue { path: String },
 }
 

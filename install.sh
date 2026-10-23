@@ -13,7 +13,7 @@
 
 set -e
 
-REPO="fcmiranda/waymaker"
+REPO="felipecm-br/waymaker"
 BRANCH="main"
 BINARY_BASE_NAME="wm"
 

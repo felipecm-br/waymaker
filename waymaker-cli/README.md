@@ -3,9 +3,9 @@
 <div align="center">
 
 [![Crates.io](https://img.shields.io/crates/v/waymaker-cli?color=orange&style=flat-square)](https://crates.io/crates/waymaker-cli)
-[![GitHub Release](https://img.shields.io/github/v/release/fcmiranda/waymaker?style=flat-square&color=blue)](https://github.com/fcmiranda/waymaker/releases)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=flat-square)](https://github.com/fcmiranda/waymaker/blob/main/waymaker-cli/LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-brightgreen?style=flat-square)](https://github.com/fcmiranda/waymaker/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/felipecm-br/waymaker?style=flat-square&color=blue)](https://github.com/felipecm-br/waymaker/releases)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=flat-square)](https://github.com/felipecm-br/waymaker/blob/main/waymaker-cli/LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-brightgreen?style=flat-square)](https://github.com/felipecm-br/waymaker/releases)
 [![Rust](https://img.shields.io/badge/built%20with-Rust-dea584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 
 **Next-generation terminal fuzzy finder, in-process file manager, media & markdown viewer, and tmux session orchestrator.**
@@ -163,7 +163,7 @@ Waymaker includes an all-in-one installation script that installs the binary **a
 ### 1-Line Universal Installer (Binary + Configs + Presets)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/fcmiranda/waymaker/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/felipecm-br/waymaker/main/install.sh | sh
 ```
 
 ### From Local Source (Repository Clone)
@@ -171,7 +171,7 @@ curl -fsSL https://raw.githubusercontent.com/fcmiranda/waymaker/main/install.sh 
 Clone the repository and run `install.sh`:
 
 ```sh
-git clone https://github.com/fcmiranda/waymaker.git
+git clone https://github.com/felipecm-br/waymaker.git
 cd waymaker
 
 # Build release binary and deploy all .toml configs and presets
