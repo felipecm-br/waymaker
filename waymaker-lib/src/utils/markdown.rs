@@ -1802,7 +1802,6 @@ graph TD
         );
     }
 
-
     #[test]
     fn test_render_markdown_inline_local_image() {
         let _lock = crate::utils::lock_test_env();
