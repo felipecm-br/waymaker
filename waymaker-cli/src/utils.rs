@@ -24,7 +24,7 @@ pub fn handle_download(cli: &crate::clap::Cli) {
     let mut curl_cmd = Command::new("curl");
     curl_cmd.args([
         "-L",
-        "https://github.com/Squirreljetpack/matchmaker/archive/refs/heads/main.zip",
+        "https://github.com/felipecm-br/waymaker/archive/refs/heads/main.zip",
         "-o",
     ]);
     curl_cmd.arg(&zip_path);
