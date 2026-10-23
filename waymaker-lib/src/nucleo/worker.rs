@@ -1298,7 +1298,6 @@ impl<T: SSS> Worker<T> {
                     || (self.depth_penalty > 0 && self.mode_index == 0)))
             || effective_dir_first;
 
-        #[cfg(feature = "frizbee")]
         let (items_buf, initial_prev_tier) = if self.engine
             == crate::config::MatcherEngineType::Frizbee
         {
@@ -1640,9 +1639,8 @@ impl<T: SSS> Worker<T> {
 
             let col_indices_buffer = &mut self.col_indices_buffer;
             let columns = &self.columns;
-            let query = &self.query;
-            let engine = self.engine;
-            let typo_tolerance = self.typo_tolerance;
+            #[cfg(feature = "frizbee")]
+            let (query, engine, typo_tolerance) = (&self.query, self.engine, self.typo_tolerance);
 
             let row: Vec<Text> = row
                 .into_iter()

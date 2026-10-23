@@ -43,3 +43,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Clippy
         run: cargo clippy --workspace --all-targets -F waymaker-cli/experimental --locked -- -D warnings
+      - name: Clippy (all features)
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Clippy (waymaker-lib without default features)
+        run: cargo clippy -p waymaker-lib --all-targets --no-default-features --locked -- -D warnings
