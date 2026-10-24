@@ -471,8 +471,9 @@ impl Display for TriggerKind {
 
 impl Display for Trigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Same `mode^^kind` form that FromStr reads, since Serialize uses this.
         if !self.mode.is_empty() {
-            write!(f, "{} ({})", self.kind, self.mode)?;
+            write!(f, "{}^^", self.mode)?;
         }
         write!(f, "{}", self.kind)
     }
@@ -841,7 +842,7 @@ mod test {
         let t = Trigger::from_str("vim^^a").unwrap();
         assert_eq!(t.mode, "vim".to_string());
         assert_eq!(t.kind, TriggerKind::Key(key!(a)));
-        assert_eq!(t.to_string(), "a (vim)a");
+        assert_eq!(t.to_string(), "vim^^a");
 
         let t2 = Trigger::from_str("a").unwrap();
         assert_eq!(t2.mode, String::new());
