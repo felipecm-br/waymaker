@@ -208,7 +208,10 @@ mod linux {
                 (-1, None)
             };
 
-            let async_fd = tokio::io::unix::AsyncFd::new(InotifyFd(fd))?;
+            // SAFETY: `fd` is the open inotify descriptor created above. It is
+            // owned by the InotifyFd moved into the AsyncFd and only closed when
+            // that is dropped, so it stays valid for the AsyncFd's lifetime.
+            let async_fd = unsafe { tokio::io::unix::AsyncFd::register(InotifyFd(fd)) }?;
 
             Ok(Self {
                 async_fd,
