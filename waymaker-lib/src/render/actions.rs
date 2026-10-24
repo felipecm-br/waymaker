@@ -244,12 +244,23 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         Action::HalfPageDown | Action::HalfPageUp => {
             let x = results.height().div_ceil(2);
             let next = matches!(action, Action::HalfPageDown) ^ results.reverse();
-            for _ in 0..x.into() {
-                *did_cursor_wrap = if next {
-                    results.cursor_next()
+            // Stop at the ends rather than wrapping: with fewer items than half
+            // a page, wrapping would circle the list and land anywhere.
+            for _ in 0..x {
+                let visible = results.cursor_offset().is_some();
+                let at_end = if next {
+                    results.index() >= results.end()
                 } else {
-                    results.cursor_prev()
+                    results.index() == 0
                 };
+                if visible && at_end {
+                    break;
+                }
+                if next {
+                    results.cursor_next();
+                } else {
+                    results.cursor_prev();
+                }
             }
         }
 
