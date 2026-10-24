@@ -152,9 +152,11 @@ async fn async_main() {
             MatchError::TUIError(e) => {
                 ebog!("TUI"; "{e}")
             }
+            // Like fzf and `wm -f`: 1 means nothing matched. (This was 404,
+            // which shells truncate to 148.)
             MatchError::NoMatch => {
-                ebog!("NoMatch");
-                exit(404);
+                log::debug!("NoMatch");
+                exit(1);
             }
             _ => unreachable!(),
         },

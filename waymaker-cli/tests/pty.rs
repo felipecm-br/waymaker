@@ -252,6 +252,24 @@ fn cli_bind_override_takes_effect() {
 }
 
 #[test]
+fn enter_with_no_match_exits_1() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("zzzz");
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (1, String::new()));
+}
+
+/// An output template can print something without a match, so that still succeeds.
+#[test]
+fn output_template_without_match_succeeds() {
+    let wm = Session::start(FRUIT, &["o={q}"]);
+    wm.send("zzzz");
+    wm.send(ENTER);
+    // Templates shell-quote placeholders.
+    assert_eq!(wm.finish(), (0, "'zzzz'\n".to_string()));
+}
+
+#[test]
 fn tab_selects_multiple_items() {
     let wm = Session::start(FRUIT, &[]);
     wm.send(TAB);

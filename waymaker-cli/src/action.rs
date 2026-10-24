@@ -228,6 +228,10 @@ pub fn action_handler(
 
             if let Some(template) = output_template {
                 crate::formatter::format_cli(state, template, Some(&repeat));
+            } else if selected_items.is_empty() {
+                // Nothing to output: exit like a failed match so scripts can tell.
+                state.should_quit_nomatch = true;
+                return;
             } else {
                 for item in selected_items {
                     repeat(item);

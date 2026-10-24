@@ -41,6 +41,17 @@ The `-o` flag allows you to layer additional configuration files on top of your 
 - **Example**: `wm -o git/status` will attempt to load `presets/git/status.toml` from the installation directory.
 - **Source Field**: Overrides support a `source` field at the top level, allowing them to inherit from another preset (one level of recursion is supported).
 
+### Exit Status
+
+| Code | Meaning |
+| --- | --- |
+| `0` | An item was accepted (or an output template printed something). |
+| `1` | Nothing matched: accepted with no items, `wm -f` found nothing, or the input was empty. |
+| `130` | Cancelled with `esc` / `ctrl-c` (`Quit` without a code). |
+| `N` | `Quit(N)` from a bind. |
+
+Scripts can rely on this instead of checking for empty output: `sel=$(… | wm) || return`.
+
 ### Headless Filtering & Benchmarking Flags
 
 - `-f` / `--filter <QUERY>`: Filter input headlessly matching query, print results to stdout, and exit immediately without entering the TUI.
