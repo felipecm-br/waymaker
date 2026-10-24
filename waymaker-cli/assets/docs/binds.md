@@ -149,7 +149,7 @@ Actions are the operations performed when a trigger is activated.
 | `CycleAll`        | Toggle selection for all items in the current view.        |
 | `ClearSelections` | Clear all active selections.                               |
 | `Accept`          | Accept the current selection and exit.                     |
-| `Quit(code)`      | Exit Matchmaker with the specified exit code (default: 1). |
+| `Quit(code)`      | Exit with the given exit code (default: 130).              |
 
 ### Navigation
 
