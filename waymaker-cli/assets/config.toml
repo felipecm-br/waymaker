@@ -101,8 +101,8 @@ ansi = false # don't set to true here
 "alt-enter" = "@Accept"
 "ctrl-enter" = "@accept_2"
 "ctrl-a" = "CycleAll"
-"tab" = ["Toggle", "Down"]
-"shift-backtab" = ["Toggle", "Up"]
+"tab" = "Toggle"  # Toggle already moves down
+"shift-backtab" = "ToggleUp"
 
 # Edit
 "right" = "ForwardChar"
