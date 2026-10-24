@@ -18,6 +18,7 @@ const ENTER: &str = "\r";
 const DOWN: &str = "\x1b[B";
 const TAB: &str = "\t";
 const BACKSPACE: &str = "\x7f";
+const BACKTAB: &str = "\x1b[Z";
 
 /// A running `wm` with its own config and state directories.
 struct Session {
@@ -48,6 +49,13 @@ impl Session {
             r#"exec "$0" "$@" < "$WM_TEST_DIR/input" > "$WM_TEST_DIR/output""#,
         ]);
         cmd.arg(env!("CARGO_BIN_EXE_wm"));
+        // Debug builds otherwise load (and rewrite) the developer playground
+        // config, dev.toml. --config with the shipped defaults is exactly what a
+        // release build uses when the user has no config.
+        cmd.args([
+            "--config",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/assets/config.toml"),
+        ]);
         cmd.args(args);
         cmd.env_clear();
         isolate_env(&mut cmd, dir.path());
@@ -210,10 +218,11 @@ fn query_then_accept_prints_the_match() {
 }
 
 #[test]
-fn escape_quits_with_130() {
+fn escape_quits_with_1() {
+    // The default config binds esc to Quit(1); ctrl-c's plain Quit is 130.
     let wm = Session::start(FRUIT, &[]);
     wm.send(ESC);
-    assert_eq!(wm.finish(), (130, String::new()));
+    assert_eq!(wm.finish(), (1, String::new()));
 }
 
 #[test]
@@ -276,4 +285,115 @@ fn tab_selects_multiple_items() {
     wm.send(TAB);
     wm.send(ENTER);
     assert_eq!(wm.finish(), (0, "apple\nfoobar\n".to_string()));
+}
+
+const UP: &str = "\x1b[A";
+const LEFT: &str = "\x1b[D";
+const PAGE_DOWN: &str = "\x1b[6~";
+const PAGE_UP: &str = "\x1b[5~";
+
+#[test]
+fn up_from_the_top_stays_put() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send(UP);
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+}
+
+#[test]
+fn down_past_the_end_stays_on_the_last_item() {
+    let wm = Session::start(FRUIT, &[]);
+    for _ in 0..3 {
+        wm.send(DOWN);
+    }
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "banana\n".to_string()));
+}
+
+/// Half-page moves clamp at the ends instead of circling a short list.
+#[test]
+fn page_down_stops_at_the_last_item() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send(PAGE_DOWN);
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "banana\n".to_string()));
+}
+
+/// With scroll_wrap on, a half page longer than the list used to circle it.
+#[test]
+fn page_down_with_scroll_wrap_stops_at_the_last_item() {
+    let wm = Session::start(FRUIT, &["results.scroll_wrap=true"]);
+    wm.send(PAGE_DOWN);
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "banana\n".to_string()));
+}
+
+#[test]
+fn page_up_stops_at_the_first_item() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send(DOWN);
+    wm.send(PAGE_UP);
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+}
+
+#[test]
+fn alt_digits_jump_to_the_ends() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("\x1b0");
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "banana\n".to_string()));
+
+    let wm = Session::start(FRUIT, &[]);
+    wm.send(DOWN);
+    wm.send("\x1b1");
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+}
+
+#[test]
+fn ctrl_u_clears_the_query() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("zzzz");
+    wm.send("\x15");
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+}
+
+#[test]
+fn cursor_movement_inserts_mid_query() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("oba");
+    for _ in 0..3 {
+        wm.send(LEFT);
+    }
+    wm.send("f");
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
+}
+
+#[test]
+fn ctrl_a_selects_all() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("\x01");
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, FRUIT.to_string()));
+}
+
+/// shift-tab walks back up, deselecting.
+#[test]
+fn shift_tab_deselects_upwards() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send(TAB);
+    wm.send(TAB);
+    wm.send(BACKTAB);
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+}
+
+#[test]
+fn ctrl_c_quits_with_130() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("\x03");
+    assert_eq!(wm.finish(), (130, String::new()));
 }

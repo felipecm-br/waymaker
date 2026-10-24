@@ -47,7 +47,7 @@ The `-o` flag allows you to layer additional configuration files on top of your 
 | --- | --- |
 | `0` | An item was accepted (or an output template printed something). |
 | `1` | Nothing matched: accepted with no items, `wm -f` found nothing, or the input was empty. |
-| `130` | Cancelled with `esc` / `ctrl-c` (`Quit` without a code). |
+| `130` | Cancelled with `ctrl-c` (`Quit` without a code). The default config binds `esc` to `Quit(1)`. |
 | `N` | `Quit(N)` from a bind. |
 
 Scripts can rely on this instead of checking for empty output: `sel=$(… | wm) || return`.
