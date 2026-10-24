@@ -286,13 +286,12 @@ pub fn guess_clip_cmd() -> Option<(String, String)> {
     }
 
     #[cfg(target_os = "windows")]
-    {
-        return Some((
-            "clip".to_string(),
-            "powershell -command Get-Clipboard".to_string(),
-        ));
-    }
+    return Some((
+        "clip".to_string(),
+        "powershell -command Get-Clipboard".to_string(),
+    ));
 
+    #[cfg(not(target_os = "windows"))]
     None
 }
 

@@ -34,6 +34,21 @@ jobs:
       - name: Check experimental features
         run: cargo check -p waymaker-cli -F experimental --locked
 
+  # Releases ship a Windows binary, so at least keep it compiling warning-free.
+  # The test suite has not been made to pass on Windows yet.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
   deny:
     runs-on: ubuntu-latest
     timeout-minutes: 20

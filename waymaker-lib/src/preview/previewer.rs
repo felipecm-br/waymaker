@@ -1139,14 +1139,12 @@ impl Previewer {
 }
 
 fn kill_child(child: &mut Child) {
-    let pid = child.id();
-
     #[cfg(unix)]
     {
         use nix::sys::signal::{Signal, kill};
         use nix::unistd::Pid;
 
-        let pgid = Pid::from_raw(-(pid as i32));
+        let pgid = Pid::from_raw(-(child.id() as i32));
         let _ = kill(pgid, Signal::SIGKILL);
     }
     let _ = child.kill();

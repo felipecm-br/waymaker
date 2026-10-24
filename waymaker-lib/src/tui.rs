@@ -512,7 +512,7 @@ mod utils {
 mod utils {
     use anyhow::Result;
     use std::time::Duration;
-    pub fn query_cursor_position(timeout: Duration) -> Result<(u16, u16)> {
+    pub fn query_cursor_position(_timeout: Duration) -> Result<(u16, u16)> {
         let ret = crossterm::cursor::position()?;
         Ok(ret)
     }
