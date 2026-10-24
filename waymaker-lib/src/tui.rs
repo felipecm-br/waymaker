@@ -57,7 +57,8 @@ where
             let cursor_y = Self::get_cursor_y(Duration::from_millis(config.sleep_ms))
                 .unwrap_or_else(|e| {
                     error!("Failed to read cursor: {e}");
-                    height - 1 // overestimate
+                    // overestimate; the size reads as 0x0 on an unsized pty
+                    height.saturating_sub(1)
                 });
 
             let initial_height = height.saturating_sub(cursor_y);
