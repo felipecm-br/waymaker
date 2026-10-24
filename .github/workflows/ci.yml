@@ -34,6 +34,16 @@ jobs:
       - name: Check experimental features
         run: cargo check -p waymaker-cli -F experimental --locked
 
+  deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # Advisories, licenses, banned crates and allowed sources; see deny.toml.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
   clippy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
