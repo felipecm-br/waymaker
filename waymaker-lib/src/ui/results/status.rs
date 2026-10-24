@@ -1,4 +1,3 @@
-use cba::bring::split::split_on_nesting;
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -95,14 +94,14 @@ impl StatusUI {
         };
 
         let mut spans = Vec::new();
-        let mut in_nested = !s.starts_with('{');
         let mut current_style = Style::default();
 
         for part in parts {
-            in_nested = !in_nested;
             let content = part.as_str();
 
-            if in_nested {
+            // Groups and text need not alternate ("{bold}{red:x}"), but only a
+            // group chunk starts with an unescaped '{'.
+            if content.starts_with('{') {
                 let inner = &content[1..content.len() - 1];
 
                 if inner.contains(':') {
@@ -252,9 +251,95 @@ impl StatusUI {
     }
 }
 
+/// Split text on entering and exiting nesting level 1, keeping the brackets.
+/// `\` before a bracket escapes it.
+///
+/// Replaces `cba::bring::split::split_on_nesting`, which indexed the input
+/// with char counts as byte offsets and panicked on non-ASCII text before a `\`.
+/// Errors are the unclosed depth (positive) or the negated byte offset of an
+/// extra closing bracket.
+fn split_on_nesting(input: &str, [open, close]: [char; 2]) -> Result<Vec<String>, i32> {
+    let mut results = Vec::new();
+    let mut current_chunk = String::new();
+    let mut level = 0;
+    let mut chars = input.char_indices().peekable();
+
+    while let Some((i, c)) = chars.next() {
+        if c == '\\'
+            && let Some(&(_, next)) = chars.peek()
+            && (next == open || next == close)
+        {
+            current_chunk.push(c);
+            current_chunk.push(next);
+            chars.next();
+            continue;
+        }
+
+        if c == open {
+            if level == 0 && !current_chunk.is_empty() {
+                results.push(std::mem::take(&mut current_chunk));
+            }
+            level += 1;
+        } else if c == close {
+            level -= 1;
+            if level < 0 {
+                return Err(-(i as i32));
+            }
+        }
+
+        current_chunk.push(c);
+
+        // Split after pushing the closing bracket if we are back at ground level
+        if c == close && level == 0 {
+            results.push(std::mem::take(&mut current_chunk));
+        }
+    }
+
+    if level > 0 {
+        return Err(level);
+    }
+
+    if !current_chunk.is_empty() {
+        results.push(current_chunk);
+    }
+
+    Ok(results)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_adjacent_template_groups() {
+        let line = StatusUI::parse_template_to_status_line("{bold}{red:x} tail");
+        let spans: Vec<_> = line.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(spans, ["x", " tail"]);
+        assert_eq!(line.spans[0].style.fg, Some(Color::Red));
+        assert!(line.spans[1].style.add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn test_split_on_nesting() {
+        let b = ['{', '}'];
+        assert_eq!(
+            split_on_nesting("a {b} c{d{e}}", b).unwrap(),
+            ["a ", "{b}", " c", "{d{e}}"]
+        );
+        assert_eq!(split_on_nesting(r"x \{y\} z", b).unwrap(), [r"x \{y\} z"]);
+        assert_eq!(split_on_nesting("{a", b), Err(1));
+        assert_eq!(split_on_nesting("abc}", b), Err(-3));
+    }
+
+    #[test]
+    fn test_split_on_nesting_non_ascii_before_escape() {
+        let b = ['{', '}'];
+        assert_eq!(split_on_nesting("\u{800}\\", b).unwrap(), ["\u{800}\\"]);
+        assert_eq!(
+            split_on_nesting("\u{f07b} \\{x\\} {red:y}", b).unwrap(),
+            ["\u{f07b} \\{x\\} ", "{red:y}"]
+        );
+    }
 
     #[test]
     fn test_status_ui_parse_style() {
