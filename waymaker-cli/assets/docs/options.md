@@ -75,6 +75,8 @@ wm m.c.split "\w+|||/\w+" # Sets the field: columns.split = Split::Regexes([Rege
 
 Note however, that when declaring a bind, you should prefer to use `wm b.ctrl-x "ExecuteSilent(rm {+})|||Reload"` over `wm b "ctrl-x=ExecuteSilent(rm {+})"`, since as you can see, the second format doesn't support chained actions, while the first does.
 
+Keys containing `=` work in both forms: `wm b.alt-==Accept` and `wm b.alt-= Accept` both bind `alt-=`. An `=` that starts the key or follows `-`, `+` or `^` is read as part of the key.
+
 Bool values can be specified with true, false, or "".
 
 ```bash

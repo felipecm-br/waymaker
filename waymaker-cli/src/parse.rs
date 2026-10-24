@@ -67,7 +67,7 @@ pub fn get_pairs(pairs: Vec<String>) -> Result<Vec<(Vec<String>, String)>, Parse
     let mut iter = pairs.into_iter().peekable();
 
     while let Some(item) = iter.next() {
-        let (path_str, value) = if let Some(eq_pos) = item.find('=') {
+        let (path_str, value) = if let Some(eq_pos) = find_value_separator(&item) {
             let path = item[..eq_pos].to_string();
             let val = item[eq_pos + 1..].to_string();
 
@@ -126,6 +126,26 @@ pub fn get_pairs(pairs: Vec<String>) -> Result<Vec<(Vec<String>, String)>, Parse
     }
 
     Ok(result)
+}
+
+/// Byte offset of the '=' that separates path and value in `item`, if any.
+///
+/// Bind keys can contain '=' themselves (`b.alt-==Accept`, `b.= Accept`). A
+/// trigger never ends in '-', '+' or '^', so an '=' that starts the key or
+/// follows one of those belongs to the key.
+fn find_value_separator(item: &str) -> Option<usize> {
+    let path = item.trim_start_matches('-');
+    let Some(key) = path
+        .strip_prefix("b.")
+        .or_else(|| path.strip_prefix("binds."))
+    else {
+        return item.find('=');
+    };
+
+    let key_start = item.len() - key.len();
+    key.char_indices()
+        .find(|&(i, c)| c == '=' && !(i == 0 || key[..i].ends_with(['-', '+', '^'])))
+        .map(|(i, _)| key_start + i)
 }
 
 pub fn valid_key(s: &str, extended: bool) -> bool {
@@ -210,6 +230,31 @@ mod tests {
         let input: Vec<String> = vec![];
         let pairs = get_pairs(input).unwrap();
         assert!(pairs.is_empty());
+    }
+
+    #[test]
+    fn test_get_pairs_bind_keys_with_equals() {
+        let bind = |key: &str, value: &str| {
+            (
+                vec!["binds".to_string(), key.to_string()],
+                value.to_string(),
+            )
+        };
+        let cases = [
+            (vec_!["b.alt-==Accept"], bind("alt-=", "Accept")),
+            (vec_!["b.alt-=", "Accept"], bind("alt-=", "Accept")),
+            (vec_!["--binds.ctrl+==Accept"], bind("ctrl+=", "Accept")),
+            (vec_!["b.==Accept"], bind("=", "Accept")),
+            (vec_!["b.=", "Accept"], bind("=", "Accept")),
+            (vec_!["b.vim^^==Accept"], bind("vim^^=", "Accept")),
+            (vec_!["b.alt-x=Accept"], bind("alt-x", "Accept")),
+            (vec_!["b.alt-x="], bind("alt-x", "")),
+            (vec_!["b.alt-x=Print(a=b)"], bind("alt-x", "Print(a=b)")),
+        ];
+        for (input, expected) in cases {
+            let shown = format!("{input:?}");
+            assert_eq!(get_pairs(input).unwrap(), [expected], "{shown}");
+        }
     }
 
     #[test]
