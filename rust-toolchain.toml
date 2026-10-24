@@ -1,6 +1,6 @@
 # Keep local builds, CI and release on the same compiler so clippy's lint set
-# does not drift between them. Bump together with the `dtolnay/rust-toolchain@`
-# pins in .github/workflows/.
+# does not drift between them. Bump together with the `dtolnay/rust-toolchain`
+# SHA pins (commented with the version) in .github/workflows/.
 [toolchain]
 channel = "1.99.1"
 components = ["clippy", "rustfmt"]
