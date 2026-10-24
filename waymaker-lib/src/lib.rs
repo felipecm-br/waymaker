@@ -37,6 +37,9 @@ pub use errors::*;
 
 pub mod noninteractive;
 
+#[cfg(test)]
+mod proptests;
+
 pub static MODE: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 pub static ACTION_BOX_ACTIVE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
