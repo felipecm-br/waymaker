@@ -1,5 +1,32 @@
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-28
+
+### 🚀 Features
+
+- Add an outer-frame border gradient (`WM_BORDER_GRADIENT`)
+- Support sesh-compatible extra windows via `[[window]]` and `windows = [...]` in sessions
+- Embed the default presets in the binary as a fallback when none are installed locally
+- Keep highlights visible under `NO_COLOR`
+
+### 🐛 Bug Fixes
+
+- Exit 1 when nothing matches; make `tab` select consecutive items; stop half-page moves at the ends of the list
+- Allow bind overrides for keys containing `=`; display mode-scoped triggers as `mode^^kind`
+- Stop status template parsing from panicking on non-ASCII text and adjacent groups; don't underflow when the terminal size reads as 0x0
+- Report preset-download I/O errors instead of panicking, download presets from the waymaker repository and explain a missing preset
+- Set the guessed `EDITOR` instead of overwriting `PAGER`; stop mutating the environment to track the target item
+
+### ⚡ Performance & Refactoring
+
+- Cut headless filter time by 40-50%
+- Split `render` into focused modules and remove the unused file-manager overlays
+
+### 🔒 CI & Security
+
+- Update crates with RustSec advisories, add `cargo-deny`, Dependabot and coverage reporting, pin GitHub Actions to commit SHAs and Rust to 1.99.1
+- Drive the real `wm` binary through a pseudo-terminal in tests and add property tests for the input parsers
+
 ## [0.3.2] - 2026-10-18
 
 ### 🧹 Storage & Worktree Hygiene
