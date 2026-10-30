@@ -40,6 +40,11 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+      # Signed build provenance (`gh attestation verify <archive> --repo felipecm-br/waymaker`).
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Install Rust Toolchain
@@ -47,6 +52,7 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - name: Build and Upload Binary Assets
+        id: wm
         uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
         with:
           bin: wm
@@ -54,3 +60,8 @@ jobs:
           archive: $bin-$tag-$target
           checksum: sha256
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          # .tar.gz everywhere except Windows (.zip)
+          subject-path: ${{ steps.wm.outputs.tar || steps.wm.outputs.zip }}

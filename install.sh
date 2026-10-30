@@ -52,6 +52,9 @@ print_help() {
     printf "  -s, --shell           Configure shell integration and Smart Tab in shell rc file\n"
     printf "  -f, --force           Overwrite existing configuration files without backups\n"
     printf "  -h, --help            Show this help dialog\n\n"
+    printf "Environment:\n"
+    printf "  WM_SKIP_CHECKSUM=1       Install a downloaded binary without checking its SHA-256\n"
+    printf "  WM_VERIFY_ATTESTATION=1  Also check its signed build provenance (needs gh; v0.5.1+)\n\n"
     printf "Target Locations:\n"
     printf "  Binary:  %s/wm\n" "${INSTALL_DIR_LOCAL}"
     printf "  Config:  %s/config.toml\n" "${CONFIG_DIR}"
@@ -281,6 +284,44 @@ install_binary_local() {
     info "Successfully installed binary to $INSTALL_DIR/$BINARY_NAME"
 }
 
+# Prints the SHA-256 of a file (sha256sum on Linux, shasum on macOS).
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    else
+        return 1
+    fi
+}
+
+# Checks a downloaded archive against the .sha256 published next to it. WM_SKIP_CHECKSUM=1 installs
+# without one (an old release, a mirror without checksums).
+verify_checksum() { # <archive> <checksum url>
+    if [ "${WM_SKIP_CHECKSUM:-0}" = "1" ]; then
+        warn "WM_SKIP_CHECKSUM=1: installing $(basename "$1") without checking its SHA-256"
+        return 0
+    fi
+    if ! curl -fsSL "$2" -o "$1.sha256"; then
+        error "No checksum published at $2; set WM_SKIP_CHECKSUM=1 to install anyway."
+    fi
+    expected=$(awk '{print $1; exit}' "$1.sha256")
+    actual=$(sha256_of "$1") || error "Neither sha256sum nor shasum is installed; cannot verify $(basename "$1")."
+    [ "$expected" = "$actual" ] || error "Checksum mismatch for $(basename "$1") (expected $expected, got $actual)."
+    info "Verified SHA-256 of $(basename "$1")"
+}
+
+# With WM_VERIFY_ATTESTATION=1, also checks the archive's signed build provenance: it must have
+# been built by this repository's release workflow (releases from v0.5.1 on). Needs an
+# authenticated `gh`.
+verify_attestation() { # <archive>
+    [ "${WM_VERIFY_ATTESTATION:-0}" = "1" ] || return 0
+    command -v gh >/dev/null 2>&1 || error "WM_VERIFY_ATTESTATION=1 needs the GitHub CLI (gh)."
+    gh auth status >/dev/null 2>&1 || error "WM_VERIFY_ATTESTATION=1 needs an authenticated gh (run: gh auth login)."
+    gh attestation verify "$1" --repo "$REPO" >/dev/null || error "No valid build provenance for $(basename "$1") from $REPO."
+    info "Verified build provenance of $(basename "$1")"
+}
+
 install_binary_remote() {
     step "Fetching pre-compiled binary for $OS ($ARCH)..."
 
@@ -322,6 +363,9 @@ install_binary_remote() {
             error "Could not download binary asset and cargo is not installed."
         fi
     fi
+
+    verify_checksum "$TEMP_DIR/$ASSET_NAME" "https://github.com/$REPO/releases/download/$VERSION/wm-${VERSION}-${TARGET}.sha256"
+    verify_attestation "$TEMP_DIR/$ASSET_NAME"
 
     step "Extracting $ASSET_NAME..."
     case "$ASSET_NAME" in

@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### 🐛 Bug Fixes
+
+- `install.sh` installed a downloaded binary without checking it against the `.sha256` published next to it; it now refuses a mismatch or a missing checksum (`WM_SKIP_CHECKSUM=1` overrides), and `WM_VERIFY_ATTESTATION=1` also checks the build provenance
+
+### 🔒 Security
+
+- Release archives carry signed build provenance (`gh attestation verify <archive> --repo felipecm-br/waymaker`)
+
 ## [0.5.0] - 2026-10-30
 
 ### 🚀 Features
