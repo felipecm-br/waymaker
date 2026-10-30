@@ -23,7 +23,9 @@ You can specify a column by its name or by its index (starting from 1).
 
 Note that the default column names (when `columns.names` is unspecified) are `1` … `columns.max`.
 
-**Note: Column names must be alphanumeric.**
+**Note: Column names must be alphanumeric.** `query`, `q`, `input`, `key` and `keys` are built-in
+names (see [Special](#special)) and win over a column of the same name, so `{key}` never reaches a
+column called `key`; Waymaker warns about such a column when it loads the config.
 
 | Placeholder | Description                                       |
 | ----------- | ------------------------------------------------- |
@@ -39,6 +41,7 @@ Note that the default column names (when `columns.names` is unspecified) are `1`
 `{query}` or `{q}` refers to the current search query text.
 `{input}` refers to the user input captured via `Action::PromptInput` (shell-quoted).
 `{=input}` refers to raw prompt input without shell quoting.
+`{key}` and `{keys}` refer to the key typed during `Action::LiveInput` (empty otherwise).
 
 See examples for more information.
 

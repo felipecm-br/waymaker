@@ -341,6 +341,11 @@ define_transparent_wrapper!(
     ColumnName: String
 );
 
+/// Template names resolved before any column (`{key}` is the key typed during `LiveInput`, `{q}` the
+/// query): a column named after one of them cannot be reached as `{name}` in a template. The CLI
+/// warns about such a column.
+pub const RESERVED_TEMPLATE_NAMES: &[&str] = &["query", "q", "input", "key", "keys"];
+
 impl<'de> Deserialize<'de> for ColumnName {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -712,6 +717,17 @@ impl<'de> Deserialize<'de> for StringValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_column_names_reserved_by_templates_still_load() {
+        // A reserved name still loads (the CLI warns): a column used for display keeps working.
+        for name in RESERVED_TEMPLATE_NAMES {
+            let parsed: ColumnName = toml::Value::String((*name).to_string()).try_into().unwrap();
+            assert_eq!(parsed.0, *name);
+        }
+        let bad: Result<ColumnName, _> = toml::Value::String("not-alnum".into()).try_into();
+        assert!(bad.is_err());
+    }
 
     #[derive(Deserialize)]
     struct TestName {

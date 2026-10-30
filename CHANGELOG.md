@@ -8,6 +8,8 @@
 
 ### 🐛 Bug Fixes
 
+- `{key}` (and `{query}`, `{q}`, `{input}`, `{keys}`) never reached a column of that name, because the built-in values win; the names are now documented as reserved and Waymaker warns at startup when a column uses one
+
 - `rg` and `workspace` called scripts from the author's dotfiles (`~/.config/tmux/scrollback-open.sh`, `~/.config/waymaker/scripts/rg-toggle-*.sh`): `e`/`o`/`Ctrl+E` and the `Ctrl+S`/`Ctrl+W` search toggles failed everywhere else. They now use the bundled `tmux/open.sh` (`$EDITOR` beside the origin pane, URLs in the browser) and `rg/toggle-*.sh`
 - `session-picker` bound `s`/`Ctrl+S` to a `__SWITCH_WINDOW__` marker nothing handled; the keys are gone
 - `install.sh` copied only the `.toml` files of preset folders, so `switcher/`, `docker/` and other presets that call their own scripts were installed without them

@@ -299,6 +299,16 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         );
     }
 
+    // `{key}`, `{q}`, ... resolve to built-ins before columns: say so where the user sees it.
+    for col in &config.columns.names {
+        let name: &str = &col.name;
+        if waymaker::config::RESERVED_TEMPLATE_NAMES.contains(&name) {
+            wbog!(
+                "Column '{name}' shares its name with a built-in template value: `{{{name}}}` will not expand to this column. Rename it."
+            );
+        }
+    }
+
     if config.start.command.default.base_command.is_none() {
         config.start.command.default.base_command =
             Some(config.start.command.default.command.clone());
