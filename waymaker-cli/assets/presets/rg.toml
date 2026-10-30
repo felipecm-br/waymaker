@@ -1,4 +1,4 @@
-# Matchmaker Live Ripgrep Search Preset (`mm -o rg`)
+# Waymaker Live Ripgrep Search Preset (`wm -o rg`)
 # Fast live full-text search with ripgrep, debounced query reload, 45/55 foveal layout,
 # line-synced bat syntax preview, Enter opening nvim at +{line} {file}, and Ctrl+V inserting {file}:{line}.
 # Search mode toggles: Ctrl+S = Match Case (Aa), Ctrl+W = Whole Word (W). Default: ignore-case.
@@ -12,19 +12,22 @@ ansi = true
 [ui.nav]
 active = true
 focus_on_start = "filter"
-bar = "Plain"
-color = "Darkgray"
-hints = true
-hints_columns = 4
+color = "lightcyan"
+marker = "│"
+hints = false
+
+[ui.border]
+sides = ""
 
 [tui]
+mouse = true
 percentage = 100
 max = 9999
 
 [query]
-prompt = " > "
-prompt_style.fg = "Cyan"
+prompt = " "
 status_inline = true
+show = true
 
 [columns]
 max = 3
@@ -44,6 +47,16 @@ scroll.index = "line"
 
 [preview.media]
 active = false
+
+[results]
+row_connection = "Full"
+
+[results.border]
+sides = ""
+
+[results.current_style]
+bg = "reset"
+modifier = "BOLD"
 
 # Layout 0: Standard 45/55 foveal split (45% list on left, 55% preview on right)
 [[preview.layout]]
@@ -82,7 +95,7 @@ if [ -f "$file" ]; then
 fi
 '''
 
-# Layout 2: Overrides and disables the 3rd layout from base config (strictly toggles 55% <-> 100%)
+# Layout 2: Overrides and disables the 3rd layout from base config (strictly toggles 60% <-> 100%)
 [[preview.layout]]
 max = 0
 
@@ -93,7 +106,7 @@ title = " Preview "
 title_fg = "Cyan"
 
 [footer]
-content = " {cyan,bold:[Enter]} {darkgray:Nvim}  •  {green,bold:[C-v]} {darkgray:Insert}  •  {magenta,bold:[y]} {darkgray:Copy}  •  {blue,bold:[J/K]} {darkgray:Scroll}  •  {cyan,bold:[C-/]} {darkgray:Layout}  •  {yellow,bold:[C-s]} {darkgray:Case}  •  {green,bold:[C-w]} {darkgray:Word}  •  {red,bold:[Esc]} {darkgray:Quit}"
+content = " {cyan,bold:Enter} {darkgray:Nvim} {darkgray:│} {cyan,bold:C-v} {darkgray:Insert} {darkgray:│} {cyan,bold:y} {darkgray:Copy} {darkgray:│} {cyan,bold:J/K} {darkgray:Scroll} {darkgray:│} {cyan,bold:C-/} {darkgray:Layout} {darkgray:│} {cyan,bold:C-s} {darkgray:Case} {darkgray:│} {cyan,bold:C-w} {darkgray:Word}"
 match_indent = false
 row_connection = "Full"
 separator = "light"
@@ -142,10 +155,10 @@ separator = "\n"
     "Filtering(false)",
     '''Bind(QueryChange = Reload)'''
 ]
-"enter" = "Become(nvim +{2} {1})"
+"enter" = "Become(${EDITOR:-nvim} +{2} {1})"
 "ctrl-v" = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {1}:{2})'
-"ctrl-e" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
-"ctrl-o" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"ctrl-e" = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"ctrl-o" = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")'
 "ctrl-y" = 'ExecuteSilent(test -n "{1}" && printf "%s:%s" {1} {2} | (command -v wl-copy >/dev/null 2>&1 && wl-copy || xclip -in -selection clipboard 2>/dev/null || tmux load-buffer -))'
 "ctrl-c" = "Quit"
 "esc" = "ToggleFocus"
@@ -160,23 +173,23 @@ separator = "\n"
 
 # Toggle Match Case (Ctrl+S = S for Sensitive)
 # Flips: ic <-> cs  and  ww <-> cs+ww
-"ctrl-s" = "Transform(sh ~/.config/waymaker/scripts/rg-toggle-case.sh)"
+"ctrl-s" = 'Transform(sh "$(dirname -- "$MM_OVERRIDE")"/rg/toggle-case.sh)'
 
 # Toggle Whole Word (Ctrl+W = W for Word)
 # Flips: ic <-> ww  and  cs <-> cs+ww
-"ctrl-w" = "Transform(sh ~/.config/waymaker/scripts/rg-toggle-word.sh)"
+"ctrl-w" = 'Transform(sh "$(dirname -- "$MM_OVERRIDE")"/rg/toggle-word.sh)'
 
 [ui.nav.binds]
-"enter" = "Become(nvim +{2} {1})"
+"enter" = "Become(${EDITOR:-nvim} +{2} {1})"
 "ctrl-v" = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {1}:{2})'
 "y" = 'ExecuteSilent(test -n "{1}" && printf "%s:%s" {1} {2} | (command -v wl-copy >/dev/null 2>&1 && wl-copy || xclip -in -selection clipboard 2>/dev/null || tmux load-buffer -))'
 "ctrl-y" = 'ExecuteSilent(test -n "{1}" && printf "%s:%s" {1} {2} | (command -v wl-copy >/dev/null 2>&1 && wl-copy || xclip -in -selection clipboard 2>/dev/null || tmux load-buffer -))'
 "esc" = "Quit"
 "q" = "Quit"
-"e" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
-"o" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
-"ctrl-e" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
-"ctrl-o" = 'ExecuteSilent(~/.config/tmux/scrollback-open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"e" = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"o" = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"ctrl-e" = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")'
+"ctrl-o" = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")'
 "/" = "FocusFilter"
 "ctrl-/" = "CyclePreview"
 "ctrl-p" = "SwitchPreview"

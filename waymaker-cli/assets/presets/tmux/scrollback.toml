@@ -1,0 +1,188 @@
+# Waymaker Scrollback Extractor (`tmux/scrollback.sh`, which runs `wm -o tmux/scrollback`)
+# Extrakto-style: stdin = all-list (recent-first); Tab cycles explicit filter
+# modes (all -> cmd -> path -> url -> sha -> all) via mode-specific binds + SetMode.
+# (Deliberately NOT @reloadnext/additional_commands: cycle state lives in the
+# mode, each Tab does Reload(<filter file>) + SetPrompt + SetMode.)
+# Enter copies (stdout -> clipboard by scrollback.sh), Ctrl+V inserts the current
+# token into the origin pane (extrakto insert_key). Space multi-selects.
+# Keymap mirrors jump.toml; nav starts in filter; preview shows the token's
+# scrollback context with highlight (toggle with Ctrl+P).
+
+[ui.nav]
+active = true
+profile = "list"
+focus_on_start = "filter"
+color = "lightcyan"
+marker = "│"
+hints = false
+
+[ui.border]
+sides = ""
+
+[tui]
+mouse = true
+percentage = 100
+max = 9999
+
+[start]
+sort = false
+mode = "all"
+
+[start.command]
+command = "cat $WM_SCROLLBACK_DIR/all.txt"
+additional = [
+  "cat $WM_SCROLLBACK_DIR/cmd.txt",
+  "cat $WM_SCROLLBACK_DIR/path.txt",
+  "cat $WM_SCROLLBACK_DIR/url.txt",
+  "cat $WM_SCROLLBACK_DIR/sha.txt",
+  "cat $WM_SCROLLBACK_DIR/all.txt",
+]
+
+[matcher.sort]
+threshold = false
+
+[query]
+prompt = "> "
+status_inline = true
+show = true
+
+[results]
+scroll_wrap = true
+max = 15
+row_connection = "Full"
+
+[results.border]
+sides = ""
+
+[results.style]
+modifier = "DIM"
+
+[results.current_style]
+bg = "reset"
+modifier = "BOLD"
+
+[results.current_nav_bar_style]
+fg = "cyan"
+modifier = "BOLD"
+
+[preview]
+show = true
+wrap = true
+scrollbar = true
+
+[[preview.layout]]
+command = 'grep -n -C 2 -F -m 3 --color=always {} $WM_SCROLLBACK_DIR/src.txt | head -40'
+side = "right"
+percentage = 60
+
+# Layout 1: Overrides and disables subsequent layouts (no fullscreen preview in scrollback popup)
+[[preview.layout]]
+max = 0
+
+[preview.border]
+sides = "LEFT"
+color = "Darkgray"
+
+[previewer]
+debounce_ms = 200
+delay_clear = true
+
+[footer]
+content = " {cyan,bold:Enter} {darkgray:Yank} {darkgray:│} {cyan,bold:Tab} {darkgray:Filter} {darkgray:│} {cyan,bold:C-v} {darkgray:Insert} {darkgray:│} {cyan,bold:C-e} {darkgray:Open} {darkgray:│} {cyan,bold:C-b} {darkgray:Browser} {darkgray:│} {cyan,bold:J/K} {darkgray:Scroll} {darkgray:│} {cyan,bold:Space} {darkgray:Multi}"
+match_indent = false
+row_connection = "Full"
+separator = "light"
+
+[exit]
+abort_empty = true
+
+[binds]
+enter = "Accept"
+esc = "ToggleFocus"
+ctrl-c = "Quit"
+ctrl-j = "Down"
+ctrl-k = "Up"
+ctrl-shift-j = "PreviewDown(5)"
+ctrl-shift-k = "PreviewUp(5)"
+ctrl-J = "PreviewDown(5)"
+ctrl-K = "PreviewUp(5)"
+ctrl-y = "Accept"
+ctrl-d = "PreviewHalfPageDown"
+ctrl-u = "PreviewHalfPageUp"
+ctrl-v = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {})'
+ctrl-e = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-o = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-b = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})'
+ctrl-w = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})'
+
+# Filter modes: Tab advances, Shift-Tab goes back. Each state reloads its own
+# file explicitly — no dependence on additional_commands cycling.
+tab = ["SetPrompt(cmd> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/cmd.txt)", "SetMode(cmd)", "Pos(0)"]
+shift-backtab = ["SetPrompt(sha> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/sha.txt)", "SetMode(sha)", "Pos(0)"]
+backtab = ["SetPrompt(sha> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/sha.txt)", "SetMode(sha)", "Pos(0)"]
+shift-tab = ["SetPrompt(sha> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/sha.txt)", "SetMode(sha)", "Pos(0)"]
+
+"all^^tab" = ["SetPrompt(cmd> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/cmd.txt)", "SetMode(cmd)", "Pos(0)"]
+"all^^shift-backtab" = ["SetPrompt(sha> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/sha.txt)", "SetMode(sha)", "Pos(0)"]
+"all^^backtab" = ["SetPrompt(sha> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/sha.txt)", "SetMode(sha)", "Pos(0)"]
+"all^^shift-tab" = ["SetPrompt(sha> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/sha.txt)", "SetMode(sha)", "Pos(0)"]
+
+"cmd^^tab" = ["SetPrompt(path> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/path.txt)", "SetMode(path)", "Pos(0)"]
+"cmd^^shift-backtab" = ["SetPrompt(> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/all.txt)", "SetMode(all)", "Pos(0)"]
+"cmd^^backtab" = ["SetPrompt(> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/all.txt)", "SetMode(all)", "Pos(0)"]
+"cmd^^shift-tab" = ["SetPrompt(> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/all.txt)", "SetMode(all)", "Pos(0)"]
+
+"path^^tab" = ["SetPrompt(url> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/url.txt)", "SetMode(url)", "Pos(0)"]
+"path^^shift-backtab" = ["SetPrompt(cmd> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/cmd.txt)", "SetMode(cmd)", "Pos(0)"]
+"path^^backtab" = ["SetPrompt(cmd> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/cmd.txt)", "SetMode(cmd)", "Pos(0)"]
+"path^^shift-tab" = ["SetPrompt(cmd> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/cmd.txt)", "SetMode(cmd)", "Pos(0)"]
+
+"url^^tab" = ["SetPrompt(sha> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/sha.txt)", "SetMode(sha)", "Pos(0)"]
+"url^^shift-backtab" = ["SetPrompt(path> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/path.txt)", "SetMode(path)", "Pos(0)"]
+"url^^backtab" = ["SetPrompt(path> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/path.txt)", "SetMode(path)", "Pos(0)"]
+"url^^shift-tab" = ["SetPrompt(path> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/path.txt)", "SetMode(path)", "Pos(0)"]
+
+"sha^^tab" = ["SetPrompt(> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/all.txt)", "SetMode(all)", "Pos(0)"]
+"sha^^shift-backtab" = ["SetPrompt(url> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/url.txt)", "SetMode(url)", "Pos(0)"]
+"sha^^backtab" = ["SetPrompt(url> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/url.txt)", "SetMode(url)", "Pos(0)"]
+"sha^^shift-tab" = ["SetPrompt(url> )", "SetQuery()", "Reload(cat $WM_SCROLLBACK_DIR/url.txt)", "SetMode(url)", "Pos(0)"]
+
+[ui.nav.binds]
+enter = "Accept"
+y = "Accept"
+ctrl-y = "Accept"
+esc = "Quit"
+q = "Quit"
+"/" = "FocusFilter"
+ctrl-c = "Quit"
+ctrl-v = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {})'
+j = "Down"
+k = "Up"
+up = "Up"
+down = "Down"
+left = "PreviewHScroll(-6)"
+right = "PreviewHScroll(6)"
+ctrl-j = "Down"
+ctrl-k = "Up"
+ctrl-shift-j = "PreviewDown(5)"
+ctrl-shift-k = "PreviewUp(5)"
+ctrl-J = "PreviewDown(5)"
+ctrl-K = "PreviewUp(5)"
+J = "PreviewDown(5)"
+K = "PreviewUp(5)"
+shift-j = "PreviewDown(5)"
+shift-k = "PreviewUp(5)"
+d = "PreviewHalfPageDown"
+ctrl-d = "PreviewHalfPageDown"
+u = "PreviewHalfPageUp"
+ctrl-u = "PreviewHalfPageUp"
+" " = "Toggle"
+e = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {} "$MM_ORIGIN_CWD")'
+o = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-e = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-o = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {} "$MM_ORIGIN_CWD")'
+b = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})'
+w = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})'
+x = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})'
+ctrl-b = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})'
+ctrl-w = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})'

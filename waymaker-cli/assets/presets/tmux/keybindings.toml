@@ -1,0 +1,112 @@
+# Waymaker tmux keybindings (`wm -o tmux/keybindings`): every key bound in this tmux server, read
+# live from `tmux list-keys`, with its note (`bind -N`, tmux's defaults) or else its command.
+# Tab cycles prefix -> root -> copy mode -> all; Enter closes the popup and presses the key in the
+# client that opened it (tmux 3.4+). Rows come from keybindings.sh, next to this file.
+
+[ui.nav]
+active = true
+basic = true
+passthrough = true
+color = "lightcyan"
+marker = "│"
+prompt = ""
+focus_on_start = "filter"
+hints = false
+
+[ui.border]
+sides = ""
+
+[tui]
+mouse = true
+percentage = 100
+max = 9999
+
+[start]
+sort = false
+
+[start.command]
+command = 'sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --items prefix'
+# The cycle starts at the first entry, the same rows as `command`.
+additional = [
+    'sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --items prefix',
+    'sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --items root',
+    'sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --items copy',
+    'sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --items all',
+]
+
+[columns]
+split = "\t"
+default = "desc"
+names = [
+    { name = "bind" },
+    { name = "table" },
+    { name = "desc" },
+]
+
+[matcher.sort]
+threshold = false
+
+[query]
+prompt = " "
+status_inline = true
+show = true
+
+[results]
+row_connection = "Full"
+column_spacing = 2
+
+[results.border]
+sides = ""
+
+[results.current_style]
+bg = "reset"
+modifier = "BOLD"
+
+[results.current_nav_bar_style]
+fg = "cyan"
+modifier = "BOLD"
+
+[preview]
+show = true
+wrap = true
+
+[preview.border]
+sides = "LEFT"
+
+[[preview.layout]]
+command = 'sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --preview {table} {bind}'
+side = "right"
+percentage = 45
+
+[previewer]
+debounce_ms = 30
+delay_clear = true
+
+[footer]
+content = " {cyan,bold:Enter} {darkgray:Press} {darkgray:│} {cyan,bold:Tab} {darkgray:Table} {darkgray:│} {cyan,bold:C-y} {darkgray:Copy} {darkgray:│} {cyan,bold:type} {darkgray:Filter} {darkgray:│} {cyan,bold:Esc} {darkgray:Close}"
+row_connection = "Full"
+match_indent = false
+separator = "light"
+
+[binds]
+"tab" = "@reloadnext"
+"shift-tab" = "@reloadprev"
+"backtab" = "@reloadprev"
+"enter" = 'Become(sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --run {table} {bind})'
+"ctrl-y" = 'ExecuteSilent(printf "%s" {bind} | tmux load-buffer -w -)'
+"esc" = "Quit"
+"ctrl-c" = "Quit"
+"ctrl-j" = "Down"
+"ctrl-k" = "Up"
+
+[ui.nav.binds]
+"tab" = "@reloadnext"
+"shift-tab" = "@reloadprev"
+"backtab" = "@reloadprev"
+"enter" = 'Become(sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --run {table} {bind})'
+"y" = 'ExecuteSilent(printf "%s" {bind} | tmux load-buffer -w -)'
+"/" = "FocusFilter"
+"j" = "Down"
+"k" = "Up"
+"q" = "Quit"
+"esc" = "Quit"

@@ -206,16 +206,20 @@ install_configs_local() {
             count=$((count + 1))
         done
 
-        # Also copy preset subdirectories if any (e.g. git, ai, docker)
+        # Also copy preset subdirectories (e.g. git, docker, tmux) with the scripts their
+        # presets call through "$(dirname -- "$MM_OVERRIDE")"
         for subdir in "$assets_dir/presets"/*/; do
             [ -d "$subdir" ] || continue
             sub_name=$(basename "$subdir")
             mkdir -p "$PRESETS_DIR/$sub_name"
-            for sub_file in "$subdir"*.toml; do
+            for sub_file in "$subdir"*.toml "$subdir"*.sh; do
                 [ -f "$sub_file" ] || continue
                 sub_preset_name=$(basename "$sub_file")
                 copy_or_backup "$sub_file" "$PRESETS_DIR/$sub_name/$sub_preset_name"
-                count=$((count + 1))
+                case "$sub_preset_name" in
+                    *.sh) chmod +x "$PRESETS_DIR/$sub_name/$sub_preset_name" ;;
+                    *) count=$((count + 1)) ;;
+                esac
             done
         done
         info "Installed $count presets to $PRESETS_DIR/"
@@ -244,6 +248,15 @@ install_configs_remote() {
     step "Fetching core presets..."
     for p in $core_presets; do
         download_or_backup "$raw_base/presets/$p" "$PRESETS_DIR/$p" || true
+    done
+
+    # tmux pickers and the scripts the core presets call
+    bundled_files="tmux/keybindings.toml tmux/scrollback.toml tmux/keybindings.sh tmux/open.sh tmux/scrollback.sh rg/toggle-case.sh rg/toggle-word.sh"
+    step "Fetching tmux presets and preset scripts..."
+    mkdir -p "$PRESETS_DIR/tmux" "$PRESETS_DIR/rg"
+    for f in $bundled_files; do
+        download_or_backup "$raw_base/presets/$f" "$PRESETS_DIR/$f" || continue
+        case "$f" in *.sh) chmod +x "$PRESETS_DIR/$f" ;; esac
     done
 
     info "Configuration files deployed to $CONFIG_DIR"

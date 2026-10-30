@@ -107,8 +107,59 @@ const EMBEDDED_PRESETS: &[&str] = &[
     "ps",
     "rg",
     "session-picker",
+    "tmux/keybindings",
+    "tmux/scrollback",
     "workspace",
 ];
+
+/// Scripts the bundled presets call through `"$(dirname -- "$MM_OVERRIDE")"`, by path under
+/// the presets directory; see [`ensure_bundled_scripts`].
+const BUNDLED_SCRIPTS: &[(&str, &str)] = &[
+    (
+        "rg/toggle-case.sh",
+        include_str!("../assets/presets/rg/toggle-case.sh"),
+    ),
+    (
+        "rg/toggle-word.sh",
+        include_str!("../assets/presets/rg/toggle-word.sh"),
+    ),
+    (
+        "tmux/keybindings.sh",
+        include_str!("../assets/presets/tmux/keybindings.sh"),
+    ),
+    (
+        "tmux/open.sh",
+        include_str!("../assets/presets/tmux/open.sh"),
+    ),
+    (
+        "tmux/scrollback.sh",
+        include_str!("../assets/presets/tmux/scrollback.sh"),
+    ),
+];
+
+/// Writes the bundled scripts that are missing under `dir` (the presets directory), so the
+/// built-in presets that call them work before `install.sh` or `wm --download` has run. A file
+/// already there, edited or not, is kept.
+fn ensure_bundled_scripts(dir: &Path) {
+    for (rel, src) in BUNDLED_SCRIPTS {
+        let path = dir.join(rel);
+        if path.exists() {
+            continue;
+        }
+        if let Some(parent) = path.parent()
+            && std::fs::create_dir_all(parent).is_err()
+        {
+            continue;
+        }
+        if std::fs::write(&path, src).is_ok() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755));
+            }
+        }
+    }
+}
 
 /// Core presets compiled into the binary. They are used when no preset of that
 /// name is installed, so `wm -o jump` works before `install.sh` or
@@ -129,6 +180,8 @@ fn embedded_preset(name: &str) -> Option<&'static str> {
         "rg" if cfg!(windows) => include_str!("../assets/presets/win.rg.toml"),
         "rg" => include_str!("../assets/presets/rg.toml"),
         "session-picker" => include_str!("../assets/presets/session-picker.toml"),
+        "tmux/keybindings" => include_str!("../assets/presets/tmux/keybindings.toml"),
+        "tmux/scrollback" => include_str!("../assets/presets/tmux/scrollback.toml"),
         "workspace" => include_str!("../assets/presets/workspace.toml"),
         _ => return None,
     })
@@ -210,6 +263,7 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
             } else {
                 main_p
             };
+            ensure_bundled_scripts(presets_path());
             if !p.exists() {
                 embedded = embedded_preset(&name);
                 if embedded.is_none() {
@@ -2731,6 +2785,36 @@ mod tests {
 
         let empty = dir.join("git");
         assert!(missing_preset_message("jump", &empty).contains(": none\n"));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn test_bundled_scripts_fill_gaps_and_keep_edits() {
+        let dir = std::env::temp_dir().join(format!("wm-bundled-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("tmux")).unwrap();
+        std::fs::write(dir.join("tmux/open.sh"), "edited").unwrap();
+        ensure_bundled_scripts(&dir);
+        assert_eq!(
+            std::fs::read_to_string(dir.join("tmux/open.sh")).unwrap(),
+            "edited"
+        );
+        for (rel, src) in BUNDLED_SCRIPTS.iter().filter(|(r, _)| *r != "tmux/open.sh") {
+            assert_eq!(
+                std::fs::read_to_string(dir.join(rel)).unwrap(),
+                *src,
+                "{rel}"
+            );
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = std::fs::metadata(dir.join(rel))
+                    .unwrap()
+                    .permissions()
+                    .mode();
+                assert_eq!(mode & 0o111, 0o111, "{rel} not executable");
+            }
+        }
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

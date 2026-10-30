@@ -1,4 +1,4 @@
-# Matchmaker / Waymaker Workspace Inspector Preset (`wm -o workspace` / `wm -o files`)
+# Waymaker Workspace Inspector Preset (`wm -o workspace` / `wm -o files`)
 # Optimized for quick inspection of workspace files, markdown diagrams, and AI-generated content.
 # Supports 60% Golden Ratio split and 100% Full-Modal preview toggle via Ctrl+P / Enter.
 # Supports Ctrl+V to insert the file path directly into the origin pane/AI prompt.
@@ -7,23 +7,26 @@
 [ui.nav]
 active = true
 focus_on_start = "filter"
-bar = "Plain"
-color = "Darkgray"
-hints = true
-hints_columns = 4
+color = "lightcyan"
+marker = "│"
+hints = false
+
+[ui.border]
+sides = ""
 
 [tui]
+mouse = true
 percentage = 100
 max = 9999
 
 [query]
-prompt = " > "
-prompt_style.fg = "Cyan"
+prompt = " "
 status_inline = true
+show = true
 
 # Data source mode prompts and styling (aligning with jump.toml)
 [query.local]
-prompt = "> "
+prompt = " "
 prompt_style.fg = "cyan"
 underline_style.fg = "cyan"
 
@@ -55,6 +58,9 @@ icons = true
 scroll_wrap = true
 row_connection = "Full"
 
+[results.border]
+sides = ""
+
 [results.tier]
 separator = "Underline"
 
@@ -62,12 +68,12 @@ separator = "Underline"
 fg = "#555555"
 
 [results.current_style]
-fg = "black"
-bg = "Darkgray"
+bg = "reset"
 modifier = "BOLD"
 
 [results.current_nav_bar_style]
-fg = "white"
+fg = "cyan"
+modifier = "BOLD"
 
 [results.bookmark]
 folder_icon = "󰮟"
@@ -120,7 +126,7 @@ color = "Darkgray"
 title_fg = "Cyan"
 
 [footer]
-# content = " {cyan,bold:[Enter]} {darkgray:Full}  •  {magenta,bold:[Tab]} {darkgray:Cycle}  •  {yellow,bold:[C-h/l]} {darkgray:Dir}  •  {cyan,bold:[C-j/k]} {darkgray:Move}  •  {blue,bold:[C-d/u]} {darkgray:Scroll}  •  {green,bold:[C-v]} {darkgray:Insert}  •  {yellow,bold:[C-e]} {darkgray:Edit}  •  {magenta,bold:[C-y]} {darkgray:Copy}  •  {red,bold:[Esc]} {darkgray:Nav}"
+content = " {cyan,bold:Enter} {darkgray:Full} {darkgray:│} {cyan,bold:Tab} {darkgray:Cycle} {darkgray:│} {cyan,bold:C-h/l} {darkgray:Dir} {darkgray:│} {cyan,bold:C-d/u} {darkgray:Scroll} {darkgray:│} {cyan,bold:C-v} {darkgray:Insert} {darkgray:│} {cyan,bold:C-e} {darkgray:Edit} {darkgray:│} {cyan,bold:C-y} {darkgray:Copy}"
 match_indent = false
 row_connection = "Full"
 separator = "light"
@@ -132,6 +138,10 @@ abort_empty = true
 
 [start.command]
 command = ""
+# Cyclable data sources via @reloadnext (Tab / Shift+Tab):
+# Index 0: "" -> Uses native AsyncWalker for local directory/files.
+# Index 1: Global frecency list via wm list.
+# Index 2: Starred bookmarks list via wm list --bookmarks.
 additional = [
     "",
     "wm list 2>/dev/null",
@@ -169,8 +179,8 @@ ctrl-s = "ToggleDiagram"
 "ctrl--" = "DiagramZoomOut"
 "ctrl-0" = "DiagramResetZoom"
 ctrl-v = 'ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {})'
-ctrl-e = 'Execute(${EDITOR:-nvim} {})'
-ctrl-o = 'Execute(${EDITOR:-nvim} {})'
+ctrl-e = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-o = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {} "$MM_ORIGIN_CWD")'
 ctrl-l = ["ChDir({=})", "Cancel", "Reload", "Pos(0)", "FocusNav"]
 ctrl-h = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 
@@ -223,9 +233,9 @@ ctrl-s = "ToggleDiagram"
 "-" = "DiagramZoomOut"
 "0" = "DiagramResetZoom"
 " " = "Toggle"
-e = 'Execute(${EDITOR:-nvim} {})'
-o = 'Execute(${EDITOR:-nvim} {})'
-ctrl-e = 'Execute(${EDITOR:-nvim} {})'
-ctrl-o = 'Execute(${EDITOR:-nvim} {})'
+e = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {} "$MM_ORIGIN_CWD")'
+o = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-e = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {} "$MM_ORIGIN_CWD")'
+ctrl-o = 'ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {} "$MM_ORIGIN_CWD")'
 l = ["ChDir({=})", "Cancel", "Reload", "Pos(0)"]
 h = ["ChDir(..)", "Cancel", "Reload"]

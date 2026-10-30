@@ -1,8 +1,8 @@
 [ui.nav]
 active = true
 basic = true
-bar = "Plain"
-color = "Darkgray"
+color = "lightcyan"
+marker = "│"
 prompt = ""
 focus_on_start = "filter"
 hints = false
@@ -20,6 +20,7 @@ additional = [
 ]
 
 [tui]
+mouse = true
 percentage = 100
 max = 9999
 
@@ -30,11 +31,12 @@ threshold = false
 sides = ""
 
 [query]
-prompt = "⚡ "
+prompt = " "
 status_inline = true
+show = true
 
 [query.local]
-prompt = "⚡ "
+prompt = " "
 prompt_style.fg = "cyan"
 
 [query.frecency]
@@ -46,16 +48,33 @@ prompt = " "
 prompt_style.fg = "yellow"
 
 [footer]
-content = " {cyan,bold:[Enter]} {darkgray:Connect}  •  {magenta,bold:[Ctrl+S]} {darkgray:Windows}  •  {yellow,bold:[Tab]} {darkgray:Cycle}  •  {red,bold:[Ctrl+D]} {darkgray:Kill}  •  {blue,bold:[Esc]} {darkgray:Cancel}"
+content = " {cyan,bold:Enter} {darkgray:Connect} {darkgray:│} {cyan,bold:Tab} {darkgray:Cycle} {darkgray:│} {cyan,bold:d} {darkgray:Kill} {darkgray:│} {cyan,bold:/} {darkgray:Filter} {darkgray:│} {cyan,bold:Esc} {darkgray:Close}"
 row_connection = "Full"
 match_indent = false
+separator = "light"
 
 [results]
+multi = false
 spinner_inline = true
-current_prefix = " "
+current_prefix = ""
 unselected_prefix = "  "
-row_connection = "Disjoint"
+row_connection = "Full"
 column_spacing = 1
+
+[results.prefix_style]
+fg = "cyan"
+modifier = "BOLD"
+
+[results.style]
+modifier = "DIM"
+
+[results.current_style]
+bg = "reset"
+modifier = "BOLD"
+
+[results.current_nav_bar_style]
+fg = "cyan"
+modifier = "BOLD"
 
 [results.border]
 sides = ""
@@ -74,16 +93,16 @@ color = "Darkgray"
 [[preview.layout]]
 command = 'wm session preview {=}'
 side = "right"
-percentage = 55
+percentage = 60
 
 [ui.nav.binds]
 "tab"           = "@reloadnext"
 "shift-tab"     = "@reloadprev"
 "backtab"       = "@reloadprev"
 "shift-backtab" = "@reloadprev"
-"s"             = ["Print(__SWITCH_WINDOW__)", "Quit"]
-"S"             = ["Print(__SWITCH_WINDOW__)", "Quit"]
-"ctrl-s"        = ["Print(__SWITCH_WINDOW__)", "Quit"]
+"/"             = "FocusFilter"
+"esc"           = "Quit"
+"q"             = "Quit"
 "d"             = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
 "D"             = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
 "ctrl-d"        = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
@@ -94,6 +113,8 @@ percentage = 55
 "shift-tab"     = "@reloadprev"
 "backtab"       = "@reloadprev"
 "shift-backtab" = "@reloadprev"
-"ctrl-s"        = ["Print(__SWITCH_WINDOW__)", "Quit"]
+"esc"           = "ToggleFocus"
+"ctrl-c"        = "Quit"
 "ctrl-d"        = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
 ","             = []
+

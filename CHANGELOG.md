@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+### 🚀 Features
+
+- Add the `tmux/scrollback` (commands, paths, URLs and hashes from a pane's scrollback) and `tmux/keybindings` (every bound key, read live; `Enter` presses it) presets, with tmux popup bindings in `presets/tmux/README.md`
+- Bring the `session-picker`, `workspace` and `rg` presets up to the author's current versions: `Key Label │` footers, a nav bar marker, mouse support and full-width rows
+- Write the scripts bundled presets call (`tmux/open.sh`, `rg/toggle-*.sh`, ...) next to them when missing, so the built-in presets work before `install.sh` or `wm --download` runs
+
+### 🐛 Bug Fixes
+
+- `rg` and `workspace` called scripts from the author's dotfiles (`~/.config/tmux/scrollback-open.sh`, `~/.config/waymaker/scripts/rg-toggle-*.sh`): `e`/`o`/`Ctrl+E` and the `Ctrl+S`/`Ctrl+W` search toggles failed everywhere else. They now use the bundled `tmux/open.sh` (`$EDITOR` beside the origin pane, URLs in the browser) and `rg/toggle-*.sh`
+- `session-picker` bound `s`/`Ctrl+S` to a `__SWITCH_WINDOW__` marker nothing handled; the keys are gone
+- `install.sh` copied only the `.toml` files of preset folders, so `switcher/`, `docker/` and other presets that call their own scripts were installed without them
+
 ## [0.4.0] - 2026-10-28
 
 ### 🚀 Features
