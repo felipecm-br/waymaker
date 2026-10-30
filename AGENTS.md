@@ -44,7 +44,7 @@ Releasing is the explicit "ship it" step, intentionally decoupled from coding ta
   - **Minor (`x.Y.0`)**: Backwards-compatible features, new CLI options, or presets.
   - **Major (`X.0.0`)**: Breaking changes in CLI flags, config schemas, public APIs, or serialization.
 - **Pre-Release Checklist**:
-  1. Working tree is clean and `just install` + tests pass (`cargo test --workspace`).
+  1. Working tree is clean and `just install` + tests pass (`cargo test --workspace`), and the `CI` and `macOS` workflows are green on `main` (re-run a `macOS` run that was cancelled while waiting for a runner).
   2. Bump `version` in workspace manifests (`waymaker-cli/Cargo.toml`, `waymaker-lib/Cargo.toml`, etc.).
   3. Promote `CHANGELOG.md` `## [Unreleased]` section to `## [X.Y.Z] - YYYY-MM-DD` so `taiki-e/create-gh-release-action` automatically populates the GitHub release notes.
   4. Commit release metadata: `git commit -am "chore(release): bump version to X.Y.Z"`.

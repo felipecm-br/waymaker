@@ -1,0 +1,35 @@
+name: macOS
+
+# The test suite on macOS, apart from CI: macOS runners often take over 15 minutes to start, and
+# a run cancelled while waiting for one is re-run here alone (`gh run rerun <id>`) without
+# holding up CI. Release archives for macOS are still built by release.yml.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: macos-latest
+    # A hung test should fail with its log kept, not run until cancelled.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Test
+        run: cargo test --workspace --locked
+      - name: Check experimental features
+        run: cargo check -p waymaker-cli -F experimental --locked

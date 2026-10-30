@@ -16,12 +16,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # macOS runs in macos.yml: its runners often take over 15 minutes to start, which cancelled
+  # whole CI runs; a macOS result now never holds up this one.
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     # A hung test should fail with its log kept, not run until cancelled.
     timeout-minutes: 20
     steps:
