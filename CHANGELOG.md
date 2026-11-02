@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-02
+
 ### 🚀 Features
 
 - `SetStyledFooter(<template>)` replaces the footer with a style template, parsed like `[footer] content` (`{cyan,bold:Key} {darkgray:Label}`), so a `Transform` bind can show state next to the key that changes it, such as `Ctrl+L` stepping an effort level
