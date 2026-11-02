@@ -95,10 +95,7 @@ impl<T: SSS> Injector for WorkerInjector<T> {
         Ok(())
     }
 
-    fn extend(
-        &self,
-        items: impl ExactSizeIterator<Item = T>,
-    ) -> Result<(), WorkerError> {
+    fn extend(&self, items: impl ExactSizeIterator<Item = T>) -> Result<(), WorkerError> {
         if self.version != self.picker_version.load(Ordering::Relaxed) {
             return Err(WorkerError::InjectorShutdown);
         }
@@ -171,12 +168,10 @@ impl<T, I: Injector<InputItem = Indexed<T>>> Injector for IndexedInjector<T, I> 
             return Ok(());
         }
         let start_index = self.counter.fetch_add(count as u32, Ordering::SeqCst);
-        let wrapped = items
-            .enumerate()
-            .map(|(offset, item)| Indexed {
-                index: start_index + offset as u32,
-                inner: item,
-            });
+        let wrapped = items.enumerate().map(|(offset, item)| Indexed {
+            index: start_index + offset as u32,
+            inner: item,
+        });
         self.injector.extend(wrapped)
     }
 }
@@ -309,8 +304,8 @@ mod ansi {
             let trim = self.trim;
 
             if !parse && !trim {
-                let wrapped = items
-                    .map(|(group, item)| (group, Either::Left(item.into_boxed_str())));
+                let wrapped =
+                    items.map(|(group, item)| (group, Either::Left(item.into_boxed_str())));
                 self.injector.extend(wrapped)
             } else if items.len() >= 256 {
                 use rayon::prelude::*;
@@ -341,8 +336,7 @@ mod ansi {
                     let ret = if !parse {
                         Either::Left(item.into_boxed_str())
                     } else {
-                        let mut parsed =
-                            item.as_bytes().into_text().unwrap_or(Text::from(item));
+                        let mut parsed = item.as_bytes().into_text().unwrap_or(Text::from(item));
                         scrub_text_styles(&mut parsed);
                         Either::Right(parsed)
                     };

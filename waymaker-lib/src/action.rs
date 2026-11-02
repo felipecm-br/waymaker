@@ -870,13 +870,27 @@ mod tests {
         assert_eq!(exec, Action::Execute("echo hi".into()));
         assert_eq!(exec.to_string(), "Execute(echo hi)");
 
-        let prompt_input: Action = Action::from_str("PromptInput(tmux send-keys -t '{=pid}' '{input}' Enter)").unwrap();
-        assert_eq!(prompt_input, Action::PromptInput("tmux send-keys -t '{=pid}' '{input}' Enter".into()));
-        assert_eq!(prompt_input.to_string(), "PromptInput(tmux send-keys -t '{=pid}' '{input}' Enter)");
+        let prompt_input: Action =
+            Action::from_str("PromptInput(tmux send-keys -t '{=pid}' '{input}' Enter)").unwrap();
+        assert_eq!(
+            prompt_input,
+            Action::PromptInput("tmux send-keys -t '{=pid}' '{input}' Enter".into())
+        );
+        assert_eq!(
+            prompt_input.to_string(),
+            "PromptInput(tmux send-keys -t '{=pid}' '{input}' Enter)"
+        );
 
-        let live_input: Action = Action::from_str("LiveInput(tmux send-keys -t '{=pid}' {keys})").unwrap();
-        assert_eq!(live_input, Action::LiveInput("tmux send-keys -t '{=pid}' {keys}".into()));
-        assert_eq!(live_input.to_string(), "LiveInput(tmux send-keys -t '{=pid}' {keys})");
+        let live_input: Action =
+            Action::from_str("LiveInput(tmux send-keys -t '{=pid}' {keys})").unwrap();
+        assert_eq!(
+            live_input,
+            Action::LiveInput("tmux send-keys -t '{=pid}' {keys}".into())
+        );
+        assert_eq!(
+            live_input.to_string(),
+            "LiveInput(tmux send-keys -t '{=pid}' {keys})"
+        );
 
         let live_input_key: Action = Action::from_str("LiveInputKey(Enter)").unwrap();
         assert_eq!(live_input_key, Action::LiveInputKey("Enter".into()));

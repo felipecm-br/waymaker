@@ -201,7 +201,8 @@ mod tests {
     #[test]
     fn test_worker_default_format_fn() {
         let worker = Worker::<String>::new_single_column();
-        let fmt_unquoted = worker.default_format_fn::<false>(|s: &String| Cow::Borrowed(s.as_str()));
+        let fmt_unquoted =
+            worker.default_format_fn::<false>(|s: &String| Cow::Borrowed(s.as_str()));
 
         let res = fmt_unquoted(&"alpha".to_string(), "Hello {}!");
         assert_eq!(res, "Hello alpha!");

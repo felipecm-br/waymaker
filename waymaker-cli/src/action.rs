@@ -49,6 +49,8 @@ pub enum MMAction {
     SetFooter(Option<String>),
     /// Push footer
     PushFooter(String),
+    /// Set footer from a style template, like the config's `[footer] content`
+    SetStyledFooter(String),
     /// Set status without interpreting style braces
     SetPrompt(Option<String>),
     /// Set prompt
@@ -593,6 +595,9 @@ pub fn action_handler(
         }
         MMAction::PushFooter(s) => {
             state.footer_ui.push(s);
+        }
+        MMAction::SetStyledFooter(s) => {
+            state.footer_ui.set_styled(&s);
         }
         MMAction::SetStyledPrompt(s) => {
             state
@@ -1473,7 +1478,7 @@ enum_from_str_display! {
 
 
     tuples:
-    Bind, Unbind, PushBind, PopBind, ExecuteOrConfirm, ExecuteAndQuit, BecomeOr, BecomeOrConfirm, BecomeOrResume, Transform, TransformConfig, SetStyledPrompt, SetStyledStatus, SetModeIndex, PushHeader, PushFooter, RunPreview, FmSetYankPaths, FmRemoveYankPaths, FmSetCutPaths, FmRemoveCutPaths, FmSetPinPaths, FmSetFlashCopy, FmSetFlashCut, Confirm, Prompt;
+    Bind, Unbind, PushBind, PopBind, ExecuteOrConfirm, ExecuteAndQuit, BecomeOr, BecomeOrConfirm, BecomeOrResume, Transform, TransformConfig, SetStyledPrompt, SetStyledStatus, SetStyledFooter, SetModeIndex, PushHeader, PushFooter, RunPreview, FmSetYankPaths, FmRemoveYankPaths, FmSetCutPaths, FmRemoveCutPaths, FmSetPinPaths, FmSetFlashCopy, FmSetFlashCut, Confirm, Prompt;
 
     defaults:
     ;
@@ -1880,6 +1885,13 @@ mod tests {
     /// current directory (chdir actions) and env vars. Run in parallel they
     /// overwrite each other's values.
     static GLOBAL_STATE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[test]
+    fn test_parse_styled_footer_keeps_the_whole_template() {
+        let tpl = " {cyan,bold:Enter} {darkgray:Launch} {darkgray:│} {cyan,bold:C-h/l} {darkgray:Effort} {white,bold:◑ medium}";
+        let action = Action::<MMAction>::from_str(&format!("SetStyledFooter({tpl})")).unwrap();
+        assert!(matches!(action, Action::Custom(MMAction::SetStyledFooter(ref s)) if s == tpl));
+    }
 
     #[test]
     fn test_parse_actions() {

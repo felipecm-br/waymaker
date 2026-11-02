@@ -137,6 +137,9 @@ mod tests {
         assert_eq!(s.sov, StringOrVec::String("single".to_string()));
 
         let v: TestContainer = toml::from_str(r#"sov = ["a", "b", "c"]"#).unwrap();
-        assert_eq!(v.sov, StringOrVec::Vec(vec!["a".into(), "b".into(), "c".into()]));
+        assert_eq!(
+            v.sov,
+            StringOrVec::Vec(vec!["a".into(), "b".into(), "c".into()])
+        );
     }
 }

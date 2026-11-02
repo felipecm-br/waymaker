@@ -93,6 +93,12 @@ impl DisplayUI {
         self.show = true;
     }
 
+    /// Set text from a style template (`{cyan,bold:Key} {darkgray:Label}`, one line per
+    /// line), as the config's `content` is parsed, and show.
+    pub fn set_styled(&mut self, template: &str) {
+        self.set(parse_content_to_text(template));
+    }
+
     /// Add a column and show.
     pub fn push(&mut self, text: impl Into<Text<'static>>) {
         self.text.push(text.into());
@@ -263,4 +269,23 @@ fn parse_content_to_text(s: &str) -> Text<'static> {
         .map(crate::ui::StatusUI::parse_template_to_status_line)
         .collect();
     Text::from(lines)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::style::{Color, Modifier};
+
+    #[test]
+    fn test_set_styled_parses_the_template_like_the_config_content() {
+        let mut ui = DisplayUI::new(DisplayConfig::default());
+        ui.set_styled(" {cyan,bold:C-h/l} {darkgray:Effort} {white,bold:◑ medium}");
+        assert!(ui.show);
+        let line = &ui.text[0].lines[0];
+        let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(text, " C-h/l Effort ◑ medium");
+        let key = line.spans.iter().find(|s| s.content == "C-h/l").unwrap();
+        assert_eq!(key.style.fg, Some(Color::Cyan));
+        assert!(key.style.add_modifier.contains(Modifier::BOLD));
+    }
 }

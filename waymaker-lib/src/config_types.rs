@@ -854,9 +854,15 @@ mod tests {
     fn test_diagram_theme_parsing_and_display() {
         use std::str::FromStr;
         assert_eq!(DiagramTheme::from_str("auto").unwrap(), DiagramTheme::Auto);
-        assert_eq!(DiagramTheme::from_str("system").unwrap(), DiagramTheme::Auto);
+        assert_eq!(
+            DiagramTheme::from_str("system").unwrap(),
+            DiagramTheme::Auto
+        );
         assert_eq!(DiagramTheme::from_str("dark").unwrap(), DiagramTheme::Dark);
-        assert_eq!(DiagramTheme::from_str("light").unwrap(), DiagramTheme::Light);
+        assert_eq!(
+            DiagramTheme::from_str("light").unwrap(),
+            DiagramTheme::Light
+        );
         assert!(DiagramTheme::from_str("unsupported").is_err());
 
         assert_eq!(format!("{}", DiagramTheme::Auto), "auto");
@@ -994,7 +1000,13 @@ impl<'de> Deserialize<'de> for SortThreshold {
 pub enum DiagramTheme {
     /// Detect theme mode automatically from Omarchy system colors.toml or terminal COLORFGBG.
     #[default]
-    #[serde(alias = "auto", alias = "Auto", alias = "AUTO", alias = "system", alias = "System")]
+    #[serde(
+        alias = "auto",
+        alias = "Auto",
+        alias = "AUTO",
+        alias = "system",
+        alias = "System"
+    )]
     Auto,
     /// Dark theme mode with dark surfaces, vibrant accents, and light text.
     #[serde(alias = "dark", alias = "Dark", alias = "DARK")]
@@ -1043,12 +1055,7 @@ pub enum DiagramBackground {
     )]
     Transparent,
     /// Solid background matching the detected or configured theme palette.
-    #[serde(
-        alias = "solid",
-        alias = "Solid",
-        alias = "SOLID",
-        alias = "opaque"
-    )]
+    #[serde(alias = "solid", alias = "Solid", alias = "SOLID", alias = "opaque")]
     Solid,
 }
 

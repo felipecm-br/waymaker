@@ -1,6 +1,6 @@
+use serde::Deserialize;
 use waymaker_partial::{Apply, Set};
 use waymaker_partial_macros::partial;
-use serde::Deserialize;
 
 #[partial(path)]
 #[derive(Debug, PartialEq, Default, Clone, Deserialize)]

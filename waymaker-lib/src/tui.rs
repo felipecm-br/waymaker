@@ -264,7 +264,6 @@ where
 
         self.terminal.show_cursor()._wlog();
 
-
         disable_raw_mode()._wlog();
 
         debug!("Terminal exited");

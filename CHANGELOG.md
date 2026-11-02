@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### 🚀 Features
+
+- `SetStyledFooter(<template>)` replaces the footer with a style template, parsed like `[footer] content` (`{cyan,bold:Key} {darkgray:Label}`), so a `Transform` bind can show state next to the key that changes it, such as `Ctrl+L` stepping an effort level
+
 ### 🐛 Bug Fixes
 
 - `install.sh` installed a downloaded binary without checking it against the `.sha256` published next to it; it now refuses a mismatch or a missing checksum (`WM_SKIP_CHECKSUM=1` overrides), and `WM_VERIFY_ATTESTATION=1` also checks the build provenance
