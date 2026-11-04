@@ -19,6 +19,8 @@
 
 ### 🐛 Bug Fixes
 
+- `--color` warnings (unknown key, unparsable colour, missing `:`) went to the log, hidden at the default verbosity, so a typo such as `--color selected:Red` did nothing silently; they now print at startup
+- A `session.toml` (or `sesh.toml`) that failed to parse made every configured session disappear from `wm session` with no message; the parse error is now printed with the file path
 - Several presets set `[start]` options under `[start.command]`, where they were silently ignored. `switcher` (Linux and macOS), `dict/en` and `docker/compose` split NUL-terminated multi-line records into one item per line, so the switcher listed titles, app names and PIDs as separate entries; `git/status`, `docker/compose`, `ai/llm` and `win.rg` printed the whole line on Enter instead of the intended column; `ai/pi_sessions` ran outside `~/.pi/agent/sessions`. The keys now live in `[start]` (`input_separator`, `output_template`, `directory`, `trim`)
 - `cmd = …` under `[start.command]` was ignored in TOML (it only worked as a CLI override alias), so a preset that set only `cmd` fell back to the directory walker. `cmd` now works in TOML too. `separator` there was parsed but never used; it is removed from the default config, `rg` and the dev playground configs, and from the options docs
 - A test now parses every shipped config and preset with `serde_ignored` and fails on any key the schema skips

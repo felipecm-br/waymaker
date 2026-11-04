@@ -49,13 +49,13 @@ pub fn apply_color_spec(config: &mut Config, spec: &str) {
             continue;
         }
         let Some((key, value)) = pair.split_once(':') else {
-            log::warn!("--color: expected 'key:value', got '{pair}'");
+            cba::wbog!("--color: expected 'key:value', got '{pair}'");
             continue;
         };
         let key = key.trim();
         let value = value.trim();
         let Ok(color) = Color::from_str(value) else {
-            log::warn!("--color: unknown color value '{value}' for key '{key}'");
+            cba::wbog!("--color: unknown color value '{value}' for key '{key}'");
             continue;
         };
 
@@ -90,7 +90,7 @@ pub fn apply_color_spec(config: &mut Config, spec: &str) {
             "cut" => config.render.results.cut_prefix_style.fg = Some(color),
             "symlink" => config.render.results.symlink.style.fg = Some(color),
             "tier-separator" => config.render.results.tier.style.fg = Some(color),
-            _ => log::warn!("--color: unknown key '{key}'"),
+            _ => cba::wbog!("--color: unknown key '{key}'"),
         }
     }
 }

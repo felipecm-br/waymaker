@@ -205,9 +205,14 @@ pub fn load_session_config() -> SessionConfig {
     for path in candidates {
         if path.exists()
             && let Ok(content) = std::fs::read_to_string(&path)
-            && let Ok(cfg) = toml::from_str::<SessionConfig>(&content)
         {
-            return cfg;
+            match toml::from_str::<SessionConfig>(&content) {
+                Ok(cfg) => return cfg,
+                // Say why the configured sessions are missing instead of silently
+                // falling back to the next candidate (or to no sessions at all).
+                // `wm session` runs before the logger is set up, so print directly.
+                Err(e) => eprintln!("[WARN] {}: {e}", path.display()),
+            }
         }
     }
 

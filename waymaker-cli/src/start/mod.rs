@@ -1987,7 +1987,9 @@ mod tests {
     async fn test_start_benchmark_input() {
         let mut config = Config::default();
         config.start.command.default.command = "printf 'alpha\\nbeta\\ngamma\\n'".to_string();
-        let code = start_benchmark_input(config, "bet", false, None).await;
+        // no_read = true: run the command above. With false, a non-tty stdin that never
+        // closes (cargo test started from a pipe) is read instead, and the test hangs.
+        let code = start_benchmark_input(config, "bet", true, None).await;
         assert_eq!(code, 0);
     }
 }

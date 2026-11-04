@@ -161,7 +161,7 @@ wm --color 'fg:#cdd6f4,bg:#1e1e2e,hl-fg:#cba6f7,hl-bg:#313244,border:#6c7086,sel
 wm --color 'border:Blue' --color 'hl-bg:DarkGray,selected-fg:White'
 ```
 
-An unknown key is ignored without a warning, so check the spelling against this table.
+An unknown key or colour is skipped with a warning.
 
 ## Spinners and the unselected marker
 
@@ -244,7 +244,7 @@ startup_script = "npx -y live-server --port=5500"   # `startup_command` also wor
 # path = "~/other/dir"                              # defaults to the session path
 ```
 
-A window name without a matching `[[window]]` is skipped. If `session.toml` fails to parse, its sessions are left out of the list without an error, so check the file when a configured session is missing.
+A window name without a matching `[[window]]` is skipped. If `session.toml` does not parse, `wm` prints the error with the file name and lists only the running sessions.
 
 ## The default file walker
 
