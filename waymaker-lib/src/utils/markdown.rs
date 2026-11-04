@@ -1695,6 +1695,7 @@ graph TD
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_render_markdown_inline_diagrams() {
         let _env_lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_DIAGRAMS").ok();
@@ -1763,6 +1764,7 @@ graph LR
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_render_markdown_ansi_inline_diagrams() {
         let _env_lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_DIAGRAMS").ok();
@@ -2070,6 +2072,7 @@ graph TD
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_render_markdown_image_disabled_flag_independence() {
         let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();
@@ -2317,6 +2320,7 @@ graph TD
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_render_markdown_image_svg_data_uri() {
         let _lock = crate::utils::lock_test_env();
         let prev = std::env::var("MM_INLINE_IMAGES").ok();

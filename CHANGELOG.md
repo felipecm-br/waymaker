@@ -10,6 +10,7 @@
 
 ### ⚡ Performance
 
+- `diagram-images` cargo feature (on by default) gates the Mermaid/SVG rasterizer (`mermaid-rs-renderer`, `resvg`, `usvg`). `cargo build --release -p waymaker-cli --no-default-features -F frizbee` builds a 15.3 MB `wm` instead of 18.5 MB; diagrams then preview through the Unicode text renderer
 - Single-column fast path in ingest injector bypassing column loops when a single unformatted column is parsed
 - Non-spinning background match wait via matcher notification and `tokio::select!`
 - Shared in-process redb database instances across threads, eliminating lock contention backoff delays

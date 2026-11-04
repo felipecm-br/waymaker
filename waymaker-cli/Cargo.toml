@@ -56,8 +56,9 @@ path = "src/main.rs"
 workspace = true
 
 [features]
-default = ["frizbee"]
+default = ["frizbee", "diagram-images"]
 frizbee = ["waymaker-lib/frizbee"]
+diagram-images = ["waymaker-lib/diagram-images"]
 experimental = [
   "waymaker-lib/experimental",
   # "log/max_level_debug"

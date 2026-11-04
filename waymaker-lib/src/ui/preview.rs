@@ -2044,6 +2044,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_diagram_placeholder_lines_generation_and_panning() {
         let _env_lock = crate::utils::lock_test_env();
         use crate::preview::previewer::Previewer;

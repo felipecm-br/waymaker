@@ -1291,6 +1291,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "diagram-images")]
     async fn test_previewer_standalone_mermaid_with_inline_and_media() {
         let mut previewer_cfg = crate::config::PreviewerConfig::default();
         previewer_cfg.media = true;
@@ -1360,6 +1361,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "diagram-images")]
     async fn test_preview_transition_from_markdown_diagram_to_code_file() {
         let _env_lock = crate::utils::lock_test_env_async().await;
         let mut previewer_cfg = crate::config::PreviewerConfig::default();

@@ -65,8 +65,10 @@ pub fn render_mermaid_file_ansi(path: &Path, opts: &MermaidOptions) -> anyhow::R
 use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHasher};
 use std::hash::{Hash, Hasher};
+#[cfg(feature = "diagram-images")]
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex};
 
 /// Terminal color mode (Dark vs Light).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -189,6 +191,7 @@ pub fn detect_color_mode() -> ColorMode {
     ColorMode::Dark
 }
 
+#[cfg(feature = "diagram-images")]
 fn lighten_hex(hex: &str, factor: f32) -> String {
     let hex = hex.trim_start_matches('#');
     if hex.len() != 6 {
@@ -201,6 +204,7 @@ fn lighten_hex(hex: &str, factor: f32) -> String {
     format!("#{:02X}{:02X}{:02X}", blend(r), blend(g), blend(b))
 }
 
+#[cfg(feature = "diagram-images")]
 fn darken_hex(hex: &str, factor: f32) -> String {
     let hex = hex.trim_start_matches('#');
     if hex.len() != 6 {
@@ -213,6 +217,7 @@ fn darken_hex(hex: &str, factor: f32) -> String {
     format!("#{:02X}{:02X}{:02X}", scale(r), scale(g), scale(b))
 }
 
+#[cfg(feature = "diagram-images")]
 fn readable_on(hex: &str) -> String {
     let hex = hex.trim_start_matches('#');
     if hex.len() != 6 {
@@ -298,6 +303,7 @@ pub fn compute_theme_fingerprint(theme_opt: DiagramTheme, bg_opt: DiagramBackgro
     hasher.finish()
 }
 
+#[cfg(feature = "diagram-images")]
 /// Construct a `mermaid_rs_renderer::Theme` matching the detected or configured theme mode
 /// and background transparency requirements.
 pub fn build_mermaid_theme(
@@ -597,6 +603,7 @@ pub fn build_mermaid_theme(
     }
 }
 
+#[cfg(feature = "diagram-images")]
 /// Shared system font database for fast SVG text rasterization.
 static FONT_DB: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
     let mut db = usvg::fontdb::Database::new();
@@ -609,6 +616,7 @@ static FONT_DB: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
 /// Moving the 50-650ms `load_system_fonts()` scan to a background thread during
 /// startup ensures that the first diagram or SVG preview renders without cold-start UI freeze.
 pub fn warmup_font_db() {
+    #[cfg(feature = "diagram-images")]
     std::thread::Builder::new()
         .name("mm-font-warmup".to_string())
         .spawn(|| {
@@ -617,6 +625,7 @@ pub fn warmup_font_db() {
         .ok();
 }
 
+#[cfg(feature = "diagram-images")]
 /// In-memory LRU cache for rendered diagram bitmaps, keyed by (FxHash(source), scale_key, theme_fingerprint).
 static DIAGRAM_CACHE: LazyLock<
     Mutex<IndexMap<(u64, u32, u64), image::DynamicImage, FxBuildHasher>>,
@@ -627,6 +636,19 @@ static DIAGRAM_CACHE: LazyLock<
 /// Uses `mermaid-rs-renderer` to produce SVG with transparent or solid background,
 /// then rasterizes with `resvg`/`usvg`/`tiny-skia`.
 /// Results are cached in an in-memory LRU cache keyed by diagram hash, scale, and theme fingerprint.
+///
+/// Returns `None` when built without the `diagram-images` feature.
+#[cfg(not(feature = "diagram-images"))]
+pub fn render_mermaid_to_image_with_options(
+    _src: &str,
+    _scale: f32,
+    _theme_opt: DiagramTheme,
+    _bg_opt: DiagramBackground,
+) -> Option<image::DynamicImage> {
+    None
+}
+
+#[cfg(feature = "diagram-images")]
 pub fn render_mermaid_to_image_with_options(
     src: &str,
     scale: f32,
@@ -694,6 +716,20 @@ pub fn render_mermaid_to_image(src: &str, scale: f32) -> Option<image::DynamicIm
 }
 
 /// Rasterize an SVG string to a `DynamicImage` at the given scale factor with background option.
+///
+/// Returns `None` when built without the `diagram-images` feature.
+#[cfg(not(feature = "diagram-images"))]
+pub fn render_svg_to_image_with_options(
+    _svg: &str,
+    _scale: f32,
+    _bg_opt: DiagramBackground,
+    _solid_bg_color: Option<&str>,
+) -> Option<image::DynamicImage> {
+    None
+}
+
+/// Rasterize an SVG string to a `DynamicImage` at the given scale factor with background option.
+#[cfg(feature = "diagram-images")]
 pub fn render_svg_to_image_with_options(
     svg: &str,
     scale: f32,
@@ -1846,6 +1882,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_render_mermaid_to_image() {
         let src =
             "flowchart TD\n    A[Start] --> B{Choice}\n    B -->|Yes| C[OK]\n    B -->|No| D[Stop]";
@@ -1880,6 +1917,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_git_worktree_diagram() {
         let src = r#"graph TD
     BARE[".dotfiles/.bare (Git Bare Repository)"] --> MAIN[".dotfiles/main (Production Worktree / Stowed)"]
@@ -1956,6 +1994,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_render_mermaid_to_unicode_placeholders_success() {
         let src = "graph LR\n  A[Start] --> B[End]";
         let diag = render_mermaid_to_unicode_placeholders(src, Some(60));
@@ -1989,6 +2028,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_placeholder_lru_cache_hit() {
         let src = "graph LR\n  X[Alpha] --> Y[Beta]";
         let diag1 = render_mermaid_to_unicode_placeholders(src, Some(60)).expect("First render");
@@ -2130,6 +2170,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_build_mermaid_theme_transparency_and_modes() {
         // Transparent dark theme
         let dark_transparent =
@@ -2158,6 +2199,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_build_mermaid_theme_omarchy_mismatch_protection() {
         // Even if Omarchy has dark mode colors active on the current machine,
         // an explicit Light theme request must NOT use dark mode's navy background or light text.
@@ -2196,6 +2238,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_render_mermaid_to_image_transparent_pixels() {
         let src = "graph LR\n  A[Foo] --> B[Bar]";
         let img = render_mermaid_to_image_with_options(
@@ -2234,6 +2277,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "diagram-images")]
     fn test_diagram_cache_differentiation_by_theme_and_bg() {
         let src = "graph TD\n  Start --> Finish";
         let img_trans = render_mermaid_to_image_with_options(

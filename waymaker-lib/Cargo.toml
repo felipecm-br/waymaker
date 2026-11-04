@@ -58,9 +58,9 @@ ratatui-image = { version = "11.0.2", default-features = false, features = ["cro
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 mermaid-text = "0.57.0"
 pulldown-cmark = { version = "0.13", default-features = false }
-mermaid-rs-renderer = { version = "0.3.1", default-features = false, features = ["png"] }
-resvg = { version = "0.47", default-features = false }
-usvg = { version = "0.47", default-features = false }
+mermaid-rs-renderer = { version = "0.3.1", default-features = false, features = ["png"], optional = true }
+resvg = { version = "0.47", default-features = false, optional = true }
+usvg = { version = "0.47", default-features = false, optional = true }
 
 
 frizbee = { version = "0.13.0", optional = true }
@@ -72,7 +72,10 @@ nix = { version = "0.31.1", features = ["poll", "signal", "term"] }
 windows-sys = "0.61.2"
 
 [features]
-default = ["frizbee"]
+default = ["frizbee", "diagram-images"]
+# Rasterize Mermaid diagrams and SVG images (mermaid-rs-renderer, resvg, usvg).
+# Without it, diagrams fall back to the Unicode text renderer.
+diagram-images = ["dep:mermaid-rs-renderer", "dep:resvg", "dep:usvg"]
 bracketed-paste = ["crossterm/bracketed-paste"]
 parallelism = []
 experimental = []

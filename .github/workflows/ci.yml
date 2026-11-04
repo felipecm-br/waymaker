@@ -109,6 +109,8 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Clippy (waymaker-lib without default features)
         run: cargo clippy -p waymaker-lib --all-targets --no-default-features --locked -- -D warnings
+      - name: Clippy (wm without diagram-images)
+        run: cargo clippy -p waymaker-cli --all-targets --no-default-features -F frizbee --locked -- -D warnings
 
   bench:
     runs-on: ubuntu-latest
