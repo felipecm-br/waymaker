@@ -260,8 +260,14 @@ mod ansi {
         pub trim: bool,
     }
 
-    impl<I: Injector<InputItem = (Option<std::sync::Arc<str>>, Either<Box<str>, Text<'static>>)>>
-        Injector for AnsiInjector<I>
+    impl<
+        I: Injector<
+            InputItem = (
+                Option<std::sync::Arc<str>>,
+                Either<Box<str>, Box<Text<'static>>>,
+            ),
+        >,
+    > Injector for AnsiInjector<I>
     {
         type InputItem = (Option<std::sync::Arc<str>>, String);
         type Inner = I;
@@ -287,7 +293,7 @@ mod ansi {
             } else {
                 let mut parsed = item.as_bytes().into_text().unwrap_or(Text::from(item));
                 scrub_text_styles(&mut parsed);
-                Either::Right(parsed)
+                Either::Right(Box::new(parsed))
             };
             Ok((group, ret))
         }
@@ -322,7 +328,7 @@ mod ansi {
                             let mut parsed =
                                 item.as_bytes().into_text().unwrap_or(Text::from(item));
                             scrub_text_styles(&mut parsed);
-                            Either::Right(parsed)
+                            Either::Right(Box::new(parsed))
                         };
                         (group, ret)
                     })
@@ -338,7 +344,7 @@ mod ansi {
                     } else {
                         let mut parsed = item.as_bytes().into_text().unwrap_or(Text::from(item));
                         scrub_text_styles(&mut parsed);
-                        Either::Right(parsed)
+                        Either::Right(Box::new(parsed))
                     };
                     (group, ret)
                 });
@@ -347,7 +353,7 @@ mod ansi {
         }
     }
 
-    impl SegmentableItem for Either<Box<str>, Text<'static>> {
+    impl SegmentableItem for Either<Box<str>, Box<Text<'static>>> {
         fn slice(&self, range: Range<usize>) -> Text<'_> {
             match self {
                 Either::Left(s) => ratatui::text::Text::from(&s[range]),

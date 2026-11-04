@@ -13,6 +13,7 @@
 
 - In nav mode (`jump`, `workspace`), `m` toggles the bookmark on the focused path; `*` still works as an alias
 - `esc` exits with 130 (like `ctrl-c` and fzf) instead of 1, so a script can tell "cancelled" from "nothing matched" (still 1). Bind `"esc" = "Quit(1)"` to keep the old code
+- Box `Text<'static>` in the item payload enum (`Either<Box<str>, Box<Text<'static>>>`), shrinking each item from 96 to 64 bytes (−32 bytes per item when `ansi = false`)
 
 ## [0.6.0] - 2026-11-02
 

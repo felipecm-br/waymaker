@@ -12,7 +12,7 @@ define_either! {
     }
 }
 
-impl Either<Box<str>, Text<'static>> {
+impl Either<Box<str>, Box<Text<'static>>> {
     pub fn to_cow(&self) -> Cow<'_, str> {
         match self {
             Either::Left(s) => Cow::Borrowed(s),
@@ -23,14 +23,14 @@ impl Either<Box<str>, Text<'static>> {
     pub fn to_text(self) -> Text<'static> {
         match self {
             Either::Left(s) => Text::from(s.into_string()),
-            Either::Right(t) => t,
+            Either::Right(t) => *t,
         }
     }
 
     pub fn as_text(&self) -> Text<'_> {
         match self {
             Either::Left(s) => Text::from(s.as_ref()),
-            Either::Right(t) => t.clone(),
+            Either::Right(t) => (**t).clone(),
         }
     }
 }
@@ -41,12 +41,18 @@ mod tests {
 
     #[test]
     fn test_either_left_and_right() {
-        let left: Either<Box<str>, Text<'static>> = Either::Left("sample left".into());
+        assert_eq!(
+            std::mem::size_of::<Either<Box<str>, Box<Text<'static>>>>(),
+            16
+        );
+
+        let left: Either<Box<str>, Box<Text<'static>>> = Either::Left("sample left".into());
         assert_eq!(left.to_cow(), Cow::Borrowed("sample left"));
         assert_eq!(left.as_text(), Text::from("sample left"));
         assert_eq!(left.to_text(), Text::from("sample left"));
 
-        let right: Either<Box<str>, Text<'static>> = Either::Right(Text::from("sample right"));
+        let right: Either<Box<str>, Box<Text<'static>>> =
+            Either::Right(Box::new(Text::from("sample right")));
         assert_eq!(right.to_cow(), Cow::Borrowed("sample right"));
         assert_eq!(right.as_text(), Text::from("sample right"));
         assert_eq!(right.to_text(), Text::from("sample right"));
