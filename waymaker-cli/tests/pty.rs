@@ -218,11 +218,11 @@ fn query_then_accept_prints_the_match() {
 }
 
 #[test]
-fn escape_quits_with_1() {
-    // The default config binds esc to Quit(1); ctrl-c's plain Quit is 130.
+fn escape_quits_with_130() {
+    // Cancelling exits 130 like ctrl-c (and fzf), so scripts can tell it from "no match" (1).
     let wm = Session::start(FRUIT, &[]);
     wm.send(ESC);
-    assert_eq!(wm.finish(), (1, String::new()));
+    assert_eq!(wm.finish(), (130, String::new()));
 }
 
 #[test]

@@ -188,7 +188,7 @@ impl<A: ActionExt> EventLoop<A> {
                 self.send(RenderCommand::quit_with(130));
             }
             key!(esc) => {
-                self.send_key_action(Action::Quit(1), key_str);
+                self.send_key_action(Action::Quit(130), key_str);
             }
             key!(up) => self.send_key_action(Action::Up(1), key_str),
             key!(down) => self.send_key_action(Action::Down(1), key_str),

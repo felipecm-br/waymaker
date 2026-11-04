@@ -96,7 +96,7 @@ ansi = false # don't set to true here
 [binds]
 # Essentia
 "ctrl-c" = "Quit"
-"esc" = "Quit(1)"
+"esc" = "Quit"
 "enter" = "@accept"
 "alt-enter" = "@Accept"
 "ctrl-enter" = "@accept_2"

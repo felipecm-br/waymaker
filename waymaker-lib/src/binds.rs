@@ -33,7 +33,7 @@ impl<A: ActionExt> BindMap<A> {
         #[allow(unused_mut)]
         let mut ret = bindmap!(
             key!(ctrl-c) => Action::Quit(130),
-            key!(esc) => Action::Quit(1),
+            key!(esc) => Action::Quit(130),
             key!(up) => Action::Up(1),
             key!(down) => Action::Down(1),
             key!(enter) => Action::Accept,
