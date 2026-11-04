@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-04
+
 ### 🚀 Features
 
 - `wm --doc features`: a task-oriented guide (icons, previews, media, `--color` keys, spinners, group headers, tmux sessions, config layering, the file walker), replacing `USAGE.md`, whose config snippets no longer parsed (`results.symlink_target`, `preview.media = true`, `[matcher] frecency = true`)
