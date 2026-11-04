@@ -20,7 +20,7 @@ use crate::{config::Config, paths::default_config_path};
 use cba::{
     _wbog,
     bait::{OptionExt, ResultExt, TransformExt},
-    bo::{MapReaderError, map_chunks, map_reader_lines, read_to_chunks, write_str},
+    bo::{MapReaderError, write_str},
     bog::BogOkExt,
     ebog, ibog, prints, wbog,
 };
@@ -630,6 +630,91 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     Ok(config)
 }
 
+/// Splits `reader` into records ending in `delim` and passes each one to `f`, without the
+/// delimiter (and without a `\r` before it when `delim` is `\n`). A last record with no
+/// trailing delimiter is passed too.
+///
+/// Invalid UTF-8 is replaced with U+FFFD, like fzf, instead of dropping the record: one
+/// non-UTF-8 file name must not hide it, or (as `read_line`'s error did in the headless
+/// filter) the whole input. Records are found with `memchr` in a large buffer and each
+/// costs one allocation.
+pub fn for_each_record<E>(
+    reader: impl Read,
+    delim: u8,
+    mut f: impl FnMut(String) -> Result<(), E>,
+) -> Result<usize, MapReaderError<E>> {
+    use std::io::BufRead;
+
+    let mut reader = std::io::BufReader::with_capacity(256 * 1024, reader);
+    // A record split across two buffer fills.
+    let mut partial: Vec<u8> = Vec::new();
+    let mut count = 0;
+    let mut lossy = 0usize;
+
+    let mut emit = |mut record: &[u8], count: &mut usize| -> Result<(), MapReaderError<E>> {
+        if delim == b'\n'
+            && let Some(rest) = record.strip_suffix(b"\r")
+        {
+            record = rest;
+        }
+        let text = match std::str::from_utf8(record) {
+            Ok(s) => s.to_owned(),
+            Err(_) => {
+                lossy += 1;
+                String::from_utf8_lossy(record).into_owned()
+            }
+        };
+        f(text).map_err(MapReaderError::Custom)?;
+        *count += 1;
+        Ok(())
+    };
+
+    loop {
+        let buf = match reader.fill_buf() {
+            Ok(buf) => buf,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(MapReaderError::ChunkError(count, e)),
+        };
+        if buf.is_empty() {
+            break;
+        }
+        let mut start = 0;
+        for end in memchr::memchr_iter(delim, buf) {
+            if partial.is_empty() {
+                emit(&buf[start..end], &mut count)?;
+            } else {
+                partial.extend_from_slice(&buf[start..end]);
+                emit(&partial, &mut count)?;
+                partial.clear();
+            }
+            start = end + 1;
+        }
+        partial.extend_from_slice(&buf[start..]);
+        let len = buf.len();
+        reader.consume(len);
+    }
+    if !partial.is_empty() {
+        emit(&partial, &mut count)?;
+    }
+    drop(emit);
+    if lossy > 0 {
+        log::warn!("{lossy} input records were not valid UTF-8; invalid bytes shown as U+FFFD");
+    }
+    Ok(count)
+}
+
+/// The byte input records end with: `input_separator`, or a newline.
+fn record_delimiter(input_separator: Option<char>) -> u8 {
+    match input_separator {
+        Some(c) if c.is_ascii() => c as u8,
+        Some(c) => {
+            log::warn!("Input separator {c:?} is not ASCII; splitting input on newlines");
+            b'\n'
+        }
+        None => b'\n',
+    }
+}
+
 /// Spawns a tokio task mapping f to reader segments.
 /// Read aborts on error. Read errors are logged.
 pub fn map_reader<E: SSS + std::fmt::Display>(
@@ -639,12 +724,7 @@ pub fn map_reader<E: SSS + std::fmt::Display>(
     abort_empty: Option<RenderSender<MMAction>>,
 ) -> tokio::task::JoinHandle<Result<usize, MapReaderError<E>>> {
     tokio::task::spawn_blocking(move || {
-        let ret = if let Some(delim) = input_separator {
-            map_chunks::<E>(read_to_chunks(reader, delim), f, true)
-        } else {
-            map_reader_lines::<E>(reader, f, true)
-        }
-        .elog();
+        let ret = for_each_record(reader, record_delimiter(input_separator), f).elog();
 
         if let Some(render_tx) = abort_empty
             && matches!(ret, Ok(0))
@@ -656,7 +736,7 @@ pub fn map_reader<E: SSS + std::fmt::Display>(
     })
 }
 
-/// Spawns a tokio task reading segments with a 64KB BufReader and batching 512 items into `injector.extend()`.
+/// Spawns a tokio task reading records (see [`for_each_record`]) and batching 512 items into `injector.extend()`.
 pub fn map_reader_batched(
     reader: impl Read + Send + 'static,
     injector: ConfigInjector,
@@ -665,8 +745,6 @@ pub fn map_reader_batched(
     abort_empty: Option<RenderSender<MMAction>>,
 ) -> tokio::task::JoinHandle<Result<usize, anyhow::Error>> {
     tokio::task::spawn_blocking(move || {
-        use std::io::BufRead;
-        let mut reader = std::io::BufReader::with_capacity(64 * 1024, reader);
         let mut total = 0;
         let mut batch: Vec<(Option<std::sync::Arc<str>>, String)> = Vec::with_capacity(512);
         let mut current_group: Option<std::sync::Arc<str>> = None;
@@ -682,81 +760,34 @@ pub fn map_reader_batched(
             }
         });
 
-        if let Some(delim) = input_separator {
-            let delim_byte = delim as u8;
-            let mut byte_buf = Vec::new();
-            loop {
-                byte_buf.clear();
-                let bytes_read = reader.read_until(delim_byte, &mut byte_buf)?;
-                if bytes_read == 0 {
-                    break;
-                }
-                if byte_buf.last() == Some(&delim_byte) {
-                    byte_buf.pop();
-                }
-                let mut line = String::from_utf8_lossy(&byte_buf).into_owned();
-                if delim == '\n' && line.ends_with('\r') {
-                    line.pop();
-                }
-
-                if let Some(prefix) = &group_prefix
-                    && line.starts_with(prefix)
-                {
-                    current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
-                    continue;
-                }
-
-                total += 1;
-                batch.push((current_group.clone(), line));
-                if batch.len() >= 512 {
-                    let mut chunk = Vec::with_capacity(512);
-                    std::mem::swap(&mut batch, &mut chunk);
-                    if batch_tx.send(chunk).is_err() {
-                        break;
-                    }
-                }
+        // Err(()) stops reading: the consumer is gone (the picker shut the injector down).
+        let read = for_each_record::<()>(reader, record_delimiter(input_separator), |line| {
+            if let Some(prefix) = &group_prefix
+                && let Some(group) = line.strip_prefix(prefix.as_str())
+            {
+                current_group = Some(group.trim().into());
+                return Ok(());
             }
-        } else {
-            let mut line = String::with_capacity(256);
-            loop {
-                line.clear();
-                let bytes_read = reader.read_line(&mut line)?;
-                if bytes_read == 0 {
-                    break;
-                }
-                if line.ends_with('\n') {
-                    line.pop();
-                    if line.ends_with('\r') {
-                        line.pop();
-                    }
-                }
-
-                if let Some(prefix) = &group_prefix
-                    && line.starts_with(prefix)
-                {
-                    current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
-                    continue;
-                }
-
-                total += 1;
-                let item = line.clone();
-                batch.push((current_group.clone(), item));
-                if batch.len() >= 512 {
-                    let mut chunk = Vec::with_capacity(512);
-                    std::mem::swap(&mut batch, &mut chunk);
-                    if batch_tx.send(chunk).is_err() {
-                        break;
-                    }
-                }
+            total += 1;
+            batch.push((current_group.clone(), line));
+            if batch.len() >= 512 {
+                let chunk = std::mem::replace(&mut batch, Vec::with_capacity(512));
+                batch_tx.send(chunk).map_err(|_| ())?;
             }
-        }
+            Ok(())
+        });
 
+        // Inject what was read even when reading failed part-way.
         if !batch.is_empty() {
             let _ = batch_tx.send(batch);
         }
         // Everything is injected once the consumer drains the channel.
         drop(batch_tx);
         let _ = consumer.join();
+
+        if let Err(MapReaderError::ChunkError(i, e)) = read {
+            log::error!("Failed to read input after {i} records: {e}");
+        }
 
         if let Some(render_tx) = abort_empty
             && total == 0
@@ -2883,6 +2914,56 @@ mod tests {
             "printf 'apple\\nbanana\\ncherry\\n'".to_string();
         let code_nomatch = start_filter(config_nomatch, "xyz", true, None).await;
         assert_eq!(code_nomatch, 1);
+    }
+
+    #[test]
+    fn test_for_each_record_utf8_lossy_crlf_and_boundaries() {
+        // Contains:
+        // 1. Invalid UTF-8 byte (0xff) inside a record -> kept with U+FFFD
+        // 2. CRLF line ending -> '\r' stripped when delim is '\n'
+        // 3. Final record without trailing delimiter -> emitted
+        let raw: &[u8] = b"alpha\nbad\xffbyte\nwindows\r\ntrailing";
+        let mut out = Vec::new();
+        let count = for_each_record::<()>(raw, b'\n', |rec| {
+            out.push(rec);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(count, 4);
+        assert_eq!(out, vec!["alpha", "bad\u{FFFD}byte", "windows", "trailing"]);
+
+        // NUL delimiter preserves '\r' and splits on 0x00.
+        let nul_raw: &[u8] = b"one\r\0two\xff\0three\0";
+        let mut nul_out = Vec::new();
+        let nul_count = for_each_record::<()>(nul_raw, b'\0', |rec| {
+            nul_out.push(rec);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(nul_count, 3);
+        assert_eq!(nul_out, vec!["one\r", "two\u{FFFD}", "three"]);
+
+        // Record spanning across the 256 KiB BufReader capacity.
+        let long = "x".repeat(300 * 1024);
+        let payload = format!("{long}\nafter\n");
+        let mut span_out = Vec::new();
+        let span_count = for_each_record::<()>(payload.as_bytes(), b'\n', |rec| {
+            span_out.push(rec);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(span_count, 2);
+        assert_eq!(span_out[0].len(), 300 * 1024);
+        assert_eq!(span_out[1], "after");
+    }
+
+    #[tokio::test]
+    async fn test_start_filter_keeps_records_after_invalid_utf8() {
+        let mut config = Config::default();
+        config.start.command.default.command =
+            "printf 'first\\nbad\\377line\\ntarget_match\\n'".to_string();
+        let code = start_filter(config, "target_match", true, None).await;
+        assert_eq!(code, 0);
     }
 
     #[tokio::test]

@@ -7,6 +7,7 @@
 
 - `CycleSort` did nothing in release builds (it only worked with the `experimental` feature); it now cycles the sort stability in every build
 - `HistoryUp` and `HistoryDown` were never implemented and silently did nothing when bound; they are removed, so a bind to them now fails with `Unknown action`
+- Input records with invalid UTF-8 bytes no longer abort `wm -f` or get silently dropped in interactive mode; invalid bytes are replaced with `U+FFFD` (matching fzf) while reading with a shared `memchr` record splitter
 
 ### 🔄 Changed
 

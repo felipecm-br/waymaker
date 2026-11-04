@@ -3740,6 +3740,7 @@ dependencies = [
  "indexmap",
  "libc",
  "log",
+ "memchr",
  "mimalloc",
  "portable-pty",
  "ratatui",
