@@ -402,7 +402,7 @@ async fn main() -> Result<()> {
 }
 ```
 
-See [ARCHITECTURE.md](waymaker-lib/ARCHITECTURE.md) for core event flow and internals.
+See [ARCHITECTURE.md](../docs/ARCHITECTURE.md) for core event flow and internals.
 
 ---
 

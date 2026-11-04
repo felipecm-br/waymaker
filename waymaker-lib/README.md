@@ -56,4 +56,4 @@ async fn main() -> Result<()> {
 }
 ```
 
-For more information, check out the [examples](./examples/) and [Architecture.md](./ARCHITECTURE.md)
+For more information, check out the [examples](./examples/) and [ARCHITECTURE.md](../docs/ARCHITECTURE.md)

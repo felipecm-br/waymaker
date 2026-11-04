@@ -9,7 +9,7 @@ This workspace is a Rust monorepo with four main crates:
 
 Prefer linking to existing docs instead of restating them:
 
-- Architecture and event flow: [waymaker-lib/ARCHITECTURE.md](waymaker-lib/ARCHITECTURE.md)
+- Architecture and event flow: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - CLI override syntax: [waymaker-cli/assets/docs/options.md](waymaker-cli/assets/docs/options.md)
 - Bind syntax: [waymaker-cli/assets/docs/binds.md](waymaker-cli/assets/docs/binds.md)
 - Template placeholders: [waymaker-cli/assets/docs/template.md](waymaker-cli/assets/docs/template.md)
@@ -62,7 +62,7 @@ Releasing is the explicit "ship it" step, intentionally decoupled from coding ta
 ## Navigation Hints
 
 - Start in `waymaker-cli/src/config.rs` and `waymaker-lib/src/config.rs` for config shape questions.
-- Start in `waymaker-lib/src/action.rs`, `waymaker-lib/src/matchmaker.rs`, and [waymaker-lib/ARCHITECTURE.md](waymaker-lib/ARCHITECTURE.md) for action flow or TUI behavior.
+- Start in `waymaker-lib/src/action.rs`, `waymaker-lib/src/matchmaker.rs`, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for action flow or TUI behavior.
 - Start in `waymaker-cli/assets/config.toml` and `waymaker-cli/assets/presets/` for default UX and preset behavior.
 - Start in `waymaker-partial/tests/` for expected merge semantics and macro edge cases.
 
