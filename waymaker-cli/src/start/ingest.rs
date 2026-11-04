@@ -1,5 +1,6 @@
 use super::*;
 use std::sync::Arc;
+use waymaker::{cache::DirCacheStore, config::WalkerConfig, nucleo::WorkerError};
 
 /// Splits `reader` into records ending in `delim` and passes each one to `f`, without the
 /// delimiter (and without a `\r` before it when `delim` is `\n`). A last record with no
@@ -247,4 +248,82 @@ pub(super) fn to_static(line: Line<'_>) -> Line<'static> {
             })
             .collect::<Vec<_>>(),
     )
+}
+
+/// Lists the current directory with the built-in walker (no input and no start command). A
+/// valid cached listing is injected at once and refreshed in the background; otherwise items
+/// stream in as they are found. Either way the fresh listing is cached for the next run.
+pub(super) fn ingest_walk(
+    push_fn: impl FnMut(Arc<str>) -> Result<(), WorkerError> + Send + 'static,
+    walker_config: &WalkerConfig,
+) -> tokio::task::JoinHandle<Result<usize, MapReaderError<WorkerError>>> {
+    let cwd_str = std::env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let cache_store = waymaker::cache::DirCacheStore::open();
+
+    let ignored_set: std::collections::HashSet<String> =
+        walker_config.effective_ignore().into_iter().collect();
+    let is_ignored_item = |item: &str| -> bool {
+        let s = item.strip_prefix("./").unwrap_or(item);
+        let s = s.strip_prefix('/').unwrap_or(s);
+        let first = s.split(['/', '\\']).next().unwrap_or("");
+        let clean_first = first.trim_end_matches(['/', '\\']);
+        !clean_first.is_empty() && ignored_set.contains(clean_first)
+    };
+
+    if let Some(cached_rec) = cache_store.get_valid(&cwd_str)
+        && !cached_rec.items.is_empty()
+    {
+        let mut push_fn = push_fn;
+        for item in cached_rec.items {
+            if is_ignored_item(&item) {
+                continue;
+            }
+            if push_fn(item.into()).is_err() {
+                break;
+            }
+        }
+
+        let walker_opts = walker_config.to_options(".");
+        tokio::spawn(async move {
+            let (collect_tx, collect_rx) = std::sync::mpsc::channel();
+            let walker = waymaker::walker::AsyncWalker::new(walker_opts);
+            let handle = walker.spawn_walk(move |line| {
+                let _ = collect_tx.send(line);
+                Ok(())
+            });
+            let _ = handle.await;
+
+            cache_listing(&cache_store, &cwd_str, collect_rx.into_iter().collect());
+            Ok(0)
+        })
+    } else {
+        let walker_opts = walker_config.to_options(".");
+        tokio::spawn(async move {
+            let (collect_tx, collect_rx) = std::sync::mpsc::channel();
+            let walker = waymaker::walker::AsyncWalker::new(walker_opts);
+            let mut push_fn = push_fn;
+
+            let handle = walker.spawn_walk(move |line| {
+                let _ = collect_tx.send(line.clone());
+                push_fn(line.into())
+            });
+            let _ = handle.await;
+
+            cache_listing(&cache_store, &cwd_str, collect_rx.into_iter().collect());
+            Ok(0)
+        })
+    }
+}
+
+/// Stores a directory listing, shallow paths first, for [`ingest_walk`] to start from.
+fn cache_listing(cache_store: &DirCacheStore, cwd: &str, mut items: Vec<String>) {
+    if !items.is_empty() {
+        items.sort_by_key(|item| {
+            let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
+            (slashes, item.clone())
+        });
+        let _ = cache_store.put(cwd, items);
+    }
 }

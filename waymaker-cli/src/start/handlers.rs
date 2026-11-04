@@ -659,3 +659,149 @@ where
         }
     }
 }
+
+/// Resolves the actions a bind fires: `Accept` becomes the CLI's accept, and a semantic action
+/// (`@name`) is looked up in the user's `[binds]` aliases for the current mode, then in the
+/// built-in names ([`builtin_alias`]). Anything else is passed through.
+pub(super) fn alias_action(
+    a: Action<MMAction>,
+    semantic_binds: &BindMap<MMAction>,
+) -> waymaker::action::Actions<MMAction> {
+    match a {
+        Action::Accept => acs![MMAction::Accept],
+        Action::Semantic(ref s) => {
+            let mode = waymaker::MODE
+                .lock()
+                .ok()
+                .map(|m| m.clone())
+                .unwrap_or_default();
+            if let Some(actions) = semantic_binds.resolve_alias(s, &mode) {
+                return actions.clone();
+            }
+            builtin_alias(s).unwrap_or_else(|| acs![a])
+        }
+        _ => acs![a],
+    }
+}
+
+/// The built-in semantic action names, matched without regard to ASCII case. Each file-manager
+/// action also answers to `fm_<name>` and `fm<name>`.
+pub(super) fn builtin_alias(name: &str) -> Option<waymaker::action::Actions<MMAction>> {
+    let action = match name.to_ascii_lowercase().as_str() {
+        "fm_create" | "fmcreate" | "create" => MMAction::FmCreateStart,
+        "fm_delete" | "fmdelete" | "delete" => MMAction::FmDeleteStart,
+        "fm_rename" | "fmrename" | "rename" => MMAction::FmRenameStart,
+        "fm_unzip" | "fmunzip" | "unzip" => MMAction::FmUnzipStart,
+        "fm_zip" | "fmzip" | "zip" => MMAction::FmZipStart,
+        "fm_yank" | "fmyank" | "yank" => MMAction::FmYank,
+        "fm_unyank" | "fmunyank" | "unyank" => MMAction::FmUnyank,
+        "fm_cut" | "fmcut" | "cut" => MMAction::FmCut,
+        "fm_uncut" | "fmuncut" | "uncut" => MMAction::FmUncut,
+        "fm_paste" | "fmpaste" | "paste" => MMAction::FmPaste,
+        "fm_paste_into" | "fmpasteinto" | "fm_paste_target" | "fmpastetarget" | "paste_into"
+        | "pasteinto" | "paste_target" | "pastetarget" => MMAction::FmPasteInto,
+        "fm_undo" | "fmundo" | "undo" => MMAction::FmUndo,
+        "fm_redo" | "fmredo" | "redo" => MMAction::FmRedo,
+        "fm_dragdrop" | "fmdragdrop" | "dragdrop" => MMAction::FmDragDrop,
+        "fm_pin" | "fmpin" | "pin" | "fm_bookmark" | "fmbookmark" | "bookmark" => {
+            MMAction::FmTogglePin
+        }
+        "pins" | "bookmarks" | "reload_pins" | "reload_bookmarks" => MMAction::ReloadNext(Some(2)),
+        "dirs" | "frecency" | "reload_dirs" | "reload_frecency" => MMAction::ReloadNext(Some(1)),
+        "cycle" | "reloadnext" | "reload_next" => MMAction::ReloadNext(None),
+        "reloadprev" | "reload_prev" => MMAction::ReloadPrev,
+        "reload_local" | "reloadlocal" | "local" => MMAction::ReloadNext(Some(0)),
+        _ => return None,
+    };
+    Some(acs![action])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every built-in name maps to the action the old `eq_ignore_ascii_case` chain gave it, in
+    /// any ASCII case; unknown names fall through.
+    #[test]
+    fn test_builtin_aliases() {
+        let expected: Vec<(&str, MMAction)> = vec![
+            ("fm_create", MMAction::FmCreateStart),
+            ("fmcreate", MMAction::FmCreateStart),
+            ("create", MMAction::FmCreateStart),
+            ("fm_delete", MMAction::FmDeleteStart),
+            ("fmdelete", MMAction::FmDeleteStart),
+            ("delete", MMAction::FmDeleteStart),
+            ("fm_rename", MMAction::FmRenameStart),
+            ("fmrename", MMAction::FmRenameStart),
+            ("rename", MMAction::FmRenameStart),
+            ("fm_unzip", MMAction::FmUnzipStart),
+            ("fmunzip", MMAction::FmUnzipStart),
+            ("unzip", MMAction::FmUnzipStart),
+            ("fm_zip", MMAction::FmZipStart),
+            ("fmzip", MMAction::FmZipStart),
+            ("zip", MMAction::FmZipStart),
+            ("fm_yank", MMAction::FmYank),
+            ("fmyank", MMAction::FmYank),
+            ("yank", MMAction::FmYank),
+            ("fm_unyank", MMAction::FmUnyank),
+            ("fmunyank", MMAction::FmUnyank),
+            ("unyank", MMAction::FmUnyank),
+            ("fm_cut", MMAction::FmCut),
+            ("fmcut", MMAction::FmCut),
+            ("cut", MMAction::FmCut),
+            ("fm_uncut", MMAction::FmUncut),
+            ("fmuncut", MMAction::FmUncut),
+            ("uncut", MMAction::FmUncut),
+            ("fm_paste", MMAction::FmPaste),
+            ("fmpaste", MMAction::FmPaste),
+            ("paste", MMAction::FmPaste),
+            ("fm_paste_into", MMAction::FmPasteInto),
+            ("fmpasteinto", MMAction::FmPasteInto),
+            ("fm_paste_target", MMAction::FmPasteInto),
+            ("fmpastetarget", MMAction::FmPasteInto),
+            ("paste_into", MMAction::FmPasteInto),
+            ("pasteinto", MMAction::FmPasteInto),
+            ("paste_target", MMAction::FmPasteInto),
+            ("pastetarget", MMAction::FmPasteInto),
+            ("fm_undo", MMAction::FmUndo),
+            ("fmundo", MMAction::FmUndo),
+            ("undo", MMAction::FmUndo),
+            ("fm_redo", MMAction::FmRedo),
+            ("fmredo", MMAction::FmRedo),
+            ("redo", MMAction::FmRedo),
+            ("fm_dragdrop", MMAction::FmDragDrop),
+            ("fmdragdrop", MMAction::FmDragDrop),
+            ("dragdrop", MMAction::FmDragDrop),
+            ("fm_pin", MMAction::FmTogglePin),
+            ("fmpin", MMAction::FmTogglePin),
+            ("pin", MMAction::FmTogglePin),
+            ("fm_bookmark", MMAction::FmTogglePin),
+            ("fmbookmark", MMAction::FmTogglePin),
+            ("bookmark", MMAction::FmTogglePin),
+            ("pins", MMAction::ReloadNext(Some(2))),
+            ("bookmarks", MMAction::ReloadNext(Some(2))),
+            ("reload_pins", MMAction::ReloadNext(Some(2))),
+            ("reload_bookmarks", MMAction::ReloadNext(Some(2))),
+            ("dirs", MMAction::ReloadNext(Some(1))),
+            ("frecency", MMAction::ReloadNext(Some(1))),
+            ("reload_dirs", MMAction::ReloadNext(Some(1))),
+            ("reload_frecency", MMAction::ReloadNext(Some(1))),
+            ("cycle", MMAction::ReloadNext(None)),
+            ("reloadnext", MMAction::ReloadNext(None)),
+            ("reload_next", MMAction::ReloadNext(None)),
+            ("reloadprev", MMAction::ReloadPrev),
+            ("reload_prev", MMAction::ReloadPrev),
+            ("reload_local", MMAction::ReloadNext(Some(0))),
+            ("reloadlocal", MMAction::ReloadNext(Some(0))),
+            ("local", MMAction::ReloadNext(Some(0))),
+        ];
+        for (name, action) in expected {
+            for variant in [name.to_string(), name.to_ascii_uppercase()] {
+                let got = builtin_alias(&variant).unwrap_or_else(|| panic!("{variant}: no alias"));
+                assert_eq!(got.0, vec![Action::Custom(action.clone())], "{variant}");
+            }
+        }
+        assert!(builtin_alias("not_an_alias").is_none());
+        assert!(builtin_alias("").is_none());
+    }
+}
