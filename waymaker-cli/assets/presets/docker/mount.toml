@@ -2,10 +2,9 @@
 source = "base.toml"
 
 [start]
+trim = true
 [start.command]
     command         = '"$(dirname -- "$MM_OVERRIDE")"/containers.sh'
-    input_separator = "\\0"
-    trim            = true
 
 [columns]
     split = "\\t"

@@ -156,14 +156,13 @@ split = '\s+'
 max = 8
 
 [start.command]
-cmd = '''
+command = '''
     if command -v fd >/dev/null 2>&1; then
-        fd --strip-cwd-prefix --print0
+        fd --strip-cwd-prefix
     else
-        find . -print0
+        find .
     fi
     '''
-separator = "\\0"
 
 [exit]
 select_1 = false

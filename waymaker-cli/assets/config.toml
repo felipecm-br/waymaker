@@ -69,7 +69,6 @@ always_trigger = true
 
 [start.command]
 command = ""
-separator = "\\0"
 
 [start]
 ansi = false # don't set to true here

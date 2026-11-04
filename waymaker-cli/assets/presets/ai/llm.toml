@@ -1,6 +1,7 @@
 # LLM models browser
 
 [start]
+output_template = "{-model}"
 [start.command]
 command = '''
 llm models --options | perl -ne '
@@ -50,7 +51,6 @@ llm models --options | perl -ne '
 '
 '''
 
-output = "{-model}"
 
 [columns]
 max = 6

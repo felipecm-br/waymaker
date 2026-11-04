@@ -130,19 +130,6 @@ case "$MODE" in
 esac
 rg --hidden --glob '!.git' --line-number --no-heading --color=always $RG_FLAGS -- "$QUERY" 2>/dev/null || true
 '''
-cmd = '''
-QUERY="${MM_QUERY:-${FZF_QUERY:-}}"
-MODE="${MM_STORE:-ic}"
-[ -z "$QUERY" ] && exit 0
-case "$MODE" in
-  cs)    RG_FLAGS="--case-sensitive" ;;
-  ww)    RG_FLAGS="--ignore-case --word-regexp" ;;
-  cs+ww) RG_FLAGS="--case-sensitive --word-regexp" ;;
-  *)     RG_FLAGS="--ignore-case" ;;
-esac
-rg --hidden --glob '!.git' --line-number --no-heading --color=always $RG_FLAGS -- "$QUERY" 2>/dev/null || true
-'''
-separator = "\n"
 
 
 [binds]

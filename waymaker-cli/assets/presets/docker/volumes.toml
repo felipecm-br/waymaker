@@ -7,7 +7,6 @@ trim = true
 [start]
 [start.command]
 command = '$DOCKERcmd volume ls --format "table {{.Driver}}\t{{.Name}}"'
-input_separator = "\n"
 
 [header]
 header_lines = 1

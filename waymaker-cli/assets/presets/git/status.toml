@@ -2,6 +2,7 @@
 source = 'base.toml'
 
 [start]
+output_template = "{=1}"
 [start.command]
 command = '''
 git status --no-rename --ignore-submodules=dirty -sz |
@@ -29,7 +30,6 @@ while IFS= read -r -d '' entry; do
   printf '%s\0%s\n' "$file" "$st"
 done
 '''
-output = "{=1}"
 
 [columns]
 split = "\\x00"

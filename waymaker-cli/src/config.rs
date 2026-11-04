@@ -495,4 +495,64 @@ mod tests {
             waymaker::config::NavProfile::Fm
         );
     }
+
+    fn toml_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                toml_files(&path, out);
+            } else if path.extension().is_some_and(|e| e == "toml") {
+                out.push(path);
+            }
+        }
+    }
+
+    /// Parse `src` as a `PartialConfig`, returning the dotted paths of ignored keys.
+    fn ignored_keys(src: &str) -> Result<Vec<String>, String> {
+        let de = toml::Deserializer::parse(src).map_err(|e| e.to_string())?;
+        let mut ignored = Vec::new();
+        let _: PartialConfig =
+            serde_ignored::deserialize(de, |path| ignored.push(path.to_string()))
+                .map_err(|e| e.to_string())?;
+        Ok(ignored)
+    }
+
+    /// Every shipped config and preset parses, and every key in it is read by the
+    /// schema. Many tables do not use `deny_unknown_fields` (so a stale key in a
+    /// user's config does not stop `wm` from starting), so plain parsing cannot
+    /// tell that a key in `reference.config.toml` or a preset was renamed or removed.
+    ///
+    /// Blind spot: tables read through an untagged helper enum (`[matcher.sort]`,
+    /// `[matcher.frecency]`) buffer their content, so `serde_ignored` cannot see
+    /// unknown keys inside them.
+    #[test]
+    fn test_shipped_configs_have_no_unknown_keys() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
+        let mut files = Vec::new();
+        toml_files(&assets, &mut files);
+        // session.toml is the `wm session` config, not a picker config.
+        files.retain(|f| f.file_name().is_none_or(|n| n != "session.toml"));
+        files.sort();
+        assert!(files.len() > 10, "found only {} toml files", files.len());
+
+        let mut problems = Vec::new();
+        for file in &files {
+            let rel = file.strip_prefix(&assets).unwrap().display().to_string();
+            let src = std::fs::read_to_string(file).unwrap();
+            match ignored_keys(&src) {
+                Ok(keys) => problems.extend(
+                    keys.into_iter()
+                        .map(|k| format!("{rel}: unknown key `{k}`")),
+                ),
+                Err(e) => problems.push(format!("{rel}: parse error: {e}")),
+            }
+        }
+        assert!(problems.is_empty(), "\n{}", problems.join("\n"));
+    }
+
+    #[test]
+    fn test_unknown_keys_are_detected() {
+        let keys = ignored_keys("[start.command]\ncmd = \"ls\"\n").unwrap();
+        assert_eq!(keys, ["start.command.cmd"]);
+    }
 }

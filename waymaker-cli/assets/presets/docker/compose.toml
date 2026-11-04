@@ -2,10 +2,10 @@
 source = "base.toml"
 
 [start]
+input_separator = "\\0"
+output_template = "{=id}"
 [start.command]
 command = '"$(dirname -- "$MM_OVERRIDE")"/projects.sh'
-input_separator = "\\0"
-output = "{=id}"
 
 [columns]
 split = "\\t"

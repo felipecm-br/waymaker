@@ -1,6 +1,7 @@
 # Pi agent sessions browser
 
 [start]
+directory = { value = "~/.pi/agent/sessions", force = true }
 [start.command]
 command = '''
 if stat --version 2>/dev/null | grep -q GNU; then
@@ -19,7 +20,6 @@ for f in **/*.jsonl; do
 done
 '''
 
-directory = { value = "~/.pi/agent/sessions", force = true }
 
 [envs]
 OPENcmd = "open"

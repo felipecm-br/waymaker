@@ -1,8 +1,10 @@
 # Find and kill processes
 
+[start]
+input_separator = "\\0"
+
 [start.command]
 command = '''zstd -dc "$(dirname -- "$MM_OVERRIDE")"/"$ACTIVE_DICT".zst'''
-separator = "\\0"
 
 [envs]
 ACTIVE_DICT = "english"

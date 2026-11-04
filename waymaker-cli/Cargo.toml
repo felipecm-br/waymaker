@@ -66,4 +66,5 @@ experimental = [
 
 [dev-dependencies]
 portable-pty = "0.9"
+serde_ignored = "0.1"
 tempfile = "3"

@@ -18,6 +18,9 @@
 
 ### 🐛 Bug Fixes
 
+- Several presets set `[start]` options under `[start.command]`, where they were silently ignored. `switcher` (Linux and macOS), `dict/en` and `docker/compose` split NUL-terminated multi-line records into one item per line, so the switcher listed titles, app names and PIDs as separate entries; `git/status`, `docker/compose`, `ai/llm` and `win.rg` printed the whole line on Enter instead of the intended column; `ai/pi_sessions` ran outside `~/.pi/agent/sessions`. The keys now live in `[start]` (`input_separator`, `output_template`, `directory`, `trim`)
+- `separator` and `cmd` under `[start.command]` were never read: `cmd` only works as a CLI override alias (`-o start.command.cmd=…`), and `separator` was parsed but unused. Removed them from the default config, `rg` and the dev playground configs (whose start command therefore never ran)
+- A test now parses every shipped config and preset with `serde_ignored` and fails on any key the schema skips
 - `*` and `?` type into the query again: the shipped config bound them to `@bookmark` and `Help` while the query had focus, so a query could never contain them and pressing `*` bookmarked the highlighted line. The default config and the `jump`/`workspace` filter binds no longer bind plain characters; Help stays on `F1` and `alt-h`
 - `wm` warns at startup when `[binds]` binds a plain character (`*`, `?`, `a`, space), which would swallow that character while typing
 
