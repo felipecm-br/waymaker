@@ -1926,7 +1926,7 @@ dependencies = [
 [[package]]
 name = "nucleo"
 version = "0.5.0"
-source = "git+https://github.com/Squirreljetpack/nucleo?branch=mm#39e4023c5f6b4f4ff778281548398a0959d13b57"
+source = "git+https://github.com/felipecm-br/nucleo?branch=waymaker#ccda7126fea7ad107faa20dfef615ded40af512c"
 dependencies = [
  "log",
  "nucleo-matcher",
@@ -1937,7 +1937,7 @@ dependencies = [
 [[package]]
 name = "nucleo-matcher"
 version = "0.3.1"
-source = "git+https://github.com/Squirreljetpack/nucleo?branch=mm#39e4023c5f6b4f4ff778281548398a0959d13b57"
+source = "git+https://github.com/felipecm-br/nucleo?branch=waymaker#ccda7126fea7ad107faa20dfef615ded40af512c"
 dependencies = [
  "memchr",
  "unicode-segmentation",

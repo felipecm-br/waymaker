@@ -42,5 +42,6 @@ wildcards = "allow"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# The nucleo fork carries waymaker's matcher changes; see [patch.crates-io].
-allow-git = ["https://github.com/Squirreljetpack/nucleo"]
+# felipecm-br/nucleo (branch `waymaker`, forked from Squirreljetpack/nucleo@mm) carries
+# waymaker's matcher and memory changes; see [patch.crates-io].
+allow-git = ["https://github.com/felipecm-br/nucleo"]

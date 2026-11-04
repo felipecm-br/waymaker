@@ -8,7 +8,7 @@ members = [
 ]
 
 [patch.crates-io]
-nucleo = { git = "https://github.com/Squirreljetpack/nucleo", branch = "mm" }
+nucleo = { git = "https://github.com/felipecm-br/nucleo", branch = "waymaker" }
 
 [profile.release]
 opt-level = 3
