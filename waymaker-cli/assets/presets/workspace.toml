@@ -67,14 +67,6 @@ separator = "Underline"
 [results.tier.style]
 fg = "#555555"
 
-[results.current_style]
-bg = "reset"
-modifier = "BOLD"
-
-[results.current_nav_bar_style]
-fg = "cyan"
-modifier = "BOLD"
-
 [results.bookmark]
 folder_icon = "󰮟"
 file_icon = "󱀻"

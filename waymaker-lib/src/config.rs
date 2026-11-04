@@ -1762,7 +1762,7 @@ impl Default for ResultsConfig {
             },
 
             current_style: StyleSetting {
-                bg: Some(Color::Black),
+                bg: Some(Color::Reset),
                 modifier: Modifier::BOLD,
                 ..Default::default()
             },
@@ -1792,8 +1792,11 @@ impl Default for ResultsConfig {
             uncolor_current_icon: false,
             invert_current_icon: false,
             current_icon_style: Default::default(),
-            current_nav_bar: None,
-            current_nav_bar_style: Default::default(),
+            current_nav_bar: Some(BorderType::Plain),
+            current_nav_bar_style: StyleSetting {
+                fg: Some(Color::Cyan),
+                ..Default::default()
+            },
             symlink: ResultsSymlinkConfig::default(),
             selected_style: StyleSetting {
                 modifier: Modifier::BOLD,

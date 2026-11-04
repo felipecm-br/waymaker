@@ -217,7 +217,7 @@ hints_columns = 4
 "*"             = "@bookmark"     # alias
 "/"             = "FocusFilter"
 " "             = "Toggle"
-"esc"           = "Quit"
+"esc"           = "@unwind"
 "q"             = "Quit"
 "j"             = "Down"
 "k"             = "Up"
@@ -245,7 +245,11 @@ hints_columns = 4
 "ctrl-h"        = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 "ctrl-left"     = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 "alt-h"         = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"ctrl-u"        = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"U"             = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"G"             = "Pos(-1)"
+"g"             = "Pos(0)"
+"+"             = "ExpandPreview(2)"
+"-"             = "ShrinkPreview(2)"
 "e"             = "Execute(nvim {+})"
 "ctrl-e"        = "Execute(nvim {+})"
 "y"             = "@yank"
@@ -721,7 +725,7 @@ fg = "Cyan"
 
 # Static or dynamic footer displayed at the bottom of the list ([footer])
 [footer]
-# content = "  h/l: Nav  •  Tab: Cycle  •  Enter: Select"
+content = " {cyan,bold:enter} {darkgray:accept} {darkgray:│} {cyan,bold:tab} {darkgray:mark} {darkgray:│} {cyan,bold:ctrl-p} {darkgray:preview} {darkgray:│} {cyan,bold:ctrl-/} {darkgray:layout} {darkgray:│} {cyan,bold:esc} {cyan,bold:?} {darkgray:help}"
 match_indent = false
 wrap = false
 # Horizontal divider line drawn above footer: "light", "heavy", "dashed", "top", "bottom", "none"
@@ -1050,7 +1054,8 @@ preset = "jump"
 "ctrl-h"        = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 "ctrl-left"     = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 "alt-h"         = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"ctrl-u"        = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"ctrl-g"        = "Pos(-1)"
+"ctrl-]"        = "ExpandPreview(2)"
 "ctrl-e"        = "Execute(nvim {+})"
 "ctrl-p"        = "SwitchPreview"
 "ctrl-v"        = "@paste_into"

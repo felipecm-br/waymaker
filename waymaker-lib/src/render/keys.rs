@@ -16,6 +16,7 @@ pub(super) fn action_from_null<A: ActionExt>(action: Action<NullActionExt>) -> O
         Action::ClearSelections => Action::ClearSelections,
         Action::Accept => Action::Accept,
         Action::Quit(x) => Action::Quit(x),
+        Action::Unwind(x) => Action::Unwind(x),
         Action::ToggleWrap => Action::ToggleWrap,
         Action::ToggleActionBox => Action::ToggleActionBox,
         Action::ToggleFocus => Action::ToggleFocus,

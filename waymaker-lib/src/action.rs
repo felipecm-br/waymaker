@@ -31,6 +31,8 @@ pub enum Action<A: ActionExt = NullActionExt> {
     Accept,
     /// Quit with code
     Quit(i32),
+    /// Unwind active state in cascade or quit with code
+    Unwind(i32),
 
     // Results
     /// Toggle wrap
@@ -520,7 +522,7 @@ enum_from_str_display!(
     CopyAsync, Copy, ChDir;
 
     defaults:
-    (Up, 1), (Down, 1), (PreviewUp, 1), (PreviewDown, 1), (Quit, 130), (Overlay, 0), (Print, String::new()), (Help, String::new()), (Reload, String::new()), (PreviewScroll, 1), (PreviewHScroll, 1), (HScroll, 0), (VScroll, 0), (ExpandPreview, 1), (ShrinkPreview, 1);
+    (Up, 1), (Down, 1), (PreviewUp, 1), (PreviewDown, 1), (Quit, 130), (Unwind, 130), (Overlay, 0), (Print, String::new()), (Help, String::new()), (Reload, String::new()), (PreviewScroll, 1), (PreviewHScroll, 1), (HScroll, 0), (VScroll, 0), (ExpandPreview, 1), (ShrinkPreview, 1);
 
     options:
     SwitchPreview, SetPreview, ToggleColumn, ShowColumn, Sort
@@ -1012,6 +1014,20 @@ mod tests {
         assert!(Action::<NullActionExt>::from_str("@invalid*char").is_err());
         assert!(Action::<NullActionExt>::from_str("@").is_err());
         assert!(Action::<NullActionExt>::from_str("NonExistentAction123").is_err());
+    }
+
+    #[test]
+    fn test_unwind_action() {
+        assert_eq!(
+            Action::<NullActionExt>::from_str("Unwind").unwrap(),
+            Action::Unwind(130)
+        );
+        assert_eq!(
+            Action::<NullActionExt>::from_str("Unwind(1)").unwrap(),
+            Action::Unwind(1)
+        );
+        assert_eq!(Action::<NullActionExt>::Unwind(130).to_string(), "Unwind");
+        assert_eq!(Action::<NullActionExt>::Unwind(1).to_string(), "Unwind(1)");
     }
 
     #[test]

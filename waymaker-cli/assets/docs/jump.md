@@ -28,7 +28,7 @@ Unlike traditional fuzzy finders where picking an item terminates the session:
 - **`h` / `ctrl-h`**: Navigates up to the parent directory (`ChDir(..)`), clears the filter query, and reloads.
 - **`Enter`**: Accepts the selected directory, automatically records it to the `frecency` database, and changes your shell working directory upon exit.
 
-### Ancestor Jump (`ctrl-u` / `u`)
+### Ancestor Jump (`U` in navigation mode)
 Instantly generates and loads the upward ancestor directory hierarchy (from current directory up to `/`).
 
 > [!TIP]
@@ -36,7 +36,7 @@ Instantly generates and loads the upward ancestor directory hierarchy (from curr
 > - **Monorepos & Deep Directory Trees**: When you are 5+ levels deep (e.g., `~/dev/github/matchmaker/matchmaker-lib/src/render/widgets/`) and need to jump straight to the repository root (`~/dev/github/matchmaker/`) in 1 step without hitting `h` or typing `cd ..` multiple times.
 > - **Sister Project Switching**: Ascend directly to a common root directory (e.g. `~/dev/github/` or `~/dev/`) to jump across distinct projects within the same Matchmaker session.
 > - **Visual Context Inspection**: Audits parent directories using the live tree preview panel before selecting and jumping.
-> - **Ergonomic Hotkeys**: Accessible via `ctrl-u` while typing in the filter or `u` in navigation mode.
+> - **Ergonomic Hotkey**: Accessible via `U` in navigation mode (leaving `ctrl-u` unified to `Cancel` everywhere).
 
 ### Hybrid Source Switching (`f` / `ctrl-f` / `@reloadnext`)
 Jump Mode allows cycling between input sources on the fly using `f` or `ctrl-f`:
@@ -138,7 +138,7 @@ percentage = 80
 "ctrl-e" = "Execute(nvim {+})"
 "ctrl-l" = ["ChDir({=})", "Cancel", "Reload", "Pos(0)"]
 "ctrl-h" = ["ChDir(..)", "Cancel", "Reload", "Pos(0)"]
-"ctrl-u" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"ctrl-g" = "Pos(-1)"
 
 [ui.nav.binds]
 "f" = "@reloadnext"
@@ -150,8 +150,7 @@ percentage = 80
 "ctrl-h" = ["ChDir(..)", "Cancel", "Reload", "Pos(0)"]
 "p" = "SwitchPreview"
 "ctrl-p" = "SwitchPreview"
-"u" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
-"ctrl-u" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"U" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
 
 [breadcrumb]
 show = true

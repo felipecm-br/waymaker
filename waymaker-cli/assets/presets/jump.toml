@@ -145,7 +145,8 @@ percentage = 60
 "ctrl-h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 "ctrl-left" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 "alt-h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"ctrl-u" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"ctrl-g" = "Pos(-1)"
+"ctrl-]" = "ExpandPreview(2)"
 "ctrl-e" = "Execute(nvim {+})"
 "ctrl-p" = "SwitchPreview"
 "ctrl-v" = "@paste_into"
@@ -188,7 +189,12 @@ percentage = 60
 "ctrl-h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 "ctrl-left" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
 "alt-h" = ["ChDir(..)", "Cancel", "Reload", "FocusNav"]
-"ctrl-u" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"U" = ["Reload(curr=\"$(pwd)\"; while [ \"$curr\" != \"/\" ] && [ -n \"$curr\" ]; do curr=\"$(dirname \"$curr\")\"; echo \"$curr\"; done)", "Cancel", "Pos(0)"]
+"G" = "Pos(-1)"
+"g" = "Pos(0)"
+"+" = "ExpandPreview(2)"
+"-" = "ShrinkPreview(2)"
+"=" = "ExpandPreview(2)"
 "e" = "Execute(nvim {+})"
 "ctrl-e" = "Execute(nvim {+})"
 "y" = "@yank"

@@ -333,6 +333,200 @@ fn parse_bg_from_args(args: &[String]) -> waymaker::config::DiagramBackground {
     waymaker::config::DiagramBackground::Transparent
 }
 
+fn handle_preview_file(path_str: &str, width: Option<usize>) -> i32 {
+    let expanded = if let Some(stripped) = path_str.strip_prefix("~/") {
+        if let Some(home) = dirs::home_dir() {
+            home.join(stripped)
+        } else {
+            std::path::PathBuf::from(path_str)
+        }
+    } else if path_str == "~" {
+        if let Some(home) = dirs::home_dir() {
+            home
+        } else {
+            std::path::PathBuf::from(path_str)
+        }
+    } else {
+        std::path::PathBuf::from(path_str)
+    };
+
+    if !expanded.exists() {
+        eprintln!("Error: file or directory '{}' not found", path_str);
+        return 1;
+    }
+
+    if expanded.is_dir() {
+        let opts = waymaker::utils::tree::TreeOptions::default();
+        let ansi_output = waymaker::utils::tree::render_dir_tree_ansi(&expanded, &opts);
+        if ansi_output.ends_with('\n') {
+            print!("{ansi_output}");
+        } else {
+            println!("{ansi_output}");
+        }
+        return 0;
+    }
+
+    let ext = expanded
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_default();
+
+    match ext.as_str() {
+        "md" | "markdown" => {
+            let content = match std::fs::read_to_string(&expanded) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Error reading '{}': {e}", path_str);
+                    return 1;
+                }
+            };
+            let opts = waymaker::utils::markdown::MarkdownOptions {
+                max_width: width,
+                base_path: Some(expanded.clone()),
+                render_mermaid: true,
+                mermaid_ascii: false,
+                show_line_numbers: false,
+                mermaid_image: false,
+                inline_diagrams: false,
+                inline_images: false,
+                diagram_theme: waymaker::config::DiagramTheme::Auto,
+                diagram_background: waymaker::config::DiagramBackground::Transparent,
+            };
+            let ansi_output = waymaker::utils::markdown::render_markdown_ansi(&content, &opts);
+            if ansi_output.ends_with('\n') {
+                print!("{ansi_output}");
+            } else {
+                println!("{ansi_output}");
+            }
+            0
+        }
+        "mmd" | "mermaid" => {
+            let content = match std::fs::read_to_string(&expanded) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Error reading '{}': {e}", path_str);
+                    return 1;
+                }
+            };
+            let opts = waymaker::utils::mermaid::MermaidOptions {
+                max_width: width,
+                ascii: false,
+                show_box: true,
+                title: Some("Mermaid Diagram".to_string()),
+                inline_diagrams: false,
+                theme: waymaker::config::DiagramTheme::Auto,
+                background: waymaker::config::DiagramBackground::Transparent,
+            };
+            let ansi_output = waymaker::utils::mermaid::render_mermaid_ansi(&content, &opts);
+            if ansi_output.ends_with('\n') {
+                print!("{ansi_output}");
+            } else {
+                println!("{ansi_output}");
+            }
+            0
+        }
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "avif" | "bmp" | "svg" | "ico" | "tiff"
+        | "tif" => {
+            let path_display = expanded.display().to_string();
+            let mut rendered_visual = false;
+            if which::which("chafa").is_ok()
+                && let Ok(output) = std::process::Command::new("chafa")
+                    .args([
+                        "--probe=off",
+                        "--format=symbols",
+                        "--size=80x35",
+                        &path_display,
+                    ])
+                    .output()
+                && output.status.success()
+            {
+                print!("{}", String::from_utf8_lossy(&output.stdout));
+                rendered_visual = true;
+            } else if which::which("img2txt").is_ok()
+                && let Ok(output) = std::process::Command::new("img2txt")
+                    .args(["-f", "ansi", "-W", "60", &path_display])
+                    .output()
+                && output.status.success()
+            {
+                print!("{}", String::from_utf8_lossy(&output.stdout));
+                rendered_visual = true;
+            }
+            if rendered_visual {
+                println!();
+            }
+            if which::which("identify").is_ok()
+                && let Ok(output) = std::process::Command::new("identify")
+                    .arg(&path_display)
+                    .output()
+                && output.status.success()
+            {
+                print!("{}", String::from_utf8_lossy(&output.stdout));
+                return 0;
+            }
+            if let Ok(meta) = expanded.metadata() {
+                println!("[Image: {} ({} bytes)]", path_str, meta.len());
+            } else {
+                println!("[Image: {}]", path_str);
+            }
+            0
+        }
+        _ => {
+            let path_display = expanded.display().to_string();
+            if which::which("bat").is_ok()
+                && let Ok(status) = std::process::Command::new("bat")
+                    .args([
+                        "--style=numbers",
+                        "--color=always",
+                        "--line-range=:300",
+                        &path_display,
+                    ])
+                    .status()
+                && status.success()
+            {
+                return 0;
+            }
+
+            use std::io::BufRead;
+            let file = match std::fs::File::open(&expanded) {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("Error opening '{}': {e}", path_str);
+                    return 1;
+                }
+            };
+            let mut reader = std::io::BufReader::new(file);
+
+            let buffer = reader.fill_buf().unwrap_or_default();
+            if buffer.contains(&b'\0') {
+                let size = expanded.metadata().map(|m| m.len()).unwrap_or(0);
+                println!("[Binary file: {} ({} bytes)]", path_str, size);
+                return 0;
+            }
+
+            let mut line = String::new();
+            let mut line_num = 1;
+            while line_num <= 300 {
+                line.clear();
+                match reader.read_line(&mut line) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        let trimmed = line.trim_end_matches(['\r', '\n']);
+                        println!("{:4} │ {}", line_num, trimmed);
+                        line_num += 1;
+                    }
+                    Err(_) => {
+                        let size = expanded.metadata().map(|m| m.len()).unwrap_or(0);
+                        println!("[Binary or non-UTF8 file: {} ({} bytes)]", path_str, size);
+                        return 0;
+                    }
+                }
+            }
+            0
+        }
+    }
+}
+
 pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
     if args.is_empty() {
         return None;
@@ -347,6 +541,11 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
         args
     };
     match args[0].as_str() {
+        "preview-file" | "preview" | "file" => {
+            let width = parse_preview_width_from_args(args);
+            let path_arg = parse_subcommand_path_arg(args).unwrap_or(".");
+            Some(handle_preview_file(path_arg, width))
+        }
         "tree" | "preview-tree" => {
             let path_str = args.get(1).map(|s| s.as_str()).unwrap_or(".");
             let path = std::path::Path::new(path_str);

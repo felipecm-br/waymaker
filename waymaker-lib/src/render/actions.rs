@@ -177,6 +177,66 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                 return Flow::Exit(Err(MatchError::Abort(code)));
             }
         }
+        Action::Unwind(code) => {
+            if state.live_input_active {
+                state.live_input_active = false;
+                *live_input_active = false;
+                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.live_input_template = None;
+                state.live_input_key = None;
+                tui.redraw();
+                return Flow::Continue;
+            } else if state.prompt_input_active {
+                state.prompt_input_active = false;
+                *prompt_input_active = false;
+                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                if let Some(id) = state.prompt_input_stash_id.take() {
+                    let _ = state.take_actions(id);
+                }
+                state.prompt_input_template = None;
+                prompt_input.cancel();
+                tui.redraw();
+                return Flow::Continue;
+            } else if picker_ui.action_visible {
+                picker_ui.action_visible = false;
+                picker_ui.action.cancel();
+                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                tui.redraw();
+                return Flow::Continue;
+            } else if state.sort_menu_active {
+                state.sort_menu_active = false;
+                tui.redraw();
+                return Flow::Continue;
+            } else if overlay_ui.as_ref().is_some_and(|o| o.current().is_some()) {
+                if let Some(o) = overlay_ui.as_mut() {
+                    o.disable();
+                }
+                tui.redraw();
+                return Flow::Continue;
+            } else if state.preview_set_payload.is_some() {
+                state.update_preview_unset();
+                tui.redraw();
+                return Flow::Continue;
+            } else if !picker_ui.selector.is_empty() {
+                picker_ui.selector.clear();
+                tui.redraw();
+                return Flow::Continue;
+            } else if !picker_ui.results.yank_paths.is_empty() {
+                picker_ui.results.yank_paths.clear();
+                tui.redraw();
+                return Flow::Continue;
+            } else if !picker_ui.results.cut_paths.is_empty() {
+                picker_ui.results.cut_paths.clear();
+                tui.redraw();
+                return Flow::Continue;
+            } else if !picker_ui.query.is_empty() {
+                picker_ui.query.cancel();
+                tui.redraw();
+                return Flow::Continue;
+            } else {
+                return Flow::Exit(Err(MatchError::Abort(code)));
+            }
+        }
 
         // Results
         Action::ToggleWrap => {

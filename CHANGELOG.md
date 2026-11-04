@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+### 🚀 Features
+
+- Built-in `wm preview-file <path>` subcommand providing fast, portable, shell-free previewing for directories (tree with Nerd Font icons), markdown, mermaid diagrams, images (`chafa`/`img2txt`/metadata), and syntax-highlighted or numbered code/text files across Linux, macOS, and Windows
+- `@unwind` action (`Action::Unwind(130)`): unrolls UI state in cascade (overlay -> prompt/live input -> action box -> sort menu -> help/preview -> selections -> query -> quit 130) before exiting, eliminating accidental exits while editing queries
+- Zero-background focus & lateral indicator: `current_style` defaults to clean terminal background (`bg = Reset`) with `BOLD`, paired with a cyan lateral indicator bar (`current_nav_bar = Plain`, `current_nav_bar_style = cyan`), eliminating opaque black bars across dark/light terminals
+- 5-item default footer hint bar (`enter accept │ tab mark │ ctrl-p preview │ ctrl-/ layout │ esc ? help`) in cyan and darkgray
+- Biomechanical home-row ergonomics: `ctrl-g` jumps to the last item (`Pos(-1)`), `ctrl-]` expands the preview (`ExpandPreview(2)`), and unified `ctrl-u` to `Cancel` across all presets (ancestor jump in `jump` moved to nav-mode `U`)
+
+### ⚡ Performance
+
+- Single-column fast path in ingest injector bypassing column loops when a single unformatted column is parsed
+- Non-spinning background match wait via matcher notification and `tokio::select!`
+- Shared in-process redb database instances across threads, eliminating lock contention backoff delays
+- Box `Text<'static>` in the item payload enum (`Either<Box<str>, Box<Text<'static>>>`), shrinking each item from 96 to 64 bytes (−32 bytes per item when `ansi = false`) and reducing 2M-line RSS from 770 MiB to 641 MiB
+
 ### 🐛 Bug Fixes
 
 - `*` and `?` type into the query again: the shipped config bound them to `@bookmark` and `Help` while the query had focus, so a query could never contain them and pressing `*` bookmarked the highlighted line. The default config and the `jump`/`workspace` filter binds no longer bind plain characters; Help stays on `F1` and `alt-h`
@@ -13,7 +28,6 @@
 
 - In nav mode (`jump`, `workspace`), `m` toggles the bookmark on the focused path; `*` still works as an alias
 - `esc` exits with 130 (like `ctrl-c` and fzf) instead of 1, so a script can tell "cancelled" from "nothing matched" (still 1). Bind `"esc" = "Quit(1)"` to keep the old code
-- Box `Text<'static>` in the item payload enum (`Either<Box<str>, Box<Text<'static>>>`), shrinking each item from 96 to 64 bytes (−32 bytes per item when `ansi = false`)
 
 ## [0.6.0] - 2026-11-02
 

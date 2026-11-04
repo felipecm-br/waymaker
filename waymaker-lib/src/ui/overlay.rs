@@ -213,7 +213,11 @@ impl<A: ActionExt> OverlayUI<A> {
     pub fn handle_action(&mut self, action: &Action<A>) -> bool {
         if let Some(inner) = self.current_mut() {
             match inner.handle_action(action) {
-                OverlayEffect::None => {}
+                OverlayEffect::None => {
+                    if matches!(action, Action::Unwind(_)) {
+                        self.disable();
+                    }
+                }
                 OverlayEffect::UpdateArea(w, h) => self.update_area(w, h),
                 OverlayEffect::Disable => self.disable(),
             }

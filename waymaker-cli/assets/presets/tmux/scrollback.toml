@@ -57,14 +57,6 @@ sides = ""
 [results.style]
 modifier = "DIM"
 
-[results.current_style]
-bg = "reset"
-modifier = "BOLD"
-
-[results.current_nav_bar_style]
-fg = "cyan"
-modifier = "BOLD"
-
 [preview]
 show = true
 wrap = true

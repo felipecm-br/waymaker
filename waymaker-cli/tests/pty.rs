@@ -226,6 +226,32 @@ fn escape_quits_with_130() {
 }
 
 #[test]
+fn escape_cascade_clears_query_before_quitting() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("ban");
+    // First Esc clears the query back to empty without quitting
+    wm.send(ESC);
+    // Enter now accepts the first item from the unfiltered list ("apple"), proving query was cleared
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+
+    // When query is already empty, Esc quits with 130
+    let wm2 = Session::start(FRUIT, &[]);
+    wm2.send("ban");
+    wm2.send(ESC); // clears query
+    wm2.send(ESC); // quits with 130
+    assert_eq!(wm2.finish(), (130, String::new()));
+}
+
+#[test]
+fn ctrl_g_jumps_to_last_item() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("\x07"); // ctrl-g
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "banana\n".to_string()));
+}
+
+#[test]
 fn enter_accepts_the_first_item() {
     let wm = Session::start(FRUIT, &[]);
     wm.send(ENTER);
@@ -434,4 +460,54 @@ fn nav_bind_resolves_custom_semantic_confirm_action() {
     );
     wm.send("q");
     assert_eq!(wm.finish().0, 130);
+}
+
+#[test]
+fn preview_file_subcommand_previews_directory_text_and_image() {
+    let bin = env!("CARGO_BIN_EXE_wm");
+    let tmp = tempfile::tempdir().unwrap();
+
+    // 1. Directory preview renders directory tree
+    let sub = tmp.path().join("subdir");
+    std::fs::create_dir_all(&sub).unwrap();
+    std::fs::write(sub.join("hello.txt"), "world").unwrap();
+
+    let dir_out = std::process::Command::new(bin)
+        .args(["preview-file", tmp.path().to_str().unwrap()])
+        .output()
+        .expect("failed to run preview-file on directory");
+    assert!(dir_out.status.success());
+    let dir_text = String::from_utf8_lossy(&dir_out.stdout);
+    assert!(dir_text.contains("subdir") || dir_text.contains("hello.txt"));
+
+    // 2. Text/code preview renders line numbers
+    let file_path = tmp.path().join("code.rs");
+    std::fs::write(&file_path, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
+    let text_out = std::process::Command::new(bin)
+        .args(["preview-file", file_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run preview-file on text file");
+    assert!(text_out.status.success());
+    let file_text = strip_ansi(&String::from_utf8_lossy(&text_out.stdout));
+    assert!(file_text.contains("fn main"));
+
+    // 3. Image preview renders image metadata or visual output
+    let img_path = tmp.path().join("test.png");
+    let png_bytes = [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
+        0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00,
+        0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+    std::fs::write(&img_path, png_bytes).unwrap();
+    let img_out = std::process::Command::new(bin)
+        .args(["preview-file", img_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run preview-file on image");
+    assert!(img_out.status.success());
+    let img_text = String::from_utf8_lossy(&img_out.stdout);
+    assert!(
+        img_text.contains("Image") || img_text.contains("PNG") || img_text.contains("test.png")
+    );
 }

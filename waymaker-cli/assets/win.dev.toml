@@ -45,7 +45,7 @@ border.padding = [2, 0]
 [binds]
 # UI
 "ctrl-c" = "Quit"
-"esc" = "Quit"
+"esc" = "@unwind"
 "enter" = "Accept"
 "ctrl-a" = "CycleAll"
 "tab" = ["Toggle", "Down"]
@@ -88,6 +88,7 @@ border.padding = [2, 0]
 "alt-1" = "Pos(0)"
 
 # Programmable
+"@unwind" = "Unwind"
 "ctrl-l" = "Execute(%MM_PREVIEW_COMMAND% | %PAGER%)" # "maximize" the preview
 "ctrl-o" = "Execute(%EDITOR% {})"
 "alt-o" = "Become(%EDITOR% {})"
