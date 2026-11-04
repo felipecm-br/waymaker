@@ -21,6 +21,7 @@
 
 ### 🐛 Bug Fixes
 
+- Windows default config caught up with the Unix one: `ctrl-p` → `SwitchPreview`, `ExpandPreview(2)`/`ShrinkPreview(2)`, `Delete` → `@rm`, `@prev`, Markdown and media previews, rounded borders, and the built-in file walker instead of a PowerShell `fd`/`Get-ChildItem` command. It is now generated at build time from `config.toml` plus `assets/win.overrides.toml` (only the shell-specific `@look`, `@open`, `@open_2` and `@copy*` binds), so it cannot fall behind again: an override for a key `config.toml` no longer has fails the build
 - Debug builds no longer replace your config with `dev.toml`: they read `config.toml` like a release build. `WM_DEV=1` (any build) switches to `<config dir>/dev.toml`, rewritten from the shipped `assets/dev.toml` on every start, and keeps the screen on exit
 - `--color` warnings (unknown key, unparsable colour, missing `:`) went to the log, hidden at the default verbosity, so a typo such as `--color selected:Red` did nothing silently; they now print at startup
 - A `session.toml` (or `sesh.toml`) that failed to parse made every configured session disappear from `wm session` with no message; the parse error is now printed with the file path
