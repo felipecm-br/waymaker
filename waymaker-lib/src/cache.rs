@@ -115,10 +115,14 @@ impl DirCacheRecord {
     }
 }
 
+static DIR_CACHE_DB_INSTANCES: std::sync::Mutex<
+    Option<rustc_hash::FxHashMap<PathBuf, std::sync::Weak<Database>>>,
+> = std::sync::Mutex::new(None);
+
 /// Directory Listing Cache Store powered by `redb`.
 #[derive(Clone)]
 pub struct DirCacheStore {
-    db: Arc<Option<Database>>,
+    db: Option<Arc<Database>>,
     pub db_path: Option<PathBuf>,
 }
 
@@ -157,13 +161,13 @@ impl DirCacheStore {
             Self::open_at(&path).unwrap_or_else(|err| {
                 log::warn!("Failed to open dir cache store at {path:?}: {err}. Falling back to in-memory mode.");
                 Self {
-                    db: Arc::new(None),
+                    db: None,
                     db_path: Some(path),
                 }
             })
         } else {
             Self {
-                db: Arc::new(None),
+                db: None,
                 db_path: None,
             }
         }
@@ -176,17 +180,45 @@ impl DirCacheStore {
             fs::create_dir_all(parent)?;
         }
 
+        let canonical_path = path.canonicalize().unwrap_or_else(|_| {
+            if let Some(parent) = path.parent() {
+                let p = parent
+                    .canonicalize()
+                    .unwrap_or_else(|_| parent.to_path_buf());
+                if let Some(name) = path.file_name() {
+                    p.join(name)
+                } else {
+                    path.to_path_buf()
+                }
+            } else {
+                path.to_path_buf()
+            }
+        });
+
+        {
+            let mut lock = DIR_CACHE_DB_INSTANCES.lock().unwrap();
+            let map = lock.get_or_insert_with(rustc_hash::FxHashMap::default);
+            if let Some(weak) = map.get(&canonical_path)
+                && let Some(existing) = weak.upgrade()
+            {
+                return Ok(Self {
+                    db: Some(existing),
+                    db_path: Some(canonical_path),
+                });
+            }
+        }
+
         let db = match Database::create(path) {
-            Ok(database) => Some(database),
+            Ok(database) => Some(Arc::new(database)),
             Err(err) => {
                 log::warn!("redb error opening dir cache at {path:?}: {err}.");
                 match &err {
                     redb::DatabaseError::DatabaseAlreadyOpen => {
                         let mut retried = None;
-                        for _ in 0..10 {
-                            std::thread::sleep(std::time::Duration::from_millis(25));
+                        for delay_ms in [2, 5, 10] {
+                            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
                             if let Ok(d) = Database::create(path) {
-                                retried = Some(d);
+                                retried = Some(Arc::new(d));
                                 break;
                             }
                         }
@@ -196,7 +228,7 @@ impl DirCacheStore {
                         if path.exists() {
                             let backup_path = path.with_extension("corrupt.bak");
                             let _ = fs::rename(path, &backup_path);
-                            Database::create(path).ok()
+                            Database::create(path).ok().map(Arc::new)
                         } else {
                             None
                         }
@@ -205,17 +237,21 @@ impl DirCacheStore {
             }
         };
 
+        if let Some(ref db_arc) = db {
+            let mut lock = DIR_CACHE_DB_INSTANCES.lock().unwrap();
+            let map = lock.get_or_insert_with(rustc_hash::FxHashMap::default);
+            map.insert(canonical_path.clone(), Arc::downgrade(db_arc));
+        }
+
         Ok(Self {
-            db: Arc::new(db),
-            db_path: Some(path.to_path_buf()),
+            db,
+            db_path: Some(canonical_path),
         })
     }
 
     /// Retrieves cached directory listing record for a root directory path.
     pub fn get(&self, raw_root: &str) -> Option<DirCacheRecord> {
-        let Some(db) = self.db.as_ref() else {
-            return None;
-        };
+        let db = self.db.as_ref()?;
 
         let key_str = crate::frecency::normalize_path(raw_root);
         if key_str.is_empty() {

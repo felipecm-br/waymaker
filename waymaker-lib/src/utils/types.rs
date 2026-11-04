@@ -13,6 +13,14 @@ define_either! {
 }
 
 impl Either<Box<str>, Box<Text<'static>>> {
+    #[inline]
+    pub fn byte_len(&self) -> usize {
+        match self {
+            Either::Left(s) => s.len(),
+            Either::Right(t) => t.to_string().len(),
+        }
+    }
+
     pub fn to_cow(&self) -> Cow<'_, str> {
         match self {
             Either::Left(s) => Cow::Borrowed(s),

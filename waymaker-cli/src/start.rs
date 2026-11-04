@@ -2536,6 +2536,11 @@ pub async fn start_filter(
         return 1;
     }
 
+    let notify = std::sync::Arc::new(tokio::sync::Notify::new());
+    let notify_cb = notify.clone();
+    mm.worker.set_notify(move || {
+        notify_cb.notify_one();
+    });
     mm.worker.find(query);
 
     let handle = if !std::io::stdin().is_terminal() && !no_read {
@@ -2571,16 +2576,19 @@ pub async fn start_filter(
         tokio::spawn(async { Ok(0) })
     };
 
-    // Match while input is still streaming, so matching overlaps with reading
-    // instead of starting only after the last line arrives.
-    while !handle.is_finished() {
-        mm.worker.nucleo.tick(10);
+    // Match while input is still streaming, waking on injector/matcher notify
+    // instead of spinning in a tight loop when nucleo is idle between batches.
+    let mut handle = std::pin::pin!(handle);
+    loop {
+        while mm.worker.nucleo.tick(10).running {}
+        tokio::select! {
+            biased;
+            _ = &mut handle => break,
+            _ = notify.notified() => {}
+        }
     }
-    let _ = handle.await;
 
-    mm.worker.find(query);
-
-    // Wait until matching is complete with 10ms timeout per tick
+    // Drain any items injected by the final batch before `handle` finished.
     while mm.worker.nucleo.tick(10).running {}
 
     let code = {

@@ -105,22 +105,44 @@ impl<T: SSS> Injector for WorkerInjector<T> {
 }
 
 pub(super) fn push_impl<T>(injector: &nucleo::Injector<T>, columns: &[Column<T>], item: T) {
-    injector.push(item, |item, dst| {
-        for (column, text) in columns.iter().filter(|column| column.filter).zip(dst) {
-            *text = column.raw(item).into()
-        }
-    });
+    if let [col] = columns
+        && col.filter
+        && let Some(raw_fn) = &col.raw
+    {
+        injector.push(item, |item, dst| {
+            if let Some(text) = dst.first_mut() {
+                *text = raw_fn(item).into();
+            }
+        });
+    } else {
+        injector.push(item, |item, dst| {
+            for (column, text) in columns.iter().filter(|column| column.filter).zip(dst) {
+                *text = column.raw(item).into()
+            }
+        });
+    }
 }
 
 pub(super) fn extend_impl<T, I>(injector: &nucleo::Injector<T>, columns: &[Column<T>], items: I)
 where
     I: ExactSizeIterator<Item = T>,
 {
-    injector.extend(items, |item, dst| {
-        for (column, text) in columns.iter().filter(|column| column.filter).zip(dst) {
-            *text = column.raw(item).into()
-        }
-    });
+    if let [col] = columns
+        && col.filter
+        && let Some(raw_fn) = &col.raw
+    {
+        injector.extend(items, |item, dst| {
+            if let Some(text) = dst.first_mut() {
+                *text = raw_fn(item).into();
+            }
+        });
+    } else {
+        injector.extend(items, |item, dst| {
+            for (column, text) in columns.iter().filter(|column| column.filter).zip(dst) {
+                *text = column.raw(item).into()
+            }
+        });
+    }
 }
 
 // ----- Injectors
@@ -360,9 +382,16 @@ mod ansi {
                 Either::Right(text) => slice_ratatui_text(text, range),
             }
         }
+        #[inline]
         fn slice_str(&self, range: Range<usize>) -> Cow<'_, str> {
             match self {
-                Either::Left(s) => (&s[range]).into(),
+                Either::Left(s) => {
+                    if range.start == 0 && range.end == s.len() {
+                        Cow::Borrowed(s)
+                    } else {
+                        (&s[range]).into()
+                    }
+                }
                 Either::Right(text) => text.to_string()[range].to_string().into(),
             }
         }

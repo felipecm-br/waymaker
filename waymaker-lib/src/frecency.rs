@@ -376,8 +376,8 @@ impl FrecencyStore {
                 match &err {
                     redb::DatabaseError::DatabaseAlreadyOpen => {
                         let mut retried = None;
-                        for _ in 0..10 {
-                            std::thread::sleep(std::time::Duration::from_millis(25));
+                        for delay_ms in [2, 5, 10] {
+                            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
                             if let Ok(d) = Database::create(path) {
                                 retried = Some(Arc::new(d));
                                 break;

@@ -312,7 +312,7 @@ impl ConfigMatchmaker {
                     ColumnRanges::from(ranges)
                 })
             }
-            Split::None => Arc::new(|s| ColumnRanges::single(0u32, s.to_cow().len() as u32)),
+            Split::None => Arc::new(|s| ColumnRanges::single(0u32, s.byte_len() as u32)),
         };
         let injector = IndexedInjector::new_globally_indexed(injector);
         let injector = SegmentedInjector::new(injector, splitter.clone());
