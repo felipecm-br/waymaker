@@ -5,9 +5,13 @@
 - `*` and `?` type into the query again: the shipped config bound them to `@bookmark` and `Help` while the query had focus, so a query could never contain them and pressing `*` bookmarked the highlighted line. The default config and the `jump`/`workspace` filter binds no longer bind plain characters; Help stays on `F1` and `alt-h`
 - `wm` warns at startup when `[binds]` binds a plain character (`*`, `?`, `a`, space), which would swallow that character while typing
 
+- `CycleSort` did nothing in release builds (it only worked with the `experimental` feature); it now cycles the sort stability in every build
+- `HistoryUp` and `HistoryDown` were never implemented and silently did nothing when bound; they are removed, so a bind to them now fails with `Unknown action`
+
 ### 🔄 Changed
 
 - In nav mode (`jump`, `workspace`), `m` toggles the bookmark on the focused path; `*` still works as an alias
+- `esc` exits with 130 (like `ctrl-c` and fzf) instead of 1, so a script can tell "cancelled" from "nothing matched" (still 1). Bind `"esc" = "Quit(1)"` to keep the old code
 
 ## [0.6.0] - 2026-11-02
 

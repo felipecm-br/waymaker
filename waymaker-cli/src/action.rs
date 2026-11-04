@@ -61,17 +61,12 @@ pub enum MMAction {
     SetStyledStatus(String),
     /// Set current mode index (0 = local, 1 = frecency, 2 = bookmarks)
     SetModeIndex(usize),
-    /// Run a command and display output in preview window (TODO)
+    /// Run a command and display output in preview window
     RunPreview(String),
 
     /// Accept current selection and print using output_template
     Accept,
 
-    // Unimplemented
-    /// History up (TODO)
-    HistoryUp,
-    /// History down (TODO)
-    HistoryDown,
     /// [`waymaker::Action::Execute`], confirm on error
     ExecuteOrConfirm(String),
     /// [`waymaker::Action::Execute`], quit on success
@@ -244,18 +239,15 @@ pub fn action_handler(
         }
         // state
         MMAction::CycleSort => {
-            #[cfg(feature = "experimental")]
-            {
-                let threshold = match state.picker_ui.worker.get_stability() {
-                    0 => 6,
-                    u32::MAX => 0,
-                    _ => u32::MAX,
-                };
-                state
-                    .picker_ui
-                    .worker
-                    .set_stability(waymaker::config::SortThreshold(threshold));
-            }
+            let threshold = match state.picker_ui.worker.get_stability() {
+                0 => 6,
+                u32::MAX => 0,
+                _ => u32::MAX,
+            };
+            state
+                .picker_ui
+                .worker
+                .set_stability(waymaker::config::SortThreshold(threshold));
         }
         MMAction::Filtering(s) => {
             if let Some(s) = s {
@@ -266,14 +258,6 @@ pub fn action_handler(
             if !state.filtering {
                 state.picker_ui.worker.find("");
             }
-        }
-
-        // history
-        MMAction::HistoryUp => {
-            // todo
-        }
-        MMAction::HistoryDown => {
-            // todo
         }
 
         MMAction::ReloadNext(x) => {
@@ -1474,7 +1458,7 @@ enum_from_str_display! {
     MMAction;
 
     units:
-    CycleSort, HistoryUp, HistoryDown, Accept, ReloadPrev, FmCreateStart, FmDeleteStart, FmRenameStart, FmUnzipStart, FmZipStart, FmYank, FmUnyank, FmCut, FmUncut, FmPaste, FmPasteInto, FmUndo, FmRedo, FmDragDrop, FmTogglePin;
+    CycleSort, Accept, ReloadPrev, FmCreateStart, FmDeleteStart, FmRenameStart, FmUnzipStart, FmZipStart, FmYank, FmUnyank, FmCut, FmUncut, FmPaste, FmPasteInto, FmUndo, FmRedo, FmDragDrop, FmTogglePin;
 
 
     tuples:
@@ -1891,6 +1875,18 @@ mod tests {
         let tpl = " {cyan,bold:Enter} {darkgray:Launch} {darkgray:│} {cyan,bold:C-h/l} {darkgray:Effort} {white,bold:◑ medium}";
         let action = Action::<MMAction>::from_str(&format!("SetStyledFooter({tpl})")).unwrap();
         assert!(matches!(action, Action::Custom(MMAction::SetStyledFooter(ref s)) if s == tpl));
+    }
+
+    /// `HistoryUp`/`HistoryDown` were never implemented: a bind to them must fail to load instead
+    /// of doing nothing. `CycleSort` works in every build, not only with `experimental`.
+    #[test]
+    fn test_unimplemented_actions_are_rejected() {
+        assert!(Action::<MMAction>::from_str("HistoryUp").is_err());
+        assert!(Action::<MMAction>::from_str("HistoryDown").is_err());
+        assert!(matches!(
+            Action::<MMAction>::from_str("CycleSort"),
+            Ok(Action::Custom(MMAction::CycleSort))
+        ));
     }
 
     #[test]
