@@ -59,6 +59,8 @@ jobs:
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           checksum: sha256
+          # Build from Cargo.lock, the dependency set CI tested.
+          locked: true
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Attest Build Provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0

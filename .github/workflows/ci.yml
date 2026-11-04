@@ -32,8 +32,8 @@ jobs:
       - name: Check experimental features
         run: cargo check -p waymaker-cli -F experimental --locked
 
-  # Releases ship a Windows binary, so at least keep it compiling warning-free.
-  # The test suite has not been made to pass on Windows yet.
+  # Releases ship a Windows binary, so keep it compiling warning-free and run the
+  # platform-independent tests. The full suite has not been made to pass on Windows yet.
   windows:
     runs-on: windows-latest
     timeout-minutes: 20
@@ -46,6 +46,21 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      # The partial-merge crates are platform-independent; the rest of the suite still assumes Unix.
+      - name: Test (partial-merge crates)
+        run: cargo test -p waymaker-partial -p waymaker-partial-macros --locked
+
+  fmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+        with:
+          components: rustfmt
+      - name: Rustfmt
+        run: cargo fmt --all --check
 
   coverage:
     runs-on: ubuntu-latest
