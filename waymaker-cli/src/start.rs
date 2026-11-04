@@ -309,6 +309,19 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         }
     }
 
+    // A bare printable key under [binds] fires while the query is typed: the character never
+    // reaches the query (and `* = @bookmark` bookmarked whatever line was highlighted).
+    // `"," = []` unbinds the key, which is fine.
+    for (trigger, actions) in &config.binds {
+        if !actions.0.is_empty()
+            && let Some(c) = trigger.bare_printable_char()
+        {
+            wbog!(
+                "[binds] '{trigger}' is a plain character: it runs its action instead of typing '{c}' into the query. Bind a chord (ctrl-…, F1) instead, or move it to [ui.nav.binds]."
+            );
+        }
+    }
+
     if config.start.command.default.base_command.is_none() {
         config.start.command.default.base_command =
             Some(config.start.command.default.command.clone());

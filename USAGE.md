@@ -435,32 +435,36 @@ wm -o git/status -o ~/wm-dark-theme.toml
 
 ## 11. Default Bind Changes
 
-Two default key bindings were updated in this fork:
+These default key bindings differ from upstream:
 
 | Key | Old action | New action |
 |---|---|---|
 | `ctrl-p` | `Up(10)` | `SwitchPreview` — toggle the active preview layout |
-| `?` | `SwitchPreview(Some(0))` | `Help("")` — open the help pane |
-| `shift-?` | — | `SwitchPreview(Some(0))` — show preview layout 0 |
+| `?`, `*` | `Help` / `@bookmark` | unbound in the query: they type `?` and `*`. Help is on `F1` and `alt-h`. |
+| `m` (nav mode) | — | `@bookmark` — toggle the bookmark on the focused path (`*` stays as an alias) |
+
+Bare printable characters (`?`, `*`, `a`, ...) bound under `[binds]` fire while you type the
+query, so the character never reaches it. Use a chord (`ctrl-…`, `F1`) there, or turn on nav mode
+(`[ui.nav] active = true`) and bind the character under `[ui.nav.binds]`, where it only applies
+once focus has left the query.
 
 ### Override them back or remap
 
 ```bash
 # Restore ctrl-p to scroll-up-10
 wm b 'ctrl-p=Up(10)'
-
-# Remap help to alt-h (already bound by default) and free ?
-wm b '?=SwitchPreview' b 'alt-h=Help'
-
-# Bind ? to cycle all preview layouts
-wm b '?=CyclePreview'
 ```
 
 ```toml
 [binds]
 "ctrl-p" = "Up(10)"           # restore old behaviour
-"?"      = "SwitchPreview"    # toggle preview
 "alt-h"  = "Help"             # keep help accessible
+
+[ui.nav]
+active = true
+
+[ui.nav.binds]
+"?"      = "Help"             # help on ? once focus is on the results
 ```
 
 ---

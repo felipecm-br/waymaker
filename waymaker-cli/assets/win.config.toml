@@ -138,8 +138,6 @@ if (Get-Command fd -ErrorAction SilentlyContinue) {
 "shift+scrollup" = "PreviewUp"
 "shift+scrolldown" = "PreviewDown"
 "alt-/" = "PreviewJump"
-"?" = "SwitchPreview"
-"shift-?" = "SwitchPreview"
 "ctrl-/" = "CyclePreview" # cycle preview layouts
 "ctrl-shift-/" = "CyclePreview"
 "alt-h" = "Help"
@@ -184,7 +182,6 @@ if (Get-Command fd -ErrorAction SilentlyContinue) {
 "@next" = "ReloadNext"
 "@prev" = "ReloadPrev"
 "@cycle" = "ReloadNext"
-"*" = "@bookmark"
 "@help" = "Help"
 "@break" = "Redraw" # invalid unicode or unsupported emoji can break rendering
 

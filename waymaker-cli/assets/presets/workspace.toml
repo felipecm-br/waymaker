@@ -159,7 +159,6 @@ shift-tab = "@reloadprev"
 "@local" = "ReloadNext(0)"
 ctrl-f = "@dirs"
 ctrl-b = "@bookmarks"
-"*" = "@bookmark"
 
 enter = "CyclePreview"
 esc = "ToggleFocus"
@@ -192,7 +191,8 @@ backtab = "@reloadprev"
 shift-tab = "@reloadprev"
 f = "@dirs"
 b = "@bookmarks"
-"*" = "@bookmark"
+m = "@bookmark"
+"*" = "@bookmark" # alias
 
 enter = "CyclePreview"
 y = "Accept"

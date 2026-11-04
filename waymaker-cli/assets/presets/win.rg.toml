@@ -55,7 +55,6 @@ scroll_wrap = true
 "enter" = "@accept"
 "ctrl-r" = "@reload"
 "ctrl-." = "NextColumn"
-"?" = "SwitchPreview"
 
 "0,1^^@accept" = "Become(powershell -Command \"& $env:EDITOR {1}\")"
 

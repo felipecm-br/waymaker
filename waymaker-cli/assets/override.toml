@@ -98,8 +98,6 @@ max = 120
 "shift+scrollup" = "PreviewUp"
 "shift+scrolldown" = "PreviewDown"
 "alt-h" = "Help"
-"?" = "SwitchPreview(0)"
-"shift-?" = "SwitchPreview(0)"
 "ctrl-shift-/" = "CyclePreview" # ctrl-shift-/
 
 # Columns

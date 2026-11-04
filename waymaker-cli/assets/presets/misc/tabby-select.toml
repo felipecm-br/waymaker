@@ -123,7 +123,6 @@ border = { title = "API Response" }
 # disk size
 "f2" = 'Preview([[ {type} != api-* ]] && ds $(dirname -- {path}))'
 "ctrl-g" = 'SwitchPreview'
-"?" = "SwitchPreview"
 
 # Unload operations
 "@unload" = 'Execute(eval $CURL_TABBY -X POST "$TABBYHOST/v1/model/unload" --fail-with-body)'

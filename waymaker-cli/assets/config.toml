@@ -143,8 +143,6 @@ ansi = false # don't set to true here
 "shift+scrolldown" = "PreviewDown"
 "alt-/" = "PreviewJump"
 "ctrl-p" = "SwitchPreview"
-"?" = "Help"
-"shift-?" = "Help"
 "ctrl-/" = "CyclePreview" # cycle preview layouts
 "ctrl-shift-/" = "CyclePreview"
 "alt-h" = "Help"
@@ -191,7 +189,6 @@ ansi = false # don't set to true here
 "@next" = "ReloadNext"
 "@prev" = "ReloadPrev"
 "@cycle" = "ReloadNext"
-"*" = "@bookmark"
 "@help" = "Help"
 "@break" = "Redraw" # invalid unicode or unsupported emoji can break rendering
 

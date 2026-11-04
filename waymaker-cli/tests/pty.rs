@@ -252,6 +252,15 @@ fn backspace_edits_the_query() {
     assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
 }
 
+/// `*` and `?` reach the query: the shipped config used to bind them to bookmark and Help.
+#[test]
+fn star_and_question_mark_type_into_the_query() {
+    let wm = Session::start("apple\nsrc/*.rs?\nbanana\n", &[]);
+    wm.send("*?");
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "src/*.rs?\n".to_string()));
+}
+
 /// Bind overrides on the command line reach the running picker.
 #[test]
 fn cli_bind_override_takes_effect() {

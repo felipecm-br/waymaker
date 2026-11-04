@@ -125,7 +125,6 @@ border = { title = "Raw Session" }
     '#fork',
     'Become(cwd={dir}; cd "${cwd/#\~/$HOME}" && pi --fork {id})',
 ]
-"?" = "SwitchPreview"
 "@rm" = ["ExecuteAsync(rm -- {+file})", "Reload"]
 "@copy" = "CopyAsync(printf '%s\n' {+id})"
 "@copy_all" = "CopyAsync(printf '%s\n' {+file})"

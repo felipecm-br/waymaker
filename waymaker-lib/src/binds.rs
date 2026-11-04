@@ -71,7 +71,6 @@ impl<A: ActionExt> BindMap<A> {
             key!(shift-End) => Action::PreviewJump,
             key!(ctrl-p) => Action::SwitchPreview(None),
             key!(ctrl-e) => Action::ToggleActionBox,
-            key!('?') => Action::Help("".to_string()),
         );
 
         #[cfg(target_os = "macos")]
@@ -449,6 +448,31 @@ impl From<KeyCombination> for Trigger {
     }
 }
 
+impl Trigger {
+    /// The character, when this trigger is a single printable key with no modifier other than
+    /// shift (`*`, `?`, `shift-?`, `a`, space) and no mode scope.
+    ///
+    /// Bound under `[binds]`, such a key fires while the query is being typed, so the character
+    /// never reaches the query. The CLI warns about it.
+    pub fn bare_printable_char(&self) -> Option<char> {
+        if !self.mode.is_empty() {
+            return None;
+        }
+        let TriggerKind::Key(key) = &self.kind else {
+            return None;
+        };
+        if !(key.modifiers - KeyModifiers::SHIFT).is_empty() {
+            return None;
+        }
+        match key.codes {
+            crokey::OneToThree::One(crossterm::event::KeyCode::Char(c)) if !c.is_control() => {
+                Some(c)
+            }
+            _ => None,
+        }
+    }
+}
+
 impl From<Event> for Trigger {
     fn from(event: Event) -> Self {
         Trigger {
@@ -794,6 +818,23 @@ pub fn display_help<A: ActionExt + Display>(
 mod test {
     use super::*;
     use crossterm::event::MouseEvent;
+
+    #[test]
+    fn test_bare_printable_char() {
+        let char_of = |s: &str| s.parse::<Trigger>().unwrap().bare_printable_char();
+        assert_eq!(char_of("*"), Some('*'));
+        assert_eq!(char_of("?"), Some('?'));
+        assert_eq!(char_of("shift-?"), Some('?'));
+        assert_eq!(char_of("m"), Some('m'));
+        assert_eq!(char_of("space"), Some(' '));
+        // Chords, named keys, mode-scoped keys and semantic triggers are fine in [binds].
+        assert_eq!(char_of("ctrl-b"), None);
+        assert_eq!(char_of("alt-m"), None);
+        assert_eq!(char_of("esc"), None);
+        assert_eq!(char_of("F1"), None);
+        assert_eq!(char_of("nav^^m"), None);
+        assert_eq!(char_of("@bookmark"), None);
+    }
 
     #[test]
     fn test_bindmap_trigger() {

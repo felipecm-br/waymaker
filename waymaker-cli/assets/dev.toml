@@ -101,8 +101,6 @@ max = 120
 "shift+scrollup" = "PreviewUp"
 "shift+scrolldown" = "PreviewDown"
 "alt-h" = "Help"
-"?" = "SwitchPreview(0)"
-"shift-?" = "SwitchPreview(0)"
 "ctrl-/" = "CyclePreview"
 "ctrl-shift-/" = "CyclePreview" # ctrl-shift-/
 
@@ -127,7 +125,6 @@ max = 120
 "@next" = "ReloadNext"
 "@prev" = "ReloadPrev"
 "@cycle" = "ReloadNext"
-"*" = "@bookmark"
 
 # Printing
 "alt-p" = "@print"

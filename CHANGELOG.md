@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+### 🐛 Bug Fixes
+
+- `*` and `?` type into the query again: the shipped config bound them to `@bookmark` and `Help` while the query had focus, so a query could never contain them and pressing `*` bookmarked the highlighted line. The default config and the `jump`/`workspace` filter binds no longer bind plain characters; Help stays on `F1` and `alt-h`
+- `wm` warns at startup when `[binds]` binds a plain character (`*`, `?`, `a`, space), which would swallow that character while typing
+
+### 🔄 Changed
+
+- In nav mode (`jump`, `workspace`), `m` toggles the bookmark on the focused path; `*` still works as an alias
+
 ## [0.6.0] - 2026-11-02
 
 ### 🚀 Features
