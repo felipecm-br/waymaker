@@ -57,7 +57,7 @@ Waymaker is an evolutionary, feature-rich **fork of [matchmaker](https://github.
 ### 🗄️ Integrated File Manager & Actions
 - **Embedded File Operations (`fm.rs`)**: In-place file creation (`a`), rename (`r`), trash (`d`), archive compression (`z`/`Z`), and clipboard yanking (`y`/`x`/`p`/`P`) with recursive drill-down (`l`) and parent ascension (`h`).
 - **Transactional Undo Stack (`u`)**: Dedicated `@undo` action to safely reverse accidental file operations and restore clipboard states.
-- **Ancestor Hierarchy Jump (`Ctrl+U`)**: Instantly jump up multi-level folder hierarchies directly to the repository or filesystem root.
+- **Ancestor Hierarchy Jump (`U` in nav mode)**: Instantly jump up multi-level folder hierarchies directly to the repository or filesystem root.
 
 ---
 
@@ -138,7 +138,7 @@ Waymaker presets are modular, reusable TOML configurations stored in `~/.config/
 
 | Preset | Invocation | Description | Key Ergonomic Actions |
 | :--- | :--- | :--- | :--- |
-| **`jump`** | `wm -o jump` | Flagship frecency directory navigator, file manager, and tree inspector. | `Enter`: `cd` to path<br>`e` / `Ctrl+E`: Open in Neovim<br>`l`: Drill into directory<br>`h`: Jump to parent<br>`u`: `@undo` file action<br>`Ctrl+U`: Ancestor hierarchy jump<br>`y` / `x` / `p`: Yank, Cut, Paste |
+| **`jump`** | `wm -o jump` | Flagship frecency directory navigator, file manager, and tree inspector. | `Enter`: `cd` to path<br>`e` / `Ctrl+E`: Open in Neovim<br>`l`: Drill into directory<br>`h`: Jump to parent<br>`u`: `@undo` file action<br>`U`: Ancestor hierarchy jump<br>`y` / `x` / `p`: Yank, Cut, Paste |
 | **`workspace`** | `wm -o workspace` | Workspace file inspector for code, markdown, and Mermaid diagrams. | `Enter`: Toggle 60% / 100% fullscreen preview<br>`Tab`: Cycle sources (Local $\to$ Frecency $\to$ Bookmarks)<br>`s` / `Ctrl+S`: Modal diagram viewer<br>`Ctrl+V`: Insert path into origin pane<br>`e`: Open in Neovim |
 | **`rg`** | `wm -o rg` | Live workspace full-text search with ripgrep and line-synced `bat` preview. | `Enter`: Open at line (`nvim +{line} {file}`)<br>`Ctrl+S`: Toggle Case Sensitivity (`[Aa]`)<br>`Ctrl+W`: Toggle Whole Word (`[W]`)<br>`Ctrl+/`: Cycle preview layouts |
 | **`tmux/scrollback`** | `presets/tmux/scrollback.sh` in a tmux popup | Extrakto-style picker of commands, paths, URLs and git hashes from the pane's scrollback, newest first. | `Enter`: Copy to clipboard<br>`Ctrl+V`: Insert into origin pane<br>`Tab`: Cycle filters (`all` $\to$ `cmd` $\to$ `path` $\to$ `url` $\to$ `sha`)<br>`Ctrl+E`: Open file beside the pane<br>`Ctrl+B`: Open URL in browser |

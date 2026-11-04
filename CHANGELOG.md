@@ -6,7 +6,7 @@
 - `@unwind` action (`Action::Unwind(130)`): unrolls UI state in cascade (overlay -> prompt/live input -> action box -> sort menu -> help/preview -> selections -> query -> quit 130) before exiting, eliminating accidental exits while editing queries
 - Zero-background focus & lateral indicator: `current_style` defaults to clean terminal background (`bg = Reset`) with `BOLD`, paired with a cyan lateral indicator bar (`current_nav_bar = Plain`, `current_nav_bar_style = cyan`), eliminating opaque black bars across dark/light terminals
 - 5-item default footer hint bar (`enter accept │ tab mark │ ctrl-p preview │ ctrl-/ layout │ esc ? help`) in cyan and darkgray
-- Biomechanical home-row ergonomics: `ctrl-g` jumps to the last item (`Pos(-1)`), `ctrl-]` expands the preview (`ExpandPreview(2)`), and unified `ctrl-u` to `Cancel` across all presets (ancestor jump in `jump` moved to nav-mode `U`)
+- Biomechanical home-row ergonomics: `ctrl-g` jumps to the last item (`Pos(-1)`), `ctrl-]` expands the preview (`ExpandPreview(2)`), and `ctrl-u` clears the query (`Cancel`) in the default config and the `jump`/`workspace` presets (their ancestor jump moved to nav-mode `U`)
 
 ### ⚡ Performance
 
