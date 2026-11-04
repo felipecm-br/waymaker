@@ -32,6 +32,7 @@ mimalloc = { version = "0.1.48", features = ["v3"] }
 regex = "1"
 ratatui = { version = "0.30", features = ["serde"] }
 serde = "1.0"
+serde_ignored = "0.1"
 termimad = "0.34.1"
 thiserror = "2.0"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "sync", "time", "process", "signal", "net"] }
@@ -66,5 +67,4 @@ experimental = [
 
 [dev-dependencies]
 portable-pty = "0.9"
-serde_ignored = "0.1"
 tempfile = "3"

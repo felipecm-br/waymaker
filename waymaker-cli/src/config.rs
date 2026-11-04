@@ -167,6 +167,29 @@ impl Default for Config {
     }
 }
 
+/// Parse a config (or partial config) from TOML, warning once per key the schema ignores.
+///
+/// Many config tables accept unknown keys so that a stale key does not stop `wm` from
+/// starting; this keeps that, but says which keys had no effect (a misspelling, or an
+/// option placed in the wrong table, such as `[start.command] input_separator`).
+/// Tables read through untagged helper enums (`[matcher.sort]`, `[matcher.frecency]`)
+/// buffer their content, so unknown keys inside them are not reported.
+pub fn parse_warn<T: serde::de::DeserializeOwned>(
+    src: &str,
+    origin: &std::path::Path,
+) -> Result<T, toml::de::Error> {
+    let de = toml::Deserializer::parse(src)?;
+    let mut ignored = Vec::new();
+    let value = serde_ignored::deserialize(de, |path| ignored.push(path.to_string()))?;
+    for key in ignored {
+        cba::wbog!(
+            "{}: unknown config key `{key}` has no effect",
+            origin.display()
+        );
+    }
+    Ok(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

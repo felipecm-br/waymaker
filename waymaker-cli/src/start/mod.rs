@@ -11,7 +11,7 @@ use crate::{
     action::{ActionContext, MMAction, action_handler},
     clap::Cli,
     color::apply_color_spec,
-    config::PartialConfig,
+    config::{PartialConfig, parse_warn},
     paths::{last_key_path, presets_path},
     register::MMExt,
     utils::{expand_tilde, guess_clip_cmd, guess_editor_cmd, guess_pager_cmd},
@@ -84,13 +84,17 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
 
     let mut config: Config = if cli.config.is_some() {
         // Explicit --config: load file verbatim, no default layering.
-        load_type(cfg_path, |s| toml::from_str(s))._ebog().or_exit()
+        load_type(cfg_path, |s| parse_warn(s, cfg_path))
+            ._ebog()
+            .or_exit()
     } else if cfg_path.exists() {
         // Default user config path: overlay the file on top of the embedded
         // defaults so the user only needs to specify what they want to change
         // (including individual [binds] entries).
         let mut base = Config::default();
-        let user: PartialConfig = load_type(cfg_path, |s| toml::from_str(s))._ebog().or_exit();
+        let user: PartialConfig = load_type(cfg_path, |s| parse_warn(s, cfg_path))
+            ._ebog()
+            .or_exit();
         base.apply(user);
         base
     } else {
@@ -127,14 +131,14 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         }
         // no recursion because tail bad
         let o: PartialConfig = match embedded {
-            Some(src) => toml::from_str(src)
+            Some(src) => parse_warn(src, &p)
                 .map_err(|e| anyhow::anyhow!("Failed to parse built-in preset: {e}"))?,
-            None => load_type(&p, |s| toml::from_str(s))?,
+            None => load_type(&p, |s| parse_warn(s, &p))?,
         };
 
         if let Some(q) = &o.source {
             let source = p.parent().as_ref().unwrap().join(q);
-            let o: PartialConfig = load_type(source, |s| toml::from_str(s))?;
+            let o: PartialConfig = load_type(&source, |s| parse_warn(s, &source))?;
             if o.source.is_some() {
                 _wbog!("Ignoring 'source' field in nested override.");
             }
@@ -195,7 +199,8 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
                         main_p
                     };
                 }
-                if let Ok(preset_config) = load_type(&preset_path, |s| toml::from_str(s)) {
+                if let Ok(preset_config) = load_type(&preset_path, |s| parse_warn(s, &preset_path))
+                {
                     config.apply(preset_config);
                 }
             }

@@ -30,6 +30,7 @@
 
 ### 🔄 Changed
 
+- `wm` warns at startup about config keys that have no effect (`<file>: unknown config key `start.command.separator` has no effect`), for the user config, `--config`, `--override`/`-o` presets, their `source` files and path-rule presets. The config still loads; keys inside `[matcher.sort]`, `[matcher.frecency]` and, with `--config`, `[start.command]` are not checked
 - In nav mode (`jump`, `workspace`), `m` toggles the bookmark on the focused path; `*` still works as an alias
 - `esc` exits with 130 (like `ctrl-c` and fzf) instead of 1, so a script can tell "cancelled" from "nothing matched" (still 1). Bind `"esc" = "Quit(1)"` to keep the old code
 
