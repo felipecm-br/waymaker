@@ -20,6 +20,7 @@ Prefer linking to existing docs instead of restating them:
 - **Mandatory Global Build**: Always run `just install` after ANY new feature, bug fix, refactor, or alteration before finalizing. It builds the release workspace and updates the global binary at `$HOME/.local/bin/wm`. Targeted tests complement this build but do not replace it.
 - Prefer narrow validation first: `cargo test -p <crate>` before `cargo test --workspace` when a change is crate-local.
 - Use `just preview -- --help` or `cargo run -p waymaker-cli -F experimental -- <args>` when validating CLI behavior.
+- Debug and release builds both read `config.toml`. Set `WM_DEV=1` to use `dev.toml` instead (rewritten from `waymaker-cli/assets/dev.toml` on each start, screen kept on exit).
 - Use `dprint fmt` or `dprint check` for Markdown and TOML edits.
 - Keep config-related changes aligned with the partial-merge model instead of patching around deserialization or override behavior.
 - When changing picker behavior, trace the path through event -> action -> renderer/handler rather than only editing a UI surface.

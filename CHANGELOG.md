@@ -21,6 +21,7 @@
 
 ### 🐛 Bug Fixes
 
+- Debug builds no longer replace your config with `dev.toml`: they read `config.toml` like a release build. `WM_DEV=1` (any build) switches to `<config dir>/dev.toml`, rewritten from the shipped `assets/dev.toml` on every start, and keeps the screen on exit
 - `--color` warnings (unknown key, unparsable colour, missing `:`) went to the log, hidden at the default verbosity, so a typo such as `--color selected:Red` did nothing silently; they now print at startup
 - A `session.toml` (or `sesh.toml`) that failed to parse made every configured session disappear from `wm session` with no message; the parse error is now printed with the file path
 - Several presets set `[start]` options under `[start.command]`, where they were silently ignored. `switcher` (Linux and macOS), `dict/en` and `docker/compose` split NUL-terminated multi-line records into one item per line, so the switcher listed titles, app names and PIDs as separate entries; `git/status`, `docker/compose`, `ai/llm` and `win.rg` printed the whole line on Enter instead of the intended column; `ai/pi_sessions` ran outside `~/.pi/agent/sessions`. The keys now live in `[start]` (`input_separator`, `output_template`, `directory`, `trim`)

@@ -73,8 +73,7 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         exit(0)
     }
 
-    #[cfg(debug_assertions)]
-    if cli.config.is_none() {
+    if crate::paths::dev_mode() && cli.config.is_none() {
         #[cfg(target_os = "windows")]
         write_str(cfg_path, include_str!("../../assets/win.dev.toml")).unwrap();
 
@@ -219,8 +218,7 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         config.render.ui.default_sort = config.default_sort;
     }
 
-    #[cfg(debug_assertions)]
-    {
+    if crate::paths::dev_mode() {
         config.tui.clear_on_exit = false;
     }
     apply_border_gradient_env(&mut config.render.ui.border);

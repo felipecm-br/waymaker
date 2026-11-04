@@ -49,10 +49,20 @@ expr_as_path_fn!(
     state_dir_impl().unwrap_or_default().join("last_key")
 );
 
-#[cfg(debug_assertions)]
+/// Developer mode (`WM_DEV=1`): the default config is `dev.toml`, rewritten from the shipped
+/// `assets/dev.toml` on every start, and the screen is kept on exit. Off by default in every
+/// build, so a debug binary behaves like a release one unless asked.
+pub fn dev_mode() -> bool {
+    std::env::var_os("WM_DEV").is_some_and(|v| v == "1")
+}
+
 expr_as_path_fn!(
     default_config_path,
-    config_dir_impl().unwrap_or_default().join("dev.toml")
+    config_dir_impl().unwrap_or_default().join(if dev_mode() {
+        "dev.toml"
+    } else {
+        "config.toml"
+    })
 );
 
 expr_as_path_fn!(
@@ -61,12 +71,6 @@ expr_as_path_fn!(
         .parent()
         .unwrap_or(std::path::Path::new(""))
         .join("presets")
-);
-
-#[cfg(not(debug_assertions))]
-expr_as_path_fn!(
-    default_config_path,
-    config_dir_impl().unwrap_or_default().join("config.toml")
 );
 
 #[cfg(test)]
