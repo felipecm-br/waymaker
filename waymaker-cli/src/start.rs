@@ -603,7 +603,6 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
 
     config.binds.check_cycles().map_err(anyhow::Error::msg)?;
     config.binds.retain(|_, actions| !actions.is_empty());
-    config.binds.resolve_semantics();
 
     for actions in config.binds.values() {
         for a in actions {
@@ -1298,6 +1297,7 @@ pub async fn start(
             ) -> String,
     );
     let binds = event_loop.binds.clone();
+    let semantic_binds = event_loop.semantic_binds.clone();
     let previewer = make_previewer(
         &mut mm,
         previewer,
@@ -1990,8 +1990,28 @@ pub async fn start(
 
     options = options
         .ext_handler(move |x, y| action_handler(x, y, &mut action_context))
-        .ext_aliaser(|a, _state| match a {
+        .ext_aliaser(move |a, _state| match a {
             Action::Accept => acs![MMAction::Accept],
+            Action::Semantic(ref s)
+                if {
+                    let mode = waymaker::MODE
+                        .lock()
+                        .ok()
+                        .map(|m| m.clone())
+                        .unwrap_or_default();
+                    semantic_binds.resolve_alias(s, &mode).is_some()
+                } =>
+            {
+                let mode = waymaker::MODE
+                    .lock()
+                    .ok()
+                    .map(|m| m.clone())
+                    .unwrap_or_default();
+                semantic_binds
+                    .resolve_alias(s, &mode)
+                    .cloned()
+                    .unwrap_or_default()
+            }
             Action::Semantic(ref s)
                 if s.eq_ignore_ascii_case("fm_create")
                     || s.eq_ignore_ascii_case("fmcreate")

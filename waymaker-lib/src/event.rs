@@ -26,6 +26,7 @@ pub struct EventLoop<A: ActionExt> {
     tick_interval: time::Duration,
 
     pub binds: BindMap<A>,
+    pub semantic_binds: BindMap<A>,
     combiner: Combiner,
     fmt: KeyCombinationFormat,
 
@@ -62,6 +63,7 @@ impl<A: ActionExt> EventLoop<A> {
             tick_interval: time::Duration::from_millis(200),
 
             binds: BindMap::new(),
+            semantic_binds: BindMap::new(),
             combiner,
             fmt,
             event_stream: None, // important not to initialize it too early?
@@ -80,6 +82,7 @@ impl<A: ActionExt> EventLoop<A> {
 
     pub fn with_binds(mut binds: BindMap<A>) -> Self {
         let mut ret = Self::new();
+        ret.semantic_binds = binds.resolve_semantic_triggers();
         binds.resolve_semantics();
         ret.binds = binds;
         ret
@@ -138,6 +141,10 @@ impl<A: ActionExt> EventLoop<A> {
             });
         if direct.is_some() {
             return direct.cloned();
+        }
+
+        if let TriggerKind::Semantic(alias) = &kind {
+            return self.semantic_binds.resolve_alias(alias, &mode).cloned();
         }
 
         // Cross-match '?' and 'shift-?' so both terminal variants trigger identically

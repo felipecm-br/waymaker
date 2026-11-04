@@ -397,3 +397,32 @@ fn ctrl_c_quits_with_130() {
     wm.send("\x03");
     assert_eq!(wm.finish(), (130, String::new()));
 }
+
+#[test]
+fn nav_bind_resolves_custom_semantic_confirm_action() {
+    let wm = Session::start(
+        FRUIT,
+        &[
+            "ui.nav.active=true",
+            "ui.nav.focus_on_start=picker",
+            "--nav-bind",
+            "d:@delete_worktree",
+            "binds.@delete_worktree=Confirm(Delete {=}? | printf '%s' {=} > \"$WM_TEST_DIR/deleted\")",
+        ],
+    );
+    wm.send("d");
+    wm.wait_for(|text| text.contains("Delete") && text.contains("apple?"));
+    wm.send(ENTER);
+    wm.wait_until_idle();
+    let deleted_path = wm.dir.path().join("deleted");
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while !deleted_path.exists() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(
+        std::fs::read_to_string(&deleted_path).unwrap_or_default(),
+        "apple"
+    );
+    wm.send("q");
+    assert_eq!(wm.finish().0, 130);
+}

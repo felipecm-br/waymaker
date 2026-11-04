@@ -208,6 +208,27 @@ impl<A: ActionExt> BindMap<A> {
         *self = new_binds;
     }
 
+    /// Resolves all semantic triggers (`@alias`, `mode^^@alias`) into their flattened concrete
+    /// action sequences so runtime semantic dispatches (such as `[ui.nav.binds]` aliases or mouse
+    /// click regions) can expand them after `resolve_semantics` strips semantic keys from the
+    /// concrete trigger table.
+    pub fn resolve_semantic_triggers(&self) -> BindMap<A> {
+        let mut sem_binds: BindMap<A> = IndexMap::new();
+        for (trigger, actions) in self.iter() {
+            if let TriggerKind::Semantic(alias) = &trigger.kind
+                && let Some(resolved) = self
+                    .resolve_actions(
+                        &Actions(vec![Action::Semantic(alias.clone())]),
+                        &trigger.mode,
+                    )
+                    .or_else(|| self.resolve_actions(actions, &trigger.mode))
+            {
+                sem_binds.insert(trigger.clone(), resolved);
+            }
+        }
+        sem_binds
+    }
+
     pub fn resolve_actions(&self, actions: &Actions<A>, mode: &str) -> Option<Actions<A>> {
         let mut resolved = Vec::new();
 
@@ -1139,5 +1160,32 @@ mod test {
 
         let t3 = Trigger::from_str("nav2^^ctrl-f").unwrap();
         assert_eq!(t3.mode, "nav2");
+    }
+
+    #[test]
+    fn test_resolve_semantic_triggers_preserves_flattened_aliases() {
+        use crate::action::NullActionExt;
+        use crate::bindmap;
+
+        let bind_map: BindMap<NullActionExt> = bindmap!(
+            Trigger {
+                kind: TriggerKind::Semantic("delete_worktree".into()),
+                mode: String::new()
+            } => Action::Semantic("inner".into()),
+            Trigger {
+                kind: TriggerKind::Semantic("inner".into()),
+                mode: String::new()
+            } => Action::Print("deleted".into()),
+        );
+
+        let sem = bind_map.resolve_semantic_triggers();
+        let resolved = sem
+            .resolve_alias("delete_worktree", "")
+            .expect("semantic alias should resolve");
+        assert!(
+            resolved
+                .iter()
+                .any(|a| matches!(a, Action::Print(s) if s == "deleted"))
+        );
     }
 }
