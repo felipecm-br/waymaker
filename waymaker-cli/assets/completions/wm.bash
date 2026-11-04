@@ -62,11 +62,11 @@ _wm() {
                     return 0
                     ;;
                 --doc)
-                    COMPREPLY=($(compgen -W "options binds template performance frecency jump other" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "features options binds template performance frecency jump other" -- "${cur}"))
                     return 0
                     ;;
                 -d)
-                    COMPREPLY=($(compgen -W "options binds template performance frecency jump other" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "features options binds template performance frecency jump other" -- "${cur}"))
                     return 0
                     ;;
                 --pos)

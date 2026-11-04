@@ -202,6 +202,7 @@ fn display_doc(cli: &Cli) {
     let mut md = String::new();
     if let Some(doc) = &cli.doc {
         match doc {
+            Doc::Features => md.push_str(include_str!("../assets/docs/features.md")),
             Doc::Options => md.push_str(include_str!("../assets/docs/options.md")),
             Doc::Binds => md.push_str(include_str!("../assets/docs/binds.md")),
             Doc::Template => md.push_str(include_str!("../assets/docs/template.md")),

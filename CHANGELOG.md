@@ -2,6 +2,7 @@
 
 ### 🚀 Features
 
+- `wm --doc features`: a task-oriented guide (icons, previews, media, `--color` keys, spinners, group headers, tmux sessions, config layering, the file walker), replacing `USAGE.md`, whose config snippets no longer parsed (`results.symlink_target`, `preview.media = true`, `[matcher] frecency = true`)
 - Built-in `wm preview-file <path>` subcommand providing fast, portable, shell-free previewing for directories (tree with Nerd Font icons), markdown, mermaid diagrams, images (`chafa`/`img2txt`/metadata), and syntax-highlighted or numbered code/text files across Linux, macOS, and Windows
 - `@unwind` action (`Action::Unwind(130)`): unrolls UI state in cascade (overlay -> prompt/live input -> action box -> sort menu -> help/preview -> selections -> query -> quit 130) before exiting, eliminating accidental exits while editing queries
 - Zero-background focus & lateral indicator: `current_style` defaults to clean terminal background (`bg = Reset`) with `BOLD`, paired with a cyan lateral indicator bar (`current_nav_bar = Plain`, `current_nav_bar_style = cyan`), eliminating opaque black bars across dark/light terminals

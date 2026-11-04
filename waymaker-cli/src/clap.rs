@@ -128,6 +128,7 @@ pub struct Cli {
 
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq)]
 pub enum Doc {
+    Features,
     Options,
     Binds,
     Template,
@@ -428,6 +429,7 @@ mod tests {
 
     #[test]
     fn test_doc_enum_variants() {
+        assert_eq!(Doc::Features, Doc::Features);
         assert_eq!(Doc::Options, Doc::Options);
         assert_eq!(Doc::Binds, Doc::Binds);
         assert_eq!(Doc::Template, Doc::Template);

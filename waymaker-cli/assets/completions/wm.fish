@@ -4,7 +4,8 @@ complete -c wm -l group-prefix -d 'Specify a prefix that indicates a line is a g
 complete -c wm -s f -l filter -d 'Filter input headlessly matching query, print results to stdout, and exit without entering the TUI' -r
 complete -c wm -l benchmark-input -d 'Benchmark continuous streaming frametime on Ratatui test backend' -r
 complete -c wm -l download -d 'Download presets from GitHub. Optionally specify a subfolder' -r
-complete -c wm -s d -l doc -d 'Display documentation' -r -f -a "options\t''
+complete -c wm -s d -l doc -d 'Display documentation' -r -f -a "features\t''
+options\t''
 binds\t''
 template\t''
 performance\t''
