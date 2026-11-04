@@ -552,7 +552,23 @@ mod tests {
 
     #[test]
     fn test_unknown_keys_are_detected() {
-        let keys = ignored_keys("[start.command]\ncmd = \"ls\"\n").unwrap();
-        assert_eq!(keys, ["start.command.cmd"]);
+        let keys = ignored_keys("[start.command]\nbogus = 1\n").unwrap();
+        assert_eq!(keys, ["start.command.bogus"]);
+    }
+
+    /// `cmd` works in TOML as well as in CLI overrides (`-o start.command.cmd=...`).
+    #[test]
+    fn test_start_command_cmd_alias() {
+        use waymaker_partial::Apply;
+        for src in [
+            "[start.command]\ncmd = \"echo hi\"\n",
+            "[start.command]\ncommand = \"echo hi\"\n",
+        ] {
+            assert!(ignored_keys(src).unwrap().is_empty(), "{src}");
+            let partial: PartialConfig = toml::from_str(src).unwrap();
+            let mut config = Config::default();
+            config.apply(partial);
+            assert_eq!(config.start.command.default.command, "echo hi", "{src}");
+        }
     }
 }

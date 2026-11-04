@@ -117,10 +117,10 @@ All colors and modifiers come from ratatui:
 ### Start (`start.`, `s`)
 
 - `command`: (string or object) The shell command used to generate items.
-  - Absolute alias: `x`, `cmd`.
+  - Absolute alias: `x`, `cmd`. In TOML, `[start.command]` accepts `command` or `cmd`.
   - If an object:
     - `command`: (string) The shell command.
-    - `separator`: (char) Input separator (overrides `start.input_separator` for this command).
+  - Input splitting, output templates, `trim` and `directory` are `[start]` options, not `[start.command]` ones.
 - `input_separator`: (char) Character separating input items.
   - Absolute alias: `i`.
 - `os`, `output_separator`: (string) String separating output selections.

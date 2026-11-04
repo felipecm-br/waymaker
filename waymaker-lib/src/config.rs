@@ -209,7 +209,7 @@ impl Default for WorkerConfig {
 pub struct StartCommandConfig {
     /// (cli only) Default command to execute when stdin is not being read.
     #[partial(alias = "cmd", alias = "x")]
-    #[serde(alias = "command")]
+    #[serde(alias = "command", alias = "cmd")]
     pub default: CommandSetting,
     /// (cli only) Additional command which can be cycled through using Action::ReloadNext
     #[partial(alias = "ax")]
