@@ -128,6 +128,12 @@ pub trait ColumnIndexable {
     fn get_text(&self, i: usize) -> Text<'_> {
         Text::from(self.get_str(i))
     }
+
+    /// Column `i` as a shared string, when the item holds it in an `Arc<str>`. The matcher
+    /// then keeps a reference instead of its own copy of the text.
+    fn get_shared(&self, _i: usize) -> Option<Arc<str>> {
+        None
+    }
 }
 
 impl<T> Worker<T>
@@ -178,6 +184,7 @@ where
         let columns = columns_vec.iter().enumerate().map(|(i, name)| {
             Column::new(name.clone(), move |item: &T| item.get_text(i))
                 .with_raw(move |item: &T| item.get_str(i))
+                .with_shared(move |item: &T| item.get_shared(i))
         });
 
         // Find the index of the default column

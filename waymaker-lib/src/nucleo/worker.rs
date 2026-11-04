@@ -118,10 +118,13 @@ fn compute_item_score(
 
 type ColumnFormatFn<T> = Box<dyn for<'a> Fn(&'a T) -> Text<'a> + Send + Sync>;
 type ColumnRawFn<T> = Box<dyn for<'a> Fn(&'a T) -> Cow<'a, str> + Send + Sync>;
+type ColumnSharedFn<T> = Box<dyn Fn(&T) -> Option<Arc<str>> + Send + Sync>;
 pub struct Column<T> {
     pub name: Arc<str>,
     pub(super) format: ColumnFormatFn<T>,
     pub(super) raw: Option<ColumnRawFn<T>>,
+    /// The column text as a shared string, when the item can lend one; see [`Column::haystack`].
+    pub(super) shared: Option<ColumnSharedFn<T>>,
     /// Whether the column should be passed to nucleo for matching and filtering.
     pub(super) filter: bool,
 }
@@ -133,6 +136,7 @@ impl<T> Column<T> {
             format,
             filter: true,
             raw: None,
+            shared: None,
         }
     }
 
@@ -145,6 +149,7 @@ impl<T> Column<T> {
             format: Box::new(f),
             filter: true,
             raw: None,
+            shared: None,
         }
     }
 
@@ -153,6 +158,16 @@ impl<T> Column<T> {
         F: for<'a> Fn(&'a T) -> Cow<'a, str> + SSS,
     {
         self.raw = Some(Box::new(f));
+        self
+    }
+
+    /// Lets the matcher share the column text with the item instead of copying it, whenever
+    /// `f` returns `Some` (it must be the same text `raw` returns).
+    pub fn with_shared<F>(mut self, f: F) -> Self
+    where
+        F: Fn(&T) -> Option<Arc<str>> + SSS,
+    {
+        self.shared = Some(Box::new(f));
         self
     }
 
@@ -173,6 +188,17 @@ impl<T> Column<T> {
         } else {
             Cow::Owned((self.format)(item).to_string())
         }
+    }
+
+    /// The text the matcher stores for this column: the item's own shared string when it has
+    /// one (so the text is stored once), otherwise a copy of [`Column::raw`].
+    pub(super) fn haystack(&self, item: &T) -> nucleo::Utf32String {
+        if let Some(shared) = &self.shared
+            && let Some(text) = shared(item)
+        {
+            return text.into();
+        }
+        self.raw(item).into()
     }
 }
 
@@ -2120,6 +2146,39 @@ mod tests {
     use ratatui::text::Text;
     use std::sync::Arc;
 
+    /// Plain items store their text once: the matcher's haystack is the item's own `Arc<str>`.
+    /// A column that is only part of the line cannot be shared and is copied.
+    #[test]
+    fn test_plain_item_text_is_shared_with_the_matcher() {
+        use crate::nucleo::{ColumnRanges, Indexed, Segmented, injector::Injector};
+        use crate::utils::Either;
+        use nucleo::Utf32String;
+        type Item = Indexed<Segmented<Either<Arc<str>, Box<Text<'static>>>>>;
+        let item = |text: &Arc<str>, ranges: ColumnRanges| Indexed {
+            index: 0,
+            inner: Segmented::new(Either::Left(text.clone()), ranges, None),
+        };
+
+        let worker = Worker::<Item>::new_indexable([""], None);
+        let text: Arc<str> = "src/main.rs".into();
+        worker
+            .injector()
+            .push(item(&text, ColumnRanges::single(0, text.len() as u32)))
+            .unwrap();
+        let snapshot = worker.nucleo.snapshot();
+        let haystack = &snapshot.get_item(0).unwrap().matcher_columns[0];
+        assert!(matches!(haystack, Utf32String::Shared(h) if Arc::ptr_eq(h, &text)));
+
+        let worker = Worker::<Item>::new_indexable(["path", "line"], None);
+        let text: Arc<str> = "src/main.rs:12".into();
+        let ranges = ColumnRanges::from(vec![(0, 11), (12, 14)]);
+        worker.injector().push(item(&text, ranges)).unwrap();
+        let snapshot = worker.nucleo.snapshot();
+        let columns = snapshot.get_item(0).unwrap().matcher_columns;
+        assert!(matches!(&columns[0], Utf32String::Ascii(h) if &**h == "src/main.rs"));
+        assert!(matches!(&columns[1], Utf32String::Ascii(h) if &**h == "12"));
+    }
+
     /// Sets up the necessary Nucleo state to trigger a match
     fn setup_nucleo_mocks(
         search_query: &str,
@@ -2825,7 +2884,7 @@ mod tests {
         ];
 
         for line in &lines {
-            let _ = injector.push((None, line.to_string()));
+            let _ = injector.push((None, (*line).into()));
         }
 
         mm.worker.nucleo.tick(10);

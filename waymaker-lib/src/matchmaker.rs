@@ -63,7 +63,7 @@ pub struct Matchmaker<T: SSS, S: Selection = T> {
 // ----------- MAIN -----------------------
 
 pub struct OddEnds {
-    pub splitter: SplitterFn<Either<Box<str>, Box<Text<'static>>>>,
+    pub splitter: SplitterFn<Either<Arc<str>, Box<Text<'static>>>>,
     pub hidden_columns: Vec<bool>,
     pub has_error: bool,
 }
@@ -104,16 +104,16 @@ pub fn set_host_clipboard_universal(text: &str) -> io::Result<()> {
 
 pub type ConfigInjector = AnsiInjector<
     SegmentedInjector<
-        Either<Box<str>, Box<Text<'static>>>,
+        Either<Arc<str>, Box<Text<'static>>>,
         IndexedInjector<
-            Segmented<Either<Box<str>, Box<Text<'static>>>>,
+            Segmented<Either<Arc<str>, Box<Text<'static>>>>,
             WorkerInjector<ConfigMMItem>,
         >,
     >,
 >;
 pub type ConfigMatchmaker =
-    Matchmaker<ConfigMMItem, Segmented<Either<Box<str>, Box<Text<'static>>>>>;
-pub type ConfigMMInnerItem = Segmented<Either<Box<str>, Box<Text<'static>>>>;
+    Matchmaker<ConfigMMItem, Segmented<Either<Arc<str>, Box<Text<'static>>>>>;
+pub type ConfigMMInnerItem = Segmented<Either<Arc<str>, Box<Text<'static>>>>;
 pub type ConfigMMItem = Indexed<ConfigMMInnerItem>;
 
 pub type ConfigWaymaker = ConfigMatchmaker;
@@ -185,7 +185,7 @@ impl ConfigMatchmaker {
         let col_count = worker.columns.len();
 
         // Arc over box due to capturing
-        let splitter: SplitterFn<Either<Box<str>, Box<Text<'static>>>> = match cc.split {
+        let splitter: SplitterFn<Either<Arc<str>, Box<Text<'static>>>> = match cc.split {
             Split::Delimiter(ref rg) => {
                 let rg = rg.clone();
                 let names = cc.names.clone();

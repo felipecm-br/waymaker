@@ -1166,7 +1166,7 @@ pub async fn start(
             let store = waymaker::frecency::FrecencyStore::open();
             let pins = store.list_pins();
             for pin in pins {
-                let _ = push_fn(pin);
+                let _ = push_fn(pin.into());
             }
 
             let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
@@ -1200,7 +1200,7 @@ pub async fn start(
 
             for path in pinned_paths {
                 if std::path::Path::new(&path).is_dir() {
-                    let _ = push_fn(path);
+                    let _ = push_fn(path.into());
                 }
             }
 
@@ -1218,7 +1218,7 @@ pub async fn start(
             }
             items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
             for (path, _, _) in items {
-                let _ = push_fn(path);
+                let _ = push_fn(path.into());
             }
 
             let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
@@ -1250,7 +1250,7 @@ pub async fn start(
 
                 state.picker_ui.selector.clear();
                 for line in lines {
-                    let _ = push_fn(line);
+                    let _ = push_fn(line.into());
                 }
 
                 let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
@@ -1297,7 +1297,7 @@ pub async fn start(
                     if is_ignored_item(&item) {
                         continue;
                     }
-                    let _ = push_fn(item);
+                    let _ = push_fn(item.into());
                 }
 
                 let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
@@ -1358,7 +1358,7 @@ pub async fn start(
                 let mut first = true;
                 let handle = walker.spawn_walk(move |line| {
                     let _ = collect_tx.send(line.clone());
-                    let res = push_fn(line);
+                    let res = push_fn(line.into());
                     if first {
                         first = false;
                         let _ =
@@ -1433,7 +1433,7 @@ pub async fn start(
                     }
                     let mut push_fn = push_fn;
                     for line in lines {
-                        let _ = push_fn(line.to_string());
+                        let _ = push_fn(line.into());
                     }
                 }
 
@@ -1713,7 +1713,7 @@ pub async fn start(
                 if is_ignored_item(&item) {
                     continue;
                 }
-                if push_fn(item).is_err() {
+                if push_fn(item.into()).is_err() {
                     break;
                 }
             }
@@ -1747,7 +1747,7 @@ pub async fn start(
 
                 let handle = walker.spawn_walk(move |line| {
                     let _ = collect_tx.send(line.clone());
-                    push_fn(line)
+                    push_fn(line.into())
                 });
                 let _ = handle.await;
 
@@ -1942,7 +1942,7 @@ mod tests {
         let raw: &[u8] = b"alpha\nbad\xffbyte\nwindows\r\ntrailing";
         let mut out = Vec::new();
         let count = for_each_record::<()>(raw, b'\n', |rec| {
-            out.push(rec);
+            out.push(rec.to_string());
             Ok(())
         })
         .unwrap();
@@ -1953,7 +1953,7 @@ mod tests {
         let nul_raw: &[u8] = b"one\r\0two\xff\0three\0";
         let mut nul_out = Vec::new();
         let nul_count = for_each_record::<()>(nul_raw, b'\0', |rec| {
-            nul_out.push(rec);
+            nul_out.push(rec.to_string());
             Ok(())
         })
         .unwrap();
@@ -1965,7 +1965,7 @@ mod tests {
         let payload = format!("{long}\nafter\n");
         let mut span_out = Vec::new();
         let span_count = for_each_record::<()>(payload.as_bytes(), b'\n', |rec| {
-            span_out.push(rec);
+            span_out.push(rec.to_string());
             Ok(())
         })
         .unwrap();

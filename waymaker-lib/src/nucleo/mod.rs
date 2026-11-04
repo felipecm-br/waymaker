@@ -24,6 +24,11 @@ pub trait SegmentableItem: SSS {
     fn slice_str(&self, range: Range<usize>) -> Cow<'_, str> {
         self.slice(range).to_string().into()
     }
+    /// The item's whole text, when it is held in an `Arc<str>` that the matcher can share
+    /// instead of copying (see [`ColumnIndexable::get_shared`]).
+    fn shared(&self) -> Option<&Arc<str>> {
+        None
+    }
 }
 
 impl SegmentableItem for String {
@@ -151,6 +156,14 @@ impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
             Text::default()
         }
     }
+
+    fn get_shared(&self, i: usize) -> Option<Arc<str>> {
+        let text = self.inner.shared()?;
+        match self.ranges.get(i) {
+            Some(&(0, end)) if end as usize == text.len() => Some(text.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl<T: SegmentableItem> Segmented<T> {
@@ -235,6 +248,10 @@ impl<T: ColumnIndexable> ColumnIndexable for Indexed<T> {
 
     fn get_text(&self, i: usize) -> Text<'_> {
         self.inner.get_text(i)
+    }
+
+    fn get_shared(&self, i: usize) -> Option<Arc<str>> {
+        self.inner.get_shared(i)
     }
 }
 

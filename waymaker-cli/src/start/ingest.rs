@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 
 /// Splits `reader` into records ending in `delim` and passes each one to `f`, without the
 /// delimiter (and without a `\r` before it when `delim` is `\n`). A last record with no
@@ -7,11 +8,11 @@ use super::*;
 /// Invalid UTF-8 is replaced with U+FFFD, like fzf, instead of dropping the record: one
 /// non-UTF-8 file name must not hide it, or (as `read_line`'s error did in the headless
 /// filter) the whole input. Records are found with `memchr` in a large buffer and each
-/// costs one allocation.
+/// costs one allocation: the `Arc<str>` is the text the item and the matcher both keep.
 pub fn for_each_record<E>(
     reader: impl Read,
     delim: u8,
-    mut f: impl FnMut(String) -> Result<(), E>,
+    mut f: impl FnMut(Arc<str>) -> Result<(), E>,
 ) -> Result<usize, MapReaderError<E>> {
     use std::io::BufRead;
 
@@ -27,11 +28,11 @@ pub fn for_each_record<E>(
         {
             record = rest;
         }
-        let text = match std::str::from_utf8(record) {
-            Ok(s) => s.to_owned(),
+        let text: Arc<str> = match std::str::from_utf8(record) {
+            Ok(s) => s.into(),
             Err(_) => {
                 lossy += 1;
-                String::from_utf8_lossy(record).into_owned()
+                String::from_utf8_lossy(record).as_ref().into()
             }
         };
         f(text).map_err(MapReaderError::Custom)?;
@@ -89,7 +90,7 @@ pub(super) fn record_delimiter(input_separator: Option<char>) -> u8 {
 /// Read aborts on error. Read errors are logged.
 pub fn map_reader<E: SSS + std::fmt::Display>(
     reader: impl Read + SSS,
-    f: impl FnMut(String) -> Result<(), E> + SSS,
+    f: impl FnMut(Arc<str>) -> Result<(), E> + SSS,
     input_separator: Option<char>,
     abort_empty: Option<RenderSender<MMAction>>,
 ) -> tokio::task::JoinHandle<Result<usize, MapReaderError<E>>> {
@@ -116,7 +117,7 @@ pub fn map_reader_batched(
 ) -> tokio::task::JoinHandle<Result<usize, anyhow::Error>> {
     tokio::task::spawn_blocking(move || {
         let mut total = 0;
-        let mut batch: Vec<(Option<std::sync::Arc<str>>, String)> = Vec::with_capacity(512);
+        let mut batch: Vec<(Option<Arc<str>>, Arc<str>)> = Vec::with_capacity(512);
         let mut current_group: Option<std::sync::Arc<str>> = None;
 
         // Inject on a separate thread so reading the next batch overlaps with
@@ -177,14 +178,14 @@ pub(super) fn inject_line(
     render_tx: RenderSender<MMAction>,
     injector: ConfigInjector,
     group_prefix: Option<String>,
-) -> impl FnMut(String) -> Result<(), waymaker::nucleo::WorkerError> + Send {
+) -> impl FnMut(Arc<str>) -> Result<(), waymaker::nucleo::WorkerError> + Send {
     let mut header_buf = Vec::with_capacity(header_lines);
     let mut remaining = header_lines;
     let injector = injector;
     let mut current_group: Option<std::sync::Arc<str>> = None;
 
     // For each row, take the first line of each segmented column, building a Vec<Vec<Line>>
-    move |line: String| {
+    move |line: Arc<str>| {
         if let Some(prefix) = &group_prefix
             && line.starts_with(prefix)
         {

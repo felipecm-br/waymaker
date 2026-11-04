@@ -200,8 +200,9 @@ impl AsyncWalker {
     /// and push batches of 512 items via `injector.extend()`, eliminating the single-thread channel funnel.
     pub fn spawn_walk_parallel<I>(&self, injector: I) -> tokio::task::JoinHandle<()>
     where
-        I: crate::nucleo::injector::Injector<InputItem = (Option<std::sync::Arc<str>>, String)>
-            + Clone
+        I: crate::nucleo::injector::Injector<
+                InputItem = (Option<std::sync::Arc<str>>, std::sync::Arc<str>),
+            > + Clone
             + Send
             + 'static,
     {
@@ -231,7 +232,7 @@ impl AsyncWalker {
                     options.strip_cwd_prefix,
                     is_dir,
                 );
-                shallow_batch.push((None, formatted));
+                shallow_batch.push((None, formatted.into()));
             }
             if !shallow_batch.is_empty() && injector.extend(shallow_batch.into_iter()).is_err() {
                 return;
@@ -245,16 +246,16 @@ impl AsyncWalker {
 
             struct BatchWorker<
                 I: crate::nucleo::injector::Injector<
-                        InputItem = (Option<std::sync::Arc<str>>, String),
+                        InputItem = (Option<std::sync::Arc<str>>, std::sync::Arc<str>),
                     >,
             > {
                 injector: I,
-                batch: Vec<(Option<std::sync::Arc<str>>, String)>,
+                batch: Vec<(Option<std::sync::Arc<str>>, std::sync::Arc<str>)>,
             }
 
             impl<
                 I: crate::nucleo::injector::Injector<
-                        InputItem = (Option<std::sync::Arc<str>>, String),
+                        InputItem = (Option<std::sync::Arc<str>>, std::sync::Arc<str>),
                     >,
             > Drop for BatchWorker<I>
             {
@@ -297,7 +298,7 @@ impl AsyncWalker {
                     let path = entry.path();
                     let formatted = format_path(path, &root, strip_cwd, is_dir);
 
-                    worker.batch.push((None, formatted));
+                    worker.batch.push((None, formatted.into()));
                     if worker.batch.len() >= 512 {
                         let drained = std::mem::take(&mut worker.batch);
                         if worker.injector.extend(drained.into_iter()).is_err() {
@@ -684,7 +685,7 @@ mod tests {
         struct CollectInjector(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
 
         impl crate::nucleo::injector::Injector for CollectInjector {
-            type InputItem = (Option<std::sync::Arc<str>>, String);
+            type InputItem = (Option<std::sync::Arc<str>>, std::sync::Arc<str>);
             type Inner = ();
             type Context = ();
             fn new(_: (), _: ()) -> Self {
@@ -697,7 +698,7 @@ mod tests {
                 Ok(())
             }
             fn push(&self, (_g, s): Self::InputItem) -> Result<(), crate::nucleo::WorkerError> {
-                self.0.lock().unwrap().push(s);
+                self.0.lock().unwrap().push(s.to_string());
                 Ok(())
             }
             fn extend(
@@ -706,7 +707,7 @@ mod tests {
             ) -> Result<(), crate::nucleo::WorkerError> {
                 let mut guard = self.0.lock().unwrap();
                 for (_g, s) in items {
-                    guard.push(s);
+                    guard.push(s.to_string());
                 }
                 Ok(())
             }

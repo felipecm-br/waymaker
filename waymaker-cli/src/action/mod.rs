@@ -1033,7 +1033,7 @@ mod tests {
         std::fs::write(&source_file, "hello world").unwrap();
 
         injector
-            .push((None, sub_dir.to_string_lossy().to_string()))
+            .push((None, sub_dir.to_string_lossy().as_ref().into()))
             .unwrap();
         mm.worker.nucleo.tick(10);
 
@@ -1215,7 +1215,7 @@ mod tests {
         std::fs::create_dir_all(&target_dir).unwrap();
 
         injector
-            .push((None, target_dir.to_string_lossy().to_string()))
+            .push((None, target_dir.to_string_lossy().as_ref().into()))
             .unwrap();
         mm.worker.nucleo.tick(10);
 
@@ -1358,7 +1358,7 @@ mod tests {
         std::fs::create_dir_all(&dest_folder).unwrap();
 
         injector
-            .push((None, dest_folder.to_string_lossy().to_string()))
+            .push((None, dest_folder.to_string_lossy().as_ref().into()))
             .unwrap();
         mm.worker.nucleo.tick(10);
 
@@ -1579,7 +1579,7 @@ mod tests {
         std::fs::create_dir_all(&dest_folder).unwrap();
 
         injector
-            .push((None, dest_folder.to_string_lossy().to_string()))
+            .push((None, dest_folder.to_string_lossy().as_ref().into()))
             .unwrap();
         mm.worker.nucleo.tick(10);
 

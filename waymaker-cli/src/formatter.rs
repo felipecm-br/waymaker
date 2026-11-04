@@ -551,7 +551,7 @@ mod tests {
     #[tokio::test]
     async fn test_format_cli_basic() {
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector.push((None, "a,b,c".to_string())).unwrap();
+        injector.push((None, "a,b,c".into())).unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
@@ -604,7 +604,7 @@ mod tests {
     #[tokio::test]
     async fn test_format_cli_ranges() {
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector.push((None, "a,b,c".to_string())).unwrap();
+        injector.push((None, "a,b,c".into())).unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
@@ -650,8 +650,8 @@ mod tests {
     #[tokio::test]
     async fn test_format_cli_selections() {
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector.push((None, "a,b,c".to_string())).unwrap();
-        injector.push((None, "1,2,3".to_string())).unwrap();
+        injector.push((None, "a,b,c".into())).unwrap();
+        injector.push((None, "1,2,3".into())).unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
@@ -707,7 +707,7 @@ mod tests {
     #[tokio::test]
     async fn test_format_cli_invalid_key() {
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector.push((None, "a,b,c".to_string())).unwrap();
+        injector.push((None, "a,b,c".into())).unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
@@ -755,7 +755,7 @@ mod tests {
         }
 
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector.push((None, "a,b,c".to_string())).unwrap();
+        injector.push((None, "a,b,c".into())).unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
@@ -799,9 +799,7 @@ mod tests {
     #[tokio::test]
     async fn test_format_cli_prompt_input() {
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector
-            .push((None, "1234,agent1,busy".to_string()))
-            .unwrap();
+        injector.push((None, "1234,agent1,busy".into())).unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();
@@ -846,9 +844,7 @@ mod tests {
     #[tokio::test]
     async fn test_format_cli_live_input() {
         let (mut mm, injector, _guard) = setup_test_mm();
-        injector
-            .push((None, "1234,agent1,busy".to_string()))
-            .unwrap();
+        injector.push((None, "1234,agent1,busy".into())).unwrap();
         mm.worker.nucleo.tick(10);
 
         let mut state_obj = State::new();

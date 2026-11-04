@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use cba::define_either;
 pub use ratatui::text::Text;
@@ -12,7 +12,7 @@ define_either! {
     }
 }
 
-impl Either<Box<str>, Box<Text<'static>>> {
+impl Either<Arc<str>, Box<Text<'static>>> {
     #[inline]
     pub fn byte_len(&self) -> usize {
         match self {
@@ -30,7 +30,7 @@ impl Either<Box<str>, Box<Text<'static>>> {
 
     pub fn to_text(self) -> Text<'static> {
         match self {
-            Either::Left(s) => Text::from(s.into_string()),
+            Either::Left(s) => Text::from(s.to_string()),
             Either::Right(t) => *t,
         }
     }
@@ -50,16 +50,16 @@ mod tests {
     #[test]
     fn test_either_left_and_right() {
         assert_eq!(
-            std::mem::size_of::<Either<Box<str>, Box<Text<'static>>>>(),
+            std::mem::size_of::<Either<Arc<str>, Box<Text<'static>>>>(),
             16
         );
 
-        let left: Either<Box<str>, Box<Text<'static>>> = Either::Left("sample left".into());
+        let left: Either<Arc<str>, Box<Text<'static>>> = Either::Left("sample left".into());
         assert_eq!(left.to_cow(), Cow::Borrowed("sample left"));
         assert_eq!(left.as_text(), Text::from("sample left"));
         assert_eq!(left.to_text(), Text::from("sample left"));
 
-        let right: Either<Box<str>, Box<Text<'static>>> =
+        let right: Either<Arc<str>, Box<Text<'static>>> =
             Either::Right(Box::new(Text::from("sample right")));
         assert_eq!(right.to_cow(), Cow::Borrowed("sample right"));
         assert_eq!(right.as_text(), Text::from("sample right"));

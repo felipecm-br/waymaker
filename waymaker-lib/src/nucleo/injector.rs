@@ -107,17 +107,16 @@ impl<T: SSS> Injector for WorkerInjector<T> {
 pub(super) fn push_impl<T>(injector: &nucleo::Injector<T>, columns: &[Column<T>], item: T) {
     if let [col] = columns
         && col.filter
-        && let Some(raw_fn) = &col.raw
     {
         injector.push(item, |item, dst| {
             if let Some(text) = dst.first_mut() {
-                *text = raw_fn(item).into();
+                *text = col.haystack(item);
             }
         });
     } else {
         injector.push(item, |item, dst| {
             for (column, text) in columns.iter().filter(|column| column.filter).zip(dst) {
-                *text = column.raw(item).into()
+                *text = column.haystack(item)
             }
         });
     }
@@ -129,17 +128,16 @@ where
 {
     if let [col] = columns
         && col.filter
-        && let Some(raw_fn) = &col.raw
     {
         injector.extend(items, |item, dst| {
             if let Some(text) = dst.first_mut() {
-                *text = raw_fn(item).into();
+                *text = col.haystack(item);
             }
         });
     } else {
         injector.extend(items, |item, dst| {
             for (column, text) in columns.iter().filter(|column| column.filter).zip(dst) {
-                *text = column.raw(item).into()
+                *text = column.haystack(item)
             }
         });
     }
@@ -262,7 +260,7 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
 }
 
 mod ansi {
-    use std::{borrow::Cow, ops::Range};
+    use std::{borrow::Cow, ops::Range, sync::Arc};
 
     use crate::{
         nucleo::Text,
@@ -286,12 +284,12 @@ mod ansi {
         I: Injector<
             InputItem = (
                 Option<std::sync::Arc<str>>,
-                Either<Box<str>, Box<Text<'static>>>,
+                Either<Arc<str>, Box<Text<'static>>>,
             ),
         >,
     > Injector for AnsiInjector<I>
     {
-        type InputItem = (Option<std::sync::Arc<str>>, String);
+        type InputItem = (Option<std::sync::Arc<str>>, Arc<str>);
         type Inner = I;
         type Context = PreprocessOptions;
 
@@ -305,19 +303,9 @@ mod ansi {
 
         fn wrap(
             &self,
-            (group, mut item): Self::InputItem,
+            (group, item): Self::InputItem,
         ) -> Result<<Self::Inner as Injector>::InputItem, WorkerError> {
-            if self.trim {
-                item = item.trim().to_string();
-            }
-            let ret = if !self.parse {
-                Either::Left(item.into_boxed_str())
-            } else {
-                let mut parsed = item.as_bytes().into_text().unwrap_or(Text::from(item));
-                scrub_text_styles(&mut parsed);
-                Either::Right(Box::new(parsed))
-            };
-            Ok((group, ret))
+            Ok((group, preprocess(item, self.parse, self.trim)))
         }
 
         fn inner(&self) -> &Self::Inner {
@@ -332,50 +320,49 @@ mod ansi {
             let trim = self.trim;
 
             if !parse && !trim {
-                let wrapped =
-                    items.map(|(group, item)| (group, Either::Left(item.into_boxed_str())));
-                self.injector.extend(wrapped)
+                self.injector
+                    .extend(items.map(|(group, item)| (group, Either::Left(item))))
             } else if items.len() >= 256 {
                 use rayon::prelude::*;
                 let items_vec: Vec<_> = items.collect();
                 let wrapped: Vec<<Self::Inner as Injector>::InputItem> = items_vec
                     .into_par_iter()
-                    .map(|(group, mut item)| {
-                        if trim {
-                            item = item.trim().to_string();
-                        }
-                        let ret = if !parse {
-                            Either::Left(item.into_boxed_str())
-                        } else {
-                            let mut parsed =
-                                item.as_bytes().into_text().unwrap_or(Text::from(item));
-                            scrub_text_styles(&mut parsed);
-                            Either::Right(Box::new(parsed))
-                        };
-                        (group, ret)
-                    })
+                    .map(|(group, item)| (group, preprocess(item, parse, trim)))
                     .collect();
                 self.injector.extend(wrapped.into_iter())
             } else {
-                let wrapped = items.map(|(group, mut item)| {
-                    if trim {
-                        item = item.trim().to_string();
-                    }
-                    let ret = if !parse {
-                        Either::Left(item.into_boxed_str())
-                    } else {
-                        let mut parsed = item.as_bytes().into_text().unwrap_or(Text::from(item));
-                        scrub_text_styles(&mut parsed);
-                        Either::Right(Box::new(parsed))
-                    };
-                    (group, ret)
-                });
-                self.injector.extend(wrapped)
+                self.injector
+                    .extend(items.map(|(group, item)| (group, preprocess(item, parse, trim))))
             }
         }
     }
 
-    impl SegmentableItem for Either<Box<str>, Box<Text<'static>>> {
+    /// Trims and/or parses ANSI styles. Plain text stays the same `Arc<str>` (shared with the
+    /// matcher); trimming only reallocates when there is whitespace to remove.
+    fn preprocess(
+        mut item: Arc<str>,
+        parse: bool,
+        trim: bool,
+    ) -> Either<Arc<str>, Box<Text<'static>>> {
+        if trim {
+            let trimmed = item.trim();
+            if trimmed.len() != item.len() {
+                item = trimmed.into();
+            }
+        }
+        if !parse {
+            Either::Left(item)
+        } else {
+            let mut parsed = item
+                .as_bytes()
+                .into_text()
+                .unwrap_or_else(|_| Text::from(item.to_string()));
+            scrub_text_styles(&mut parsed);
+            Either::Right(Box::new(parsed))
+        }
+    }
+
+    impl SegmentableItem for Either<Arc<str>, Box<Text<'static>>> {
         fn slice(&self, range: Range<usize>) -> Text<'_> {
             match self {
                 Either::Left(s) => ratatui::text::Text::from(&s[range]),
@@ -393,6 +380,13 @@ mod ansi {
                     }
                 }
                 Either::Right(text) => text.to_string()[range].to_string().into(),
+            }
+        }
+        #[inline]
+        fn shared(&self) -> Option<&Arc<str>> {
+            match self {
+                Either::Left(s) => Some(s),
+                Either::Right(_) => None,
             }
         }
     }

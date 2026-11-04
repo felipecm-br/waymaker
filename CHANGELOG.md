@@ -12,6 +12,7 @@
 ### ⚡ Performance
 
 - Peak memory for large inputs drops by a third (2M lines: 641 → 430 MiB, and about half at 1M short lines). nucleo initialized a flag in every entry of each item bucket, including the bucket twice the size that it allocates in advance, so that whole bucket was resident while still empty. The flags now sit in a small header (nucleo now comes from the `felipecm-br/nucleo` fork, branch `waymaker`)
+- Each input line's text is stored once instead of twice: plain lines are read straight into an `Arc<str>` that the item and the matcher's haystack share (`Utf32String::Shared` in the fork). 2M lines: 430 → 345 MiB with no match, 490 → 398 MiB on a broad query; same output and speed. Lines with ANSI parsing, non-ASCII text, or a column that is only part of the line still get their own matcher copy
 - `diagram-images` cargo feature (on by default) gates the Mermaid/SVG rasterizer (`mermaid-rs-renderer`, `resvg`, `usvg`). `cargo build --release -p waymaker-cli --no-default-features -F frizbee` builds a 15.3 MB `wm` instead of 18.5 MB; diagrams then preview through the Unicode text renderer
 - Single-column fast path in ingest injector bypassing column loops when a single unformatted column is parsed
 - Non-spinning background match wait via matcher notification and `tokio::select!`
