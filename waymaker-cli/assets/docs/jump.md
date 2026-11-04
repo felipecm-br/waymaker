@@ -4,7 +4,7 @@
 
 ---
 
-## 1. What is Jump Mode & Why Matchmaker?
+## 1. What is Jump Mode & Why Waymaker?
 
 Jump Mode is designed for instant shell directory switching (`j <keyword>`) and interactive filesystem exploration.
 
@@ -33,8 +33,8 @@ Instantly generates and loads the upward ancestor directory hierarchy (from curr
 
 > [!TIP]
 > #### 🌟 Where Ancestor Jump Shines:
-> - **Monorepos & Deep Directory Trees**: When you are 5+ levels deep (e.g., `~/dev/github/matchmaker/matchmaker-lib/src/render/widgets/`) and need to jump straight to the repository root (`~/dev/github/matchmaker/`) in 1 step without hitting `h` or typing `cd ..` multiple times.
-> - **Sister Project Switching**: Ascend directly to a common root directory (e.g. `~/dev/github/` or `~/dev/`) to jump across distinct projects within the same Matchmaker session.
+> - **Monorepos & Deep Directory Trees**: When you are 5+ levels deep (e.g., `~/dev/github/waymaker/waymaker-lib/src/render/`) and need to jump straight to the repository root (`~/dev/github/matchmaker/`) in 1 step without hitting `h` or typing `cd ..` multiple times.
+> - **Sister Project Switching**: Ascend directly to a common root directory (e.g. `~/dev/github/` or `~/dev/`) to jump across distinct projects within the same Waymaker session.
 > - **Visual Context Inspection**: Audits parent directories using the live tree preview panel before selecting and jumping.
 > - **Ergonomic Hotkey**: Accessible via `U` in navigation mode (leaving `ctrl-u` unified to `Cancel` everywhere).
 
@@ -52,7 +52,7 @@ Jump Mode allows cycling between input sources on the fly using `f` or `ctrl-f`:
 
 ## 3. File Manager & File Manipulation Possibilities
 
-Matchmaker Jump Mode goes beyond simple directory jumping, supporting rich overlay actions and file operations:
+Waymaker Jump Mode goes beyond simple directory jumping, supporting rich overlay actions and file operations:
 
 ### Selection & Path Operations
 - **Smart Selection & Rewind (`Space`)**: Pressing `Space` on an unselected item selects it and steps DOWN. Pressing `Space` on an already-selected item unselects it and steps UP (rewind chain), allowing fast 1-key multi-selection and backward unselection without extra keybindings.

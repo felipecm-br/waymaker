@@ -4,11 +4,11 @@ Key Binds allow you to map user input (Triggers) to one or more operations (Acti
 
 ## Triggers
 
-A trigger is the event that activates a binding. Matchmaker supports keyboard, mouse, and semantic aliases.
+A trigger is the event that activates a binding. Waymaker supports keyboard, mouse, and semantic aliases.
 
 ### Keyboard
 
-Standard key names and combinations are supported. Matchmaker uses a very human format:
+Standard key names and combinations are supported. Waymaker uses a very human format:
 
 - **Single Keys**: `enter`, `esc`, `space`, `tab`, `backspace`, `up`, `down`, `left`, `right`, `pageup`, `pagedown`, `home`, `end`, `f1` through `f12`.
 - **Characters**: `a`, `b`, `c`, `1`, `2`, `3`, `?`, `/`, etc.
@@ -122,7 +122,7 @@ Binds defined without a mode act as fallbacks and are active in all modes unless
 
 In this example, if the mode is `vim`, `h` and `l` will move the cursor horizontally. In any other mode, they will move the selection cursor vertically.
 
-Matchmaker initializes with a default mode based on how it was started:
+Waymaker initializes with a default mode based on how it was started:
 
 - `command`: When started with a shell command.
 - `piped`: When reading from stdin.
@@ -349,4 +349,4 @@ ansi = true
 "ctrl-r" = "@reload"
 ```
 
-This example is simplified to demonstrate the special actions `Bind`, `Store`, `Transform`, and `Semantic`. You can find the full version at https://github.com/Squirreljetpack/matchmaker/blob/main/matchmaker-cli/assets/presets/rg.toml
+This example is simplified to demonstrate the special actions `Bind`, `Store`, `Transform`, and `Semantic`. You can find the full version at [`assets/presets/rg.toml`](../presets/rg.toml) (`wm -o rg`)

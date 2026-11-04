@@ -1,4 +1,4 @@
-# Matchmaker Performance Architecture & Optimization Guide
+# Waymaker Performance Architecture & Optimization Guide
 
 Waymaker (`wm`) is engineered for instant interactive filtering and TUI navigation over massive codebases and file trees (600,000+ files). This document details the architectural techniques, bottlenecks identified during development, and the engineering solutions applied to achieve zero-disk-syscall search loops and sub-millisecond response times.
 
@@ -6,7 +6,7 @@ Waymaker (`wm`) is engineered for instant interactive filtering and TUI navigati
 
 ## 1. Core Performance Architecture
 
-Matchmaker uses **Nucleo** (the high-performance fuzzy matcher engine from the Helix editor) written in Rust. The key performance principles applied across the codebase are:
+Waymaker uses **Nucleo** (the high-performance fuzzy matcher engine from the Helix editor) written in Rust. The key performance principles applied across the codebase are:
 
 1. **Zero Disk Syscalls in Critical Search Loops**: The inner comparison functions of `sort_by` and UI row renderers must operate purely on in-memory `&str` buffers without invoking filesystem I/O (`stat()`, `canonicalize()`, `read_link()`).
 2. **Deterministic Tiered Sorting**: High-priority items (direct directories and direct files) are categorized via memory-slice inspection (`slash_count`) before expensive evaluation.

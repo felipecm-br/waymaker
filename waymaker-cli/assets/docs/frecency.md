@@ -1,4 +1,4 @@
-# Matchmaker Frecency Database & Subcommand Architecture
+# Waymaker Frecency Database & Subcommand Architecture
 
 Waymaker (`wm`) includes a built-in, high-performance **Frecency** (Frequency + Recency) tracking engine designed to track, rank, and provide instant access to your most frequently and recently accessed files and directories.
 
@@ -42,8 +42,8 @@ Setting `frecency.half_life_days = 0` re-enables the legacy discrete 5-bucket we
 ## 3. Automatic Recording on Selection, Execution & Navigation
 
 When `frecency = true` (or `--frecency` / `-f`) is enabled (such as in **Jump Mode** `wm -o jump`, the default config, or shell integrations `j` / `z`):
-- **Automatic Selection & Accept Tracking**: Whenever you select/accept a directory or file in navigation mode (`nav_mode = true`) or hit `Enter`/`@accept` to pick a path, Matchmaker automatically records access via `FrecencyStore::add()`.
-- **Automatic Execution & Editor Tracking**: Whenever items are opened or executed via `Execute` (e.g. `e` / `Ctrl+E` with `Execute(nvim {+})`), `ExecuteAndQuit`, or `Become`, Matchmaker automatically registers all opened files/directories into the frecency database.
+- **Automatic Selection & Accept Tracking**: Whenever you select/accept a directory or file in navigation mode (`nav_mode = true`) or hit `Enter`/`@accept` to pick a path, Waymaker automatically records access via `FrecencyStore::add()`.
+- **Automatic Execution & Editor Tracking**: Whenever items are opened or executed via `Execute` (e.g. `e` / `Ctrl+E` with `Execute(nvim {+})`), `ExecuteAndQuit`, or `Become`, Waymaker automatically registers all opened files/directories into the frecency database.
 - **Multi-Selection Tracking**: When multiple items are selected (using <kbd>Tab</kbd>), every selected path is automatically tracked and boosted in the frecency database.
 - **Dynamic Score Growth**: Every access increases the path's access count, updates its `last_accessed` timestamp, and boosts its frecency score, making frequently visited and edited files and directories naturally climb to the top of future searches.
 - **Intentional vs Transient Selection**: Navigation hops (`ChDir` with `l`/`h`) do not pollute intermediate paths; only deliberate selection and execution actions commit access.
@@ -52,7 +52,7 @@ When `frecency = true` (or `--frecency` / `-f`) is enabled (such as in **Jump Mo
 
 ## 4. In-Memory Search Engine (`FrecencySnapshot`) & Location Bias
 
-To prevent database disk reads during active TUI fuzzy filtering, Matchmaker loads all active frecency records into an in-memory `FrecencySnapshot`:
+To prevent database disk reads during active TUI fuzzy filtering, Waymaker loads all active frecency records into an in-memory `FrecencySnapshot`:
 
 - **Zero-Allocation Lookups**: Uses `rustc_hash::FxHashMap` for absolute paths and CWD-relative resolution without heap allocations during search.
 - **Strict Exact Path Resolution**: Matches absolute paths, tilde-expanded paths (`~/...`), and paths relative to the current working directory (`self.cwd`). Generic basename boosting is omitted to avoid phantom frecency pollution across sibling repositories.
@@ -63,7 +63,7 @@ To prevent database disk reads during active TUI fuzzy filtering, Matchmaker loa
 
 ## 5. Frecency CLI Commands & Subcommands
 
-Matchmaker provides a comprehensive set of CLI subcommands for managing and inspecting the frecency database:
+Waymaker provides a comprehensive set of CLI subcommands for managing and inspecting the frecency database:
 
 ### Record & Query
 - **`wm add <path>`**: Records an access event for a file or directory path (increases score and timestamp).
@@ -117,7 +117,7 @@ For every matched candidate, Rust computes:
 
 In directories with 600,000+ files:
 - **`sort_cap`** (default `1000`, preset `2000`) restricts full CPU-intensive re-sorting to the top candidate entries.
-- If navigation extends beyond `sort_cap`, Matchmaker transparently streams Nucleo matches without UI stutter or blank screens.
+- If navigation extends beyond `sort_cap`, Waymaker transparently streams Nucleo matches without UI stutter or blank screens.
 
 ---
 
@@ -129,8 +129,8 @@ In directories with 600,000+ files:
 
 #### Example 2: Filtering in Project Directory (`/home/fecavmi/dev/github`)
 - **Query `"mat"`**:
-  - `matchmaker/` (direct folder): Tier 0 (+2B) + Frecency bonus (+300) + Nucleo prefix match -> **Score ~2,000,000,350** (**#1 Position**).
-  - `matchmaker/fecavmi/src/main.rs` (deep file): Tier 2 (0) + Depth penalty (-45) -> **Score ~850** (Ranks far below, preserving root folder navigation).
+  - `waymaker/` (direct folder): Tier 0 (+2B) + Frecency bonus (+300) + Nucleo prefix match -> **Score ~2,000,000,350** (**#1 Position**).
+  - `waymaker/waymaker-cli/src/main.rs` (deep file): Tier 2 (0) + Depth penalty (-45) -> **Score ~850** (Ranks far below, preserving root folder navigation).
 
 ---
 

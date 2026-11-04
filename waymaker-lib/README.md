@@ -1,13 +1,13 @@
-# waymaker-lib [![Crates.io](https://img.shields.io/crates/v/waymaker-lib)](https://crates.io/crates/waymaker-cli) [![License](https://img.shields.io/github/license/squirreljetpack/matchmaker)](https://github.com/squirreljetpack/matchmaker/blob/main/LICENSE)
+# waymaker-lib [![License](https://img.shields.io/github/license/felipecm-br/waymaker)](LICENSE)
 
 Waymaker is a fuzzy searcher, powered by nucleo and written in rust.
 
-![screen1](https://github.com/Squirreljetpack/matchmaker/blob/main/waymaker-lib/assets/screen1.png)
+![screen1](assets/screen1.png)
 
 ## Features
 
 - Matching with [nucleo](https://github.com/helix-editor/nucleo).
-- Declarative configuration which can be sourced from a [toml file](./waymaker-cli/assets/config.toml), or overridden using an intuitive [syntax](./waymaker-cli/assets/docs/options.md) for specifying command line options.
+- Declarative configuration which can be sourced from a [toml file](../waymaker-cli/assets/config.toml), or overridden using an intuitive [syntax](../waymaker-cli/assets/docs/options.md) for specifying command line options.
 - Interactive preview supports color, scrolling, wrapping, multiple layouts, and even entering into an interactive view.
 - [FZF](https://github.com/junegunn/fzf)-inspired actions.
 - Column support: Split input lines into multiple columns, that you can dynamically search, filter, highlight, return etc.

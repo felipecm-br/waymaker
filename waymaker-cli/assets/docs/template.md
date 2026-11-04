@@ -1,6 +1,6 @@
 # Templating Rules
 
-Matchmaker uses a template system for formatting output and executing commands.
+Waymaker uses a template system for formatting output and executing commands.
 Templates use `{}` placeholders with various modifiers to inject item data.
 
 >[!NOTE]
@@ -164,7 +164,7 @@ With the `SetStyledStatus` action, it, along with the input prompt (by `SetStyle
 You can style parts of the status line and input prompt using the `{fg,bg,..modifiers:text}` syntax.
 
 - `{red:Error:}` renders "Error:" in red.
-- `{,blue:Matchmaker}` renders "Matchmaker" in a blue background.
+- `{,blue:Waymaker}` renders "Waymaker" in a blue background.
 - `{red,bold,italic:Caution}` renders "Caution" in red, with bold and italic modifiers.
 
 ### Variables
@@ -226,7 +226,7 @@ Interactions are defined as a list of `(index, action)` pairs:
 - `index`: The 0-based horizontal character offset from the left of the UI component.
 - `action`: The name of the semantic trigger to activate (e.g., `"foo"` for `@foo`).
 
-When a region is clicked, Matchmaker finds the entry with the largest `index` that is less than or equal to the click position and triggers the associated action. An empty action string (`""`) can be used to disable interaction for a specific range.
+When a region is clicked, Waymaker finds the entry with the largest `index` that is less than or equal to the click position and triggers the associated action. An empty action string (`""`) can be used to disable interaction for a specific range.
 
 ### Example
 

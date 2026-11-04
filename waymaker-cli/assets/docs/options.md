@@ -1,6 +1,6 @@
 # Command Line Options
 
-Matchmaker allows you to override any configuration setting directly from the command line. Overrides are specified as key-value pairs following the standard arguments.
+Waymaker allows you to override any configuration setting directly from the command line. Overrides are specified as key-value pairs following the standard arguments.
 
 ## Syntax
 
@@ -265,7 +265,7 @@ All colors and modifiers come from ratatui:
     - `side`: `top`, `bottom`, `left`, `right`.
     - `percentage`: Percentage of the screen to occupy.
     - `min`, `max`: Pixel/row constraints for the preview size. On `left` or `right`, `min`/`max` restrict the preview row height. Setting `max` to 0 disables a preview layout.
-    - `scroll` *(flattened)*: Initial scroll settings for this layout. See [Initial](#initial) for available fields.
+    - `scroll` *(flattened)*: Initial scroll settings for this layout. Takes the same fields as `initial` below.
 - `border`: [Border Settings](#border-settings).
 - `initial`: Control the initial scroll offset of the preview window.
   - Alias: `i`.

@@ -1,6 +1,6 @@
 # Queries
 
-Matchmaker uses a powerful fuzzy matcher (based on Nucleo) to filter and rank items. It implements fzf-style scoring with smart case, consecutive match boosting, and start-of-word preference.
+Waymaker uses a powerful fuzzy matcher (based on Nucleo) to filter and rank items. It implements fzf-style scoring with smart case, consecutive match boosting, and start-of-word preference.
 
 ---
 
