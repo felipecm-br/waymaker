@@ -26,6 +26,22 @@ Prefer linking to existing docs instead of restating them:
 - When changing picker behavior, trace the path through event -> action -> renderer/handler rather than only editing a UI surface.
 - Treat `waymaker-partial-macros` as sensitive code: prefer small changes and validate with targeted tests because the generated behavior is easy to regress.
 
+## Refactoring Safely
+
+Large functions are split by moving code unchanged, then proving it unchanged:
+
+- `scripts/extract_arm.py` moves one `match` arm's body into a function; `scripts/extract_arms.py` moves a run of arms into a function that matches on them. Both flag `.await`, `return`, `?`, `break` and `continue` for review.
+- `scripts/verify_move.py --old HEAD:<file> --new <file> --fn <name>...` checks each new function's body appears verbatim in the old code (whitespace-insensitive). Run it before committing a move.
+- `scripts/fn_lengths.py [N]` lists functions of at least N lines.
+
+Behaviour guards, all in `cargo test`:
+
+- `waymaker-cli/tests/golden.rs`: full styled-screen snapshots of the real binary (layout, cursor, colours). After an intended change, review it with `cargo insta review`; never accept snapshots blindly.
+- `test_bind_tables_snapshot` in `waymaker-cli/src/config.rs`: every bind of the default config and of each preset.
+- `waymaker-cli/tests/pty.rs`: key-sequence tests for the filter and for navigation mode (`jump`).
+
+`scripts/regress.py OLD_WM NEW_WM` compares two release binaries (`wm -f` output, peak memory, speed); CI's `regress` job runs it against the base commit. Use it for any change to matching, ingest or rendering.
+
 ## Commit Policy
 
 - After implementing a feature, fix, or alteration, ensure the global build (`just install`) succeeds, then create a git commit for that change.

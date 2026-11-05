@@ -120,6 +120,45 @@ jobs:
       - name: Clippy (wm without diagram-images)
         run: cargo clippy -p waymaker-cli --all-targets --no-default-features -F frizbee --locked -- -D warnings
 
+  # Old vs new binary on the same 500k-line input: `wm -f` output must be identical, peak RSS
+  # may grow at most 10%, and only a large slowdown fails (see scripts/regress.py).
+  regress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # Same settings for both builds; thin LTO keeps two release builds affordable.
+      CARGO_PROFILE_RELEASE_LTO: thin
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+      BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Build new (this commit)
+        run: |
+          cargo build --release -p waymaker-cli --locked
+          cp target/release/wm "$RUNNER_TEMP/wm-new"
+      - name: Build old (${{ env.BASE }})
+        id: base
+        run: |
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No base commit to compare with; skipping."; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          git worktree add "$RUNNER_TEMP/base" "$BASE"
+          cargo build --release -p waymaker-cli --locked \
+            --manifest-path "$RUNNER_TEMP/base/Cargo.toml" --target-dir target
+          cp target/release/wm "$RUNNER_TEMP/wm-old"
+      - name: Compare
+        if: steps.base.outputs.skip != 'true'
+        # An explicit bash shell runs with pipefail, so the script's exit status survives `tee`.
+        shell: bash
+        run: |
+          python3 scripts/regress.py "$RUNNER_TEMP/wm-old" "$RUNNER_TEMP/wm-new" --markdown \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   bench:
     runs-on: ubuntu-latest
     timeout-minutes: 15
