@@ -5,6 +5,9 @@ use cba::{
 };
 use std::{fs::OpenOptions, path::Path};
 
+/// Size at which the log starts over.
+const LOG_MAX_BYTES: u64 = 5 * 1024 * 1024;
+
 pub fn init_logger([q, v]: [u8; 2], log_path: &Path) {
     bog::init_bogger(true, true);
     bog::init_filter((4 + v).saturating_sub(q));
@@ -41,8 +44,12 @@ pub fn init_logger([q, v]: [u8; 2], log_path: &Path) {
 
     log_path.parent().map(cba::bs::create_dir);
 
+    // Append, so a `wm` started by this one (a preview, `wm list`, a reload command) adds to
+    // the log instead of wiping it; start afresh only once the file passes LOG_MAX_BYTES.
+    let fresh = std::fs::metadata(log_path).is_ok_and(|m| m.len() > LOG_MAX_BYTES);
     if let Some(log_file) = OpenOptions::new()
-        .truncate(true)
+        .append(!fresh)
+        .truncate(fresh)
         .write(true)
         .create(true)
         .open(log_path)
