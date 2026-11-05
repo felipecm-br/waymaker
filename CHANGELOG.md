@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### 🐛 Bug Fixes
+
+- A query made only of exclusions (`!apple`, `!a !b`) matched nothing; like fzf it now lists every item without those terms, in `wm -f` and in the picker (nucleo fork `b6b254c`, the upstream fix)
+- With a Markdown file (or, with `--media`, an image) under the cursor, `wm` redrew the screen about 30 times a second while idle; the preview now renders once
+
 ## [0.7.0] - 2026-11-04
 
 ### 🚀 Features

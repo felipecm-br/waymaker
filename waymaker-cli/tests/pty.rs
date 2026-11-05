@@ -463,3 +463,33 @@ fn escape_closes_help_before_quitting() {
     wm.send(ENTER);
     assert_eq!(wm.finish(), (0, "apple\n".to_string()));
 }
+
+#[test]
+fn filter_with_only_negative_terms_lists_the_rest() {
+    // `!apple` alone used to match nothing (a pure negation scores 0, which was read as "no
+    // match"); like fzf it lists every line without "apple".
+    let run = |query: &str| {
+        let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_wm"))
+            .args([
+                "--config",
+                concat!(env!("CARGO_MANIFEST_DIR"), "/assets/config.toml"),
+            ])
+            .args(["-f", query])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        use std::io::Write;
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(b"apple\nbanana\ncherry\napple tart\n")
+            .unwrap();
+        String::from_utf8(child.wait_with_output().unwrap().stdout).unwrap()
+    };
+    assert_eq!(run("!apple"), "banana\ncherry\n");
+    assert_eq!(run("!apple !cherry"), "banana\n");
+    assert_eq!(run("apple !tart"), "apple\n");
+}

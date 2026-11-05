@@ -1955,7 +1955,7 @@ dependencies = [
 [[package]]
 name = "nucleo"
 version = "0.5.0"
-source = "git+https://github.com/felipecm-br/nucleo?branch=waymaker#f0f2395531dc26ca2abfdb8c753ddfae1e005e6b"
+source = "git+https://github.com/felipecm-br/nucleo?branch=waymaker#b6b254c176b237ad52d038a17aa860800b3fa46c"
 dependencies = [
  "log",
  "nucleo-matcher",
@@ -1966,7 +1966,7 @@ dependencies = [
 [[package]]
 name = "nucleo-matcher"
 version = "0.3.1"
-source = "git+https://github.com/felipecm-br/nucleo?branch=waymaker#f0f2395531dc26ca2abfdb8c753ddfae1e005e6b"
+source = "git+https://github.com/felipecm-br/nucleo?branch=waymaker#b6b254c176b237ad52d038a17aa860800b3fa46c"
 dependencies = [
  "memchr",
  "unicode-segmentation",
