@@ -336,3 +336,130 @@ fn markdown_preview_goes_idle() {
     );
     wm.send(ESC);
 }
+
+// ---- Navigation-mode key contract (the jump preset over real files) ----
+
+const TREE: &[(&str, &str)] = &[
+    ("alpha/one.txt", "1\n"),
+    ("beta/three.txt", "3\n"),
+    ("gamma/", ""),
+    ("top.md", "# top\n"),
+];
+
+/// The jump preset draws inline in 43% of the terminal height, so give it room for every entry.
+fn jump() -> Session {
+    let (rows, cols) = (50, 100);
+    Launch::new("")
+        .files(TREE)
+        .no_input()
+        .args(&["-o", "jump"])
+        .size(rows, cols)
+        .ready("top.md")
+        .start()
+}
+
+/// Puts the cursor on the first item matching `query`, then gives focus back to the list.
+fn nav_to(wm: &Session, query: &str) {
+    wm.send("/");
+    wm.send("\x15"); // ctrl-u: clear the query
+    wm.send(query);
+    wm.send(ESC); // back to the list (ToggleFocus), keeping the filter
+}
+
+#[test]
+fn jump_l_enters_and_h_returns_to_the_directory_left() {
+    let wm = jump();
+    nav_to(&wm, "alpha");
+    wm.send("l");
+    wm.wait_for(|t| t.contains("one.txt"));
+    wm.send("h");
+    wm.wait_for(|t| t.contains("top.md"));
+    // The cursor is back on the directory we came out of.
+    wm.send(ENTER);
+    let (code, out) = wm.finish();
+    assert_eq!(code, 0);
+    assert!(
+        out.trim_end().trim_end_matches('/').ends_with("alpha"),
+        "{out:?}"
+    );
+}
+
+#[test]
+fn jump_yank_paste_then_undo() {
+    let wm = jump();
+    let work = wm.dir.path().join("work");
+    nav_to(&wm, "top.md");
+    wm.send("y");
+    nav_to(&wm, "gamma");
+    wm.send("l"); // into the empty gamma/
+    wm.send("p");
+    let pasted = work.join("gamma/top.md");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !pasted.exists() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(pasted.exists(), "p did not paste into gamma/");
+    assert!(
+        work.join("top.md").exists(),
+        "a yank (copy) must keep the original"
+    );
+    wm.send("u");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while pasted.exists() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(!pasted.exists(), "u did not undo the paste");
+    assert!(work.join("top.md").exists());
+    // Quit (ctrl-c, and `q` in nav mode) is a cascade: it closes the "Undone ..." box, then
+    // clears the restored yank marks, then exits. See ctrl_c_quits_at_once.
+    for _ in 0..3 {
+        wm.send("\x03");
+    }
+    assert_eq!(wm.finish().0, 130);
+}
+
+/// Gets to the state after `u` undid a paste: the "Undone ..." box is up and the yank of
+/// top.md is restored.
+fn after_undo() -> Session {
+    let wm = jump();
+    nav_to(&wm, "top.md");
+    wm.send("y");
+    nav_to(&wm, "gamma");
+    wm.send("l");
+    wm.send("p");
+    wm.send("u");
+    wm
+}
+
+#[test]
+#[ignore = "open question: ctrl-c runs the Quit cascade instead of exiting at once"]
+fn ctrl_c_quits_at_once() {
+    // Quit closes the action box, then clears selections, yank marks and cut marks before it
+    // exits, so after an undo ctrl-c (and nav-mode `q`) needs three presses, and up to five in
+    // general. fzf and most TUIs exit on the first ctrl-c; `esc` (@unwind) is the cascade.
+    let wm = after_undo();
+    wm.send("\x03");
+    assert_eq!(wm.finish().0, 130);
+}
+
+#[test]
+fn jump_f_switches_to_frecency_and_tab_cycles_back() {
+    let wm = jump();
+    wm.send("f"); // frecency: only the directory wm was started in
+    wm.wait_for_screen(|t| t.contains("\u{f0abb}")); // the frecency folder icon in the list
+    wm.send(TAB); // next source (bookmarks: empty)
+    wm.send(TAB); // and back to the local listing
+    wm.wait_for_screen(|t| !t.contains("\u{f0abb}") && t.contains("top.md"));
+    wm.send("q");
+    assert_eq!(wm.finish().0, 130);
+}
+
+#[test]
+fn escape_closes_help_before_quitting() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send("\x1bOP"); // F1
+    wm.wait_for(|t| t.to_lowercase().contains("help"));
+    wm.send(ESC); // closes help, does not quit
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+}

@@ -247,6 +247,26 @@ impl Session {
         String::from_utf8_lossy(&self.screen.lock().unwrap()).into_owned()
     }
 
+    /// The text on screen right now (unlike [`Session::screen_text`], which is every byte
+    /// `wm` has written so far).
+    pub fn current_screen(&self) -> String {
+        let (rows, cols) = self.size;
+        let mut parser = vt100::Parser::new(rows.try_into().unwrap(), cols.try_into().unwrap(), 0);
+        parser.process(&self.screen.lock().unwrap());
+        parser.screen().contents()
+    }
+
+    /// Wait until the text on screen right now satisfies `ready`.
+    pub fn wait_for_screen(&self, ready: impl Fn(&str) -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !ready(&self.current_screen()) {
+            if Instant::now() > deadline {
+                panic!("screen never matched; it shows:\n{}", self.current_screen());
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+
     /// The current screen as a terminal shows it: the text rows, then every run of cells with
     /// non-default style (`row: cols attrs`). The session's temporary directory is written as
     /// `$DIR`, so snapshots do not depend on where the test runs.
