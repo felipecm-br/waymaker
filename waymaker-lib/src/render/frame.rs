@@ -482,6 +482,184 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
         }
     }
 
+    draw_footer(
+        frame,
+        FooterCtx {
+            footer,
+            has_footer_separator,
+            preview,
+            picker_area,
+            parent_peek_rect,
+            show_sort_menu,
+            show_nav_hints,
+            is_filter_mode,
+            state,
+            ui,
+            preview_ui,
+            footer_ui,
+            picker_ui,
+        },
+    );
+    draw_preview(
+        frame,
+        preview_ui,
+        state,
+        picker_ui,
+        preview,
+        gap_area,
+        mouse_hover,
+    );
+    if let Some(x) = overlay_ui_ref {
+        x.draw(frame);
+    }
+    if crate::ui::no_color() {
+        crate::ui::strip_colors(frame.buffer_mut());
+    }
+}
+
+/// Draws the preview pane (titled with the current item), and over the gap between it and the
+/// results the drag-hover shadow and the cut / yank / selected counters.
+fn draw_preview<T: SSS, S: Selection>(
+    frame: &mut Frame,
+    preview_ui: &mut Option<PreviewUI>,
+    state: &mut State,
+    picker_ui: &PickerUI<'_, T, S>,
+    preview: Rect,
+    gap_area: Rect,
+    mouse_hover: Option<Position>,
+) {
+    if let Some(preview_ui) = preview_ui.as_mut() {
+        state.update_preview_visible(preview_ui);
+        if preview_ui.visible() {
+            // Set the dynamic title from the first column of the current item.
+            let item_title = picker_ui
+                .worker
+                .get_nth(picker_ui.results.index())
+                .map(|item| picker_ui.worker.columns[0].raw(item).into_owned());
+            preview_ui.set_title(item_title);
+            render_preview(frame, preview, preview_ui);
+
+            // Highlight the gap area when the mouse is hovering over it.
+            if !gap_area.is_empty() {
+                let is_hovered = mouse_hover.is_some_and(|p| gap_area.contains(p));
+                let is_dragging = state.dragging.is_some();
+                if is_hovered || is_dragging {
+                    let buf = frame.buffer_mut();
+                    let shadow_style = Style::default().bg(Color::DarkGray);
+                    for y in gap_area.top()..gap_area.bottom() {
+                        for x in gap_area.left()..gap_area.right() {
+                            if let Some(cell) = buf.cell_mut((x, y)) {
+                                cell.set_char(' ');
+                                cell.set_style(shadow_style);
+                            }
+                        }
+                    }
+                }
+
+                // Counter bar: render cut / yank / selected counts.
+                // - suppress selected if fully covered by yank (same count)
+                // - suppress yank    if fully covered by cut  (same count)
+                // - single group → one horizontal row
+                // - multiple groups → stacked vertically, one row per group
+                // - positioned 5 rows from the bottom of the gap
+                let sel_raw = picker_ui.selector.len();
+                let yank_raw = picker_ui.results.yank_paths.len();
+                let cut_raw = picker_ui.results.cut_paths.len();
+
+                let show_cut = cut_raw > 0;
+                let show_yank = yank_raw > 0 && yank_raw != cut_raw;
+                let show_sel = sel_raw > 0 && sel_raw != yank_raw && sel_raw != cut_raw;
+
+                // Collect the groups to render (cut first = highest priority).
+                let rcfg = &picker_ui.results.config;
+                let groups: Vec<(usize, Color)> = [
+                    show_cut.then(|| (cut_raw, rcfg.cut_prefix_style.fg.unwrap_or(Color::Red))),
+                    show_yank
+                        .then(|| (yank_raw, rcfg.yank_prefix_style.fg.unwrap_or(Color::Yellow))),
+                    show_sel.then(|| {
+                        (
+                            sel_raw,
+                            rcfg.selected_prefix_style.fg.unwrap_or(Color::Cyan),
+                        )
+                    }),
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+
+                if !groups.is_empty() {
+                    let n_rows = groups.len() as u16;
+                    // Position from the top of the gap using the configured offset.
+                    let offset_from_top = preview_ui
+                        .setting()
+                        .map(|s| s.layout.gap_counter_offset)
+                        .unwrap_or(0);
+                    let start_y = (gap_area.y + offset_from_top)
+                        .min(gap_area.y + gap_area.height.saturating_sub(n_rows));
+
+                    for (row_idx, (count, bg)) in groups.iter().enumerate() {
+                        let row_y = start_y + row_idx as u16;
+                        if row_y >= gap_area.y + gap_area.height {
+                            break;
+                        }
+                        let row_rect = Rect {
+                            x: gap_area.x,
+                            y: row_y,
+                            width: gap_area.width,
+                            height: 1,
+                        };
+                        let span = Span::styled(
+                            format!(" {} ", count),
+                            Style::default().fg(Color::Black).bg(*bg),
+                        );
+                        frame.render_widget(
+                            Paragraph::new(Line::from(span))
+                                .alignment(ratatui::layout::Alignment::Center),
+                            row_rect,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// What [`draw_footer`] reads; field names are the `draw_frame` locals it was moved from.
+struct FooterCtx<'r, 'a, T: SSS, S: Selection> {
+    footer: Rect,
+    has_footer_separator: bool,
+    preview: Rect,
+    picker_area: Rect,
+    parent_peek_rect: Rect,
+    show_sort_menu: bool,
+    show_nav_hints: bool,
+    is_filter_mode: bool,
+    state: &'r State,
+    ui: &'r UI,
+    preview_ui: &'r Option<PreviewUI>,
+    footer_ui: &'r mut DisplayUI,
+    picker_ui: &'r PickerUI<'a, T, S>,
+}
+
+/// Draws the footer row: the separator line (with junctions where the preview and parent-peek
+/// borders meet it), then the preview's nav hints, the sort menu, the nav hints, or the
+/// footer content.
+fn draw_footer<T: SSS, S: Selection>(frame: &mut Frame, cx: FooterCtx<'_, '_, T, S>) {
+    let FooterCtx {
+        footer,
+        has_footer_separator,
+        preview,
+        picker_area,
+        parent_peek_rect,
+        show_sort_menu,
+        show_nav_hints,
+        is_filter_mode,
+        state,
+        ui,
+        preview_ui,
+        footer_ui,
+        picker_ui,
+    } = cx;
     if footer.height > 0 {
         let (separator_rect, content_rect) = if has_footer_separator && footer.height > 1 {
             (
@@ -588,106 +766,6 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
                 render_display(frame, content_rect, footer_ui, &picker_ui.results);
             }
         }
-    }
-    if let Some(preview_ui) = preview_ui.as_mut() {
-        state.update_preview_visible(preview_ui);
-        if preview_ui.visible() {
-            // Set the dynamic title from the first column of the current item.
-            let item_title = picker_ui
-                .worker
-                .get_nth(picker_ui.results.index())
-                .map(|item| picker_ui.worker.columns[0].raw(item).into_owned());
-            preview_ui.set_title(item_title);
-            render_preview(frame, preview, preview_ui);
-
-            // Highlight the gap area when the mouse is hovering over it.
-            if !gap_area.is_empty() {
-                let is_hovered = mouse_hover.is_some_and(|p| gap_area.contains(p));
-                let is_dragging = state.dragging.is_some();
-                if is_hovered || is_dragging {
-                    let buf = frame.buffer_mut();
-                    let shadow_style = Style::default().bg(Color::DarkGray);
-                    for y in gap_area.top()..gap_area.bottom() {
-                        for x in gap_area.left()..gap_area.right() {
-                            if let Some(cell) = buf.cell_mut((x, y)) {
-                                cell.set_char(' ');
-                                cell.set_style(shadow_style);
-                            }
-                        }
-                    }
-                }
-
-                // Counter bar: render cut / yank / selected counts.
-                // - suppress selected if fully covered by yank (same count)
-                // - suppress yank    if fully covered by cut  (same count)
-                // - single group → one horizontal row
-                // - multiple groups → stacked vertically, one row per group
-                // - positioned 5 rows from the bottom of the gap
-                let sel_raw = picker_ui.selector.len();
-                let yank_raw = picker_ui.results.yank_paths.len();
-                let cut_raw = picker_ui.results.cut_paths.len();
-
-                let show_cut = cut_raw > 0;
-                let show_yank = yank_raw > 0 && yank_raw != cut_raw;
-                let show_sel = sel_raw > 0 && sel_raw != yank_raw && sel_raw != cut_raw;
-
-                // Collect the groups to render (cut first = highest priority).
-                let rcfg = &picker_ui.results.config;
-                let groups: Vec<(usize, Color)> = [
-                    show_cut.then(|| (cut_raw, rcfg.cut_prefix_style.fg.unwrap_or(Color::Red))),
-                    show_yank
-                        .then(|| (yank_raw, rcfg.yank_prefix_style.fg.unwrap_or(Color::Yellow))),
-                    show_sel.then(|| {
-                        (
-                            sel_raw,
-                            rcfg.selected_prefix_style.fg.unwrap_or(Color::Cyan),
-                        )
-                    }),
-                ]
-                .into_iter()
-                .flatten()
-                .collect();
-
-                if !groups.is_empty() {
-                    let n_rows = groups.len() as u16;
-                    // Position from the top of the gap using the configured offset.
-                    let offset_from_top = preview_ui
-                        .setting()
-                        .map(|s| s.layout.gap_counter_offset)
-                        .unwrap_or(0);
-                    let start_y = (gap_area.y + offset_from_top)
-                        .min(gap_area.y + gap_area.height.saturating_sub(n_rows));
-
-                    for (row_idx, (count, bg)) in groups.iter().enumerate() {
-                        let row_y = start_y + row_idx as u16;
-                        if row_y >= gap_area.y + gap_area.height {
-                            break;
-                        }
-                        let row_rect = Rect {
-                            x: gap_area.x,
-                            y: row_y,
-                            width: gap_area.width,
-                            height: 1,
-                        };
-                        let span = Span::styled(
-                            format!(" {} ", count),
-                            Style::default().fg(Color::Black).bg(*bg),
-                        );
-                        frame.render_widget(
-                            Paragraph::new(Line::from(span))
-                                .alignment(ratatui::layout::Alignment::Center),
-                            row_rect,
-                        );
-                    }
-                }
-            }
-        }
-    }
-    if let Some(x) = overlay_ui_ref {
-        x.draw(frame);
-    }
-    if crate::ui::no_color() {
-        crate::ui::strip_colors(frame.buffer_mut());
     }
 }
 
