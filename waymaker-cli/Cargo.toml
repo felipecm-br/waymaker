@@ -67,5 +67,7 @@ experimental = [
 ]
 
 [dev-dependencies]
+insta = "1.49.0"
 portable-pty = "0.9"
 tempfile = "3"
+vt100 = "0.18.1"
