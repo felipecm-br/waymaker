@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
 
 ## Acknowledgements
 
-Waymaker is a fork of [matchmaker](https://github.com/Squirreljetpack/matchmaker) by Squirreljetpack, which provides the matcher integration, the partial-merge config and the override syntax. It borrows ideas from [fzf](https://github.com/junegunn/fzf), [television](https://github.com/alexpasmantier/television), [zoxide](https://github.com/ajeetdsouza/zoxide), [mcat](https://github.com/Skardyy/mcat), [sesh](https://github.com/joshmedeski/sesh) and [yazi](https://github.com/sxyazi/yazi), and is built on [nucleo](https://github.com/helix-editor/nucleo) and [ratatui](https://github.com/ratatui/ratatui).
+Waymaker is developed by [felipecm-br](https://github.com/felipecm-br). It began as a fork of [matchmaker](https://github.com/Squirreljetpack/matchmaker) by Squirreljetpack, which provided the matcher integration, the partial-merge config and the override syntax. It borrows ideas from [fzf](https://github.com/junegunn/fzf), [television](https://github.com/alexpasmantier/television), [zoxide](https://github.com/ajeetdsouza/zoxide), [mcat](https://github.com/Skardyy/mcat), [sesh](https://github.com/joshmedeski/sesh) and [yazi](https://github.com/sxyazi/yazi), and is built on [nucleo](https://github.com/helix-editor/nucleo) and [ratatui](https://github.com/ratatui/ratatui).
 
 ## License
 

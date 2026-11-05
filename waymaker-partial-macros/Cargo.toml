@@ -1,6 +1,7 @@
 [package]
 name = "waymaker-partial-macros"
 version = "0.0.30"
+authors = ["felipecm-br"]
 edition = "2024"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/felipecm-br/waymaker"
