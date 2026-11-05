@@ -1,0 +1,25 @@
+---
+source: waymaker-cli/tests/golden.rs
+expression: wm.styled_screen()
+---
+ 0|
+ 1| >                           README.md
+ 2|      6/6
+ 3|     README.md
+ 4|     notes.txt
+ 5|     Cargo.toml
+ 6|     src/main.rs
+ 7|     scripts/run.sh
+ 8|       enter accept
+ 9|
+10|
+11|
+-- styles --
+ 1: 1-2 fg=7
+ 2: 1-8 fg=2 italic
+ 3: 3 bold | 4 fg=4 bold | 5-28 bold
+ 4: 4 fg=7
+ 5: 4 fg=1
+ 6: 4 fg=1
+ 7: 4 fg=2
+ 8: 1-6 fg=6 | 7-11 fg=6 bold | 12 fg=6 | 13-18 fg=8 | 19-28 fg=6
