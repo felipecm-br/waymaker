@@ -53,79 +53,9 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     let full_width_footer =
         footer_ui.is_single_column() && footer_ui.config.row_connection == RowConnectionStyle::Full;
 
-    let mut breadcrumb_spans = Vec::new();
-    let mut is_global_breadcrumb = false;
-    let mut global_breadcrumb_rect = Rect::default();
-
-    if picker_ui.breadcrumb_config.show
-        && let Some(ref cwd) = state.cached_cwd
-    {
-        let mut components = Vec::new();
-        let home_dir = std::env::var("HOME").ok().map(std::path::PathBuf::from);
-
-        if let Some(home) = home_dir
-            && let Ok(stripped) = cwd.strip_prefix(&home)
-        {
-            components.push("~".to_string());
-            for comp in stripped.components() {
-                components.push(comp.as_os_str().to_string_lossy().to_string());
-            }
-        }
-
-        if components.is_empty() {
-            for comp in cwd.components() {
-                components.push(comp.as_os_str().to_string_lossy().to_string());
-            }
-        }
-
-        if picker_ui.breadcrumb_config.current_folder_only && !components.is_empty() {
-            let last = components.pop().unwrap();
-            components.clear();
-            components.push(last);
-        }
-
-        let truncate_len = picker_ui.breadcrumb_config.truncate_length;
-        let num_components = components.len();
-        let mut breadcrumb_width = 0;
-
-        for (i, mut text) in components.into_iter().enumerate() {
-            if truncate_len > 0
-                && i < num_components.saturating_sub(1)
-                && text != "~"
-                && text.chars().count() > truncate_len
-            {
-                text = text.chars().take(truncate_len).collect();
-            }
-
-            breadcrumb_width += text.chars().count() as u16;
-            breadcrumb_spans.push(ratatui::text::Span::styled(
-                text,
-                ratatui::style::Style::from(picker_ui.breadcrumb_config.style),
-            ));
-            if i < num_components - 1 {
-                let sep = picker_ui.breadcrumb_config.separator.clone();
-                breadcrumb_width += sep.chars().count() as u16;
-                breadcrumb_spans.push(ratatui::text::Span::styled(
-                    sep,
-                    ratatui::style::Style::from(picker_ui.breadcrumb_config.separator_style),
-                ));
-            }
-        }
-
-        // Determine if we need global breadcrumb
-        let has_preview = preview_ui.as_ref().is_some_and(|p| p.visible());
-        let picker_w = if has_preview {
-            let [_, p_area, _] = preview_ui.as_ref().unwrap().split(_area);
-            p_area.width
-        } else {
-            _area.width
-        };
-
-        if has_preview || breadcrumb_width > picker_w {
-            is_global_breadcrumb = true;
-            global_breadcrumb_rect = split(&mut _area, 1, !picker_ui.reverse());
-        }
-    }
+    let (breadcrumb_spans, is_global_breadcrumb, global_breadcrumb_rect, area_left) =
+        breadcrumb_layout(picker_ui, state, preview_ui, _area);
+    _area = area_left;
 
     let is_filter_mode = state.focus == Focus::Input;
     let show_sort_menu = state.sort_menu_active;
@@ -759,4 +689,94 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     if crate::ui::no_color() {
         crate::ui::strip_colors(frame.buffer_mut());
     }
+}
+
+/// The breadcrumb (the working directory, `~`-shortened, truncated and styled per
+/// `[breadcrumb]`), whether it needs its own full-width row (a preview is visible, or it is wider
+/// than the picker), that row, and the area left below it.
+fn breadcrumb_layout<T: SSS, S: Selection>(
+    picker_ui: &PickerUI<'_, T, S>,
+    state: &State,
+    preview_ui: &Option<PreviewUI>,
+    mut _area: Rect,
+) -> (Vec<ratatui::text::Span<'static>>, bool, Rect, Rect) {
+    let mut breadcrumb_spans = Vec::new();
+    let mut is_global_breadcrumb = false;
+    let mut global_breadcrumb_rect = Rect::default();
+
+    if picker_ui.breadcrumb_config.show
+        && let Some(ref cwd) = state.cached_cwd
+    {
+        let mut components = Vec::new();
+        let home_dir = std::env::var("HOME").ok().map(std::path::PathBuf::from);
+
+        if let Some(home) = home_dir
+            && let Ok(stripped) = cwd.strip_prefix(&home)
+        {
+            components.push("~".to_string());
+            for comp in stripped.components() {
+                components.push(comp.as_os_str().to_string_lossy().to_string());
+            }
+        }
+
+        if components.is_empty() {
+            for comp in cwd.components() {
+                components.push(comp.as_os_str().to_string_lossy().to_string());
+            }
+        }
+
+        if picker_ui.breadcrumb_config.current_folder_only && !components.is_empty() {
+            let last = components.pop().unwrap();
+            components.clear();
+            components.push(last);
+        }
+
+        let truncate_len = picker_ui.breadcrumb_config.truncate_length;
+        let num_components = components.len();
+        let mut breadcrumb_width = 0;
+
+        for (i, mut text) in components.into_iter().enumerate() {
+            if truncate_len > 0
+                && i < num_components.saturating_sub(1)
+                && text != "~"
+                && text.chars().count() > truncate_len
+            {
+                text = text.chars().take(truncate_len).collect();
+            }
+
+            breadcrumb_width += text.chars().count() as u16;
+            breadcrumb_spans.push(ratatui::text::Span::styled(
+                text,
+                ratatui::style::Style::from(picker_ui.breadcrumb_config.style),
+            ));
+            if i < num_components - 1 {
+                let sep = picker_ui.breadcrumb_config.separator.clone();
+                breadcrumb_width += sep.chars().count() as u16;
+                breadcrumb_spans.push(ratatui::text::Span::styled(
+                    sep,
+                    ratatui::style::Style::from(picker_ui.breadcrumb_config.separator_style),
+                ));
+            }
+        }
+
+        // Determine if we need global breadcrumb
+        let has_preview = preview_ui.as_ref().is_some_and(|p| p.visible());
+        let picker_w = if has_preview {
+            let [_, p_area, _] = preview_ui.as_ref().unwrap().split(_area);
+            p_area.width
+        } else {
+            _area.width
+        };
+
+        if has_preview || breadcrumb_width > picker_w {
+            is_global_breadcrumb = true;
+            global_breadcrumb_rect = split(&mut _area, 1, !picker_ui.reverse());
+        }
+    }
+    (
+        breadcrumb_spans,
+        is_global_breadcrumb,
+        global_breadcrumb_rect,
+        _area,
+    )
 }
