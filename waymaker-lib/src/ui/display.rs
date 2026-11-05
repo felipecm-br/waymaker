@@ -155,11 +155,25 @@ impl DisplayUI {
 
         let (cells, height) = if self.is_single_column() {
             // Single Cell (Full Width)
-            let text = wrap_text(
+            let mut text = wrap_text(
                 self.text[0].clone(),
                 if self.config.wrap { self.width } else { 0 },
             )
             .0;
+            // The table cell is as wide as the results' first column, which can be narrower than
+            // the footer; fit to that too, so this copy never shows past the full-width row
+            // drawn over it (make_full_width_row).
+            let cell_width = widths
+                .first()
+                .copied()
+                .filter(|w| *w > 0)
+                .unwrap_or(self.width);
+            let limit = self.width.min(cell_width);
+            if !self.config.wrap && limit > 0 {
+                for line in &mut text.lines {
+                    *line = fit_line(std::mem::take(line), limit as usize);
+                }
+            }
             let cells = vec![Cell::from(text)];
             let height = self.text[0].height() as u16;
 
@@ -257,10 +271,58 @@ impl DisplayUI {
             bottom,
         });
 
-        Paragraph::new(self.text[0].clone())
-            .block(block)
-            .style(self.config.style)
+        let mut text = self.text[0].clone();
+        let available = (self.width + self.config.border.width()).saturating_sub(left + right);
+        if !self.config.wrap && available > 0 {
+            for line in &mut text.lines {
+                *line = fit_line(std::mem::take(line), available as usize);
+            }
+        }
+        Paragraph::new(text).block(block).style(self.config.style)
     }
+}
+
+/// Shortens a line that does not fit in `width`. When it is a hint bar with `│` (or `|`)
+/// separators, whole segments are dropped from the end, so the bar ends on a complete hint
+/// (key and label); otherwise whole spans are. Trailing blank and separator spans go too, so
+/// the result never ends in a word cut in half or a dangling separator.
+fn fit_line(mut line: Line<'static>, width: usize) -> Line<'static> {
+    if line.width() <= width {
+        return line;
+    }
+    let is_sep = |span: &ratatui::text::Span| matches!(span.content.trim(), "│" | "|");
+    let mut used = 0;
+    let mut keep = 0;
+    if line.spans.iter().any(is_sep) {
+        // Keep spans up to the last separator before the overflow: whole segments only.
+        for (i, span) in line.spans.iter().enumerate() {
+            used += span.width();
+            if used > width {
+                break;
+            }
+            if is_sep(span) {
+                keep = i;
+            }
+        }
+    } else {
+        keep = line
+            .spans
+            .iter()
+            .take_while(|span| {
+                used += span.width();
+                used <= width
+            })
+            .count();
+    }
+    line.spans.truncate(keep);
+    while line
+        .spans
+        .last()
+        .is_some_and(|span| span.content.trim().is_empty() || is_sep(span))
+    {
+        line.spans.pop();
+    }
+    line
 }
 
 fn parse_content_to_text(s: &str) -> Text<'static> {
@@ -275,6 +337,30 @@ fn parse_content_to_text(s: &str) -> Text<'static> {
 mod tests {
     use super::*;
     use ratatui::style::{Color, Modifier};
+
+    #[test]
+    fn test_fit_line_drops_whole_hints_and_trailing_separators() {
+        let line = crate::ui::StatusUI::parse_template_to_status_line(
+            " {cyan,bold:enter} {darkgray:accept} {darkgray:│} {cyan,bold:tab} {darkgray:mark} {darkgray:│} {cyan,bold:ctrl-p} {darkgray:preview}",
+        );
+        let text = |l: &Line| {
+            l.spans
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect::<String>()
+        };
+        assert_eq!(text(&fit_line(line.clone(), 100)), text(&line));
+        // 30 columns reach "ctrl-p" but not its label: the whole "ctrl-p preview" hint goes.
+        assert_eq!(
+            text(&fit_line(line.clone(), 30)),
+            " enter accept │ tab mark"
+        );
+        assert_eq!(text(&fit_line(line.clone(), 3)), "");
+        // Without separators, whole spans are dropped.
+        let plain =
+            crate::ui::StatusUI::parse_template_to_status_line("{cyan:one} {cyan:two} three");
+        assert_eq!(text(&fit_line(plain, 9)), "one two");
+    }
 
     #[test]
     fn test_set_styled_parses_the_template_like_the_config_content() {
