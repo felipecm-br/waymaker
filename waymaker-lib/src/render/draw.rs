@@ -591,8 +591,10 @@ pub(super) fn render_nav_hints(
                         format!(" {key}"),
                         Style::default().fg(color).add_modifier(Modifier::BOLD),
                     );
-                    let label_span =
-                        Span::styled(format!(" {label_owned}"), Style::default().fg(Color::DarkGray));
+                    let label_span = Span::styled(
+                        format!(" {label_owned}"),
+                        Style::default().fg(Color::DarkGray),
+                    );
                     let used_w = key_span.width() + label_span.width();
                     line_spans.push(key_span);
                     line_spans.push(label_span);
