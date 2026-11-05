@@ -137,7 +137,9 @@ impl Session {
         ]);
         cmd.args(args);
         cmd.env_clear();
-        isolate_env(&mut cmd, dir.path());
+        // The resolved path: on macOS the temp dir is behind a symlink (/var -> /private/var), and
+        // a HOME that differs from the resolved working directory would not be shortened to `~`.
+        isolate_env(&mut cmd, &dir.path().canonicalize().unwrap());
 
         let child = pty.slave.spawn_command(cmd).unwrap();
         drop(pty.slave);
@@ -275,7 +277,13 @@ impl Session {
         let mut parser = vt100::Parser::new(rows.try_into().unwrap(), cols.try_into().unwrap(), 0);
         parser.process(&self.screen.lock().unwrap());
         let screen = parser.screen();
-        let dir = self.dir.path().to_string_lossy().into_owned();
+        let dir = self
+            .dir
+            .path()
+            .canonicalize()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
 
         let mut text = String::new();
         let mut styles = String::new();
