@@ -81,7 +81,9 @@ const FILES: &[(&str, &str)] = &[
 
 #[test]
 fn golden_preview_wide() {
-    let wm = Launch::new("src/main.rs\nsrc/lib.rs\nREADME.md\nnotes.txt\n")
+    // README.md first: wm renders Markdown itself, whereas a code file's preview depends on
+    // whether the host has `bat`, so the frame would differ between machines.
+    let wm = Launch::new("README.md\nnotes.txt\nsrc/lib.rs\nsrc/main.rs\n")
         .files(FILES)
         .size(40, 120)
         .start();
