@@ -32,6 +32,7 @@ Large functions are split by moving code unchanged, then proving it unchanged:
 
 - `scripts/extract_arm.py` moves one `match` arm's body into a function; `scripts/extract_arms.py` moves a run of arms into a function that matches on them. Both flag `.await`, `return`, `?`, `break` and `continue` for review.
 - `scripts/verify_move.py --old HEAD:<file> --new <file> --fn <name>...` checks each new function's body appears verbatim in the old code (whitespace-insensitive). Run it before committing a move.
+- When code moves to a shallower indent, rustfmt may re-wrap it, which `verify_move.py` reports as a difference. `scripts/verify_fmt_move.py --old HEAD:<file> --arm '<arm header>' --new <file> --fn <name> [--method] [--drop-tail N]` compares the new body with rustfmt applied to the old arm body instead.
 - `scripts/fn_lengths.py [N]` lists functions of at least N lines.
 
 Behaviour guards, all in `cargo test`:

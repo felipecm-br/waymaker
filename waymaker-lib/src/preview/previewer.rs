@@ -328,284 +328,7 @@ impl Previewer {
 
             match m {
                 PreviewMessage::Run(cmd, variables) | PreviewMessage::Rerun(cmd, variables) => {
-                    self.last = cmd.clone();
-                    let mut cmd_builder = if let Some(s) = &self.config.shell
-                        && !s.is_empty()
-                    {
-                        let mut iter = s.iter();
-                        let mut program = Command::new(iter.next().unwrap());
-                        program.args(iter).arg(&cmd);
-                        program
-                    } else if let Some(direct) = try_parse_simple_command(&cmd) {
-                        direct
-                    } else {
-                        Command::from_script(&cmd)
-                    };
-
-                    cmd_builder
-                        .envs(variables.iter().cloned())
-                        .stdout(Stdio::piped())
-                        .stdin(Stdio::null())
-                        .stderr(Stdio::null());
-
-                    #[cfg(not(target_os = "windows"))]
-                    cmd_builder.detach();
-
-                    if !self.config.delay_clear {
-                        self.lines.clear();
-                        self.changed.store(true, Ordering::Relaxed);
-                    }
-
-                    // we need the child handle
-                    if let Some(mut child) = cmd_builder._spawn() {
-                        let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-                        if let Some(stdout) = child.stdout.take() {
-                            let lines = self.lines.clone();
-                            let mut guard = self.lines.read();
-                            let changed = self.changed.clone();
-                            let cmd_str = cmd.clone();
-                            let string_state = self.string.clone();
-                            let image_state = self.image.clone();
-                            let image_id = self.image_id.clone();
-                            let diagram_sources_state = self.diagram_sources.clone();
-                            let diagram_offsets_state = self.diagram_offsets.clone();
-                            let current_diagram_idx_state = self.current_diagram_idx.clone();
-                            let current_generation = self.generation.clone();
-
-                            let delay_clear = self.config.delay_clear;
-                            let try_lossy = self.config.try_lossy;
-
-                            // false => needs refresh (i.e. invalid utf-8)
-                            let handle = tokio::spawn(async move {
-                                let mut reader = BufReader::new(stdout);
-                                let mut leftover = Vec::new();
-                                let mut buf = [0u8; 8192];
-                                let mut staged = Vec::new();
-                                let mut has_swapped = false;
-
-                                while let Ok(n) = std::io::Read::read(&mut reader, &mut buf) {
-                                    if n == 0
-                                        || current_generation.load(Ordering::Acquire) != task_gen
-                                    {
-                                        break;
-                                    }
-
-                                    leftover.extend_from_slice(&buf[..n]);
-
-                                    let valid_up_to = match std::str::from_utf8(&leftover) {
-                                        Ok(_) => leftover.len(),
-                                        Err(e) => e.valid_up_to(),
-                                    };
-
-                                    let split_at = leftover[..valid_up_to]
-                                        .iter()
-                                        .rposition(|&b| b == b'\n' || b == b'\r')
-                                        .map(|pos| pos + 1)
-                                        .unwrap_or(valid_up_to);
-
-                                    let (valid_bytes, rest) = leftover.split_at(split_at);
-
-                                    match valid_bytes.into_text() {
-                                        Ok(text) => {
-                                            let has_text = !text.lines.is_empty();
-                                            if delay_clear && !has_swapped {
-                                                staged.extend(text.lines);
-                                                if staged.len() >= 500 {
-                                                    if current_generation.load(Ordering::Acquire)
-                                                        != task_gen
-                                                    {
-                                                        return true;
-                                                    }
-                                                    lines.replace_all(std::mem::take(&mut staged));
-                                                    has_swapped = true;
-                                                    guard = lines.read();
-                                                    if let Ok(mut s) = string_state.lock() {
-                                                        *s = None;
-                                                    }
-                                                    if let Ok(mut img) = image_state.lock()
-                                                        && img.is_some()
-                                                    {
-                                                        *img = None;
-                                                        image_id.fetch_add(1, Ordering::Release);
-                                                    }
-                                                    if let Ok(mut d) = diagram_sources_state.lock()
-                                                    {
-                                                        d.clear();
-                                                    }
-                                                    if let Ok(mut d) = diagram_offsets_state.lock()
-                                                    {
-                                                        d.clear();
-                                                    }
-                                                    current_diagram_idx_state
-                                                        .store(0, Ordering::Release);
-                                                    changed.store(true, Ordering::Release);
-                                                }
-                                            } else {
-                                                for line in text {
-                                                    if current_generation.load(Ordering::Acquire)
-                                                        != task_gen
-                                                        || lines.is_expired(&guard)
-                                                    {
-                                                        return true;
-                                                    }
-                                                    guard.push(line);
-                                                }
-                                                if has_text {
-                                                    changed.store(true, Ordering::Release);
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            if try_lossy {
-                                                let mut has_text = false;
-                                                for bytes in valid_bytes.split(|b| *b == b'\n') {
-                                                    let line = Line::from(
-                                                        String::from_utf8_lossy(bytes).into_owned(),
-                                                    );
-                                                    if delay_clear && !has_swapped {
-                                                        staged.push(line);
-                                                    } else {
-                                                        if current_generation
-                                                            .load(Ordering::Acquire)
-                                                            != task_gen
-                                                            || lines.is_expired(&guard)
-                                                        {
-                                                            return true;
-                                                        }
-                                                        guard.push(line);
-                                                        has_text = true;
-                                                    }
-                                                }
-                                                if delay_clear
-                                                    && !has_swapped
-                                                    && staged.len() >= 500
-                                                {
-                                                    if current_generation.load(Ordering::Acquire)
-                                                        != task_gen
-                                                    {
-                                                        return true;
-                                                    }
-                                                    lines.replace_all(std::mem::take(&mut staged));
-                                                    has_swapped = true;
-                                                    guard = lines.read();
-                                                    if let Ok(mut s) = string_state.lock() {
-                                                        *s = None;
-                                                    }
-                                                    if let Ok(mut img) = image_state.lock()
-                                                        && img.is_some()
-                                                    {
-                                                        *img = None;
-                                                        image_id.fetch_add(1, Ordering::Release);
-                                                    }
-                                                    if let Ok(mut d) = diagram_sources_state.lock()
-                                                    {
-                                                        d.clear();
-                                                    }
-                                                    if let Ok(mut d) = diagram_offsets_state.lock()
-                                                    {
-                                                        d.clear();
-                                                    }
-                                                    current_diagram_idx_state
-                                                        .store(0, Ordering::Release);
-                                                    changed.store(true, Ordering::Release);
-                                                } else if has_text && has_swapped {
-                                                    changed.store(true, Ordering::Release);
-                                                }
-                                            } else {
-                                                error!("Error displaying {cmd_str}: {:?}", e);
-                                                return false;
-                                            }
-                                        }
-                                    }
-
-                                    leftover = rest.to_vec();
-                                }
-
-                                if current_generation.load(Ordering::Acquire) != task_gen {
-                                    return true;
-                                }
-
-                                if !leftover.is_empty() {
-                                    match leftover.into_text() {
-                                        Ok(text) => {
-                                            if delay_clear && !has_swapped {
-                                                staged.extend(text.lines);
-                                            } else {
-                                                let has_text = !text.lines.is_empty();
-                                                for line in text {
-                                                    if current_generation.load(Ordering::Acquire)
-                                                        != task_gen
-                                                        || lines.is_expired(&guard)
-                                                    {
-                                                        return true;
-                                                    }
-                                                    guard.push(line);
-                                                }
-                                                if has_text {
-                                                    changed.store(true, Ordering::Release);
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            if try_lossy {
-                                                let mut has_text = false;
-                                                for bytes in leftover.split(|b| *b == b'\n') {
-                                                    let line = Line::from(
-                                                        String::from_utf8_lossy(bytes).into_owned(),
-                                                    );
-                                                    if delay_clear && !has_swapped {
-                                                        staged.push(line);
-                                                    } else {
-                                                        if lines.is_expired(&guard) {
-                                                            return true;
-                                                        }
-                                                        guard.push(line);
-                                                        has_text = true;
-                                                    }
-                                                }
-                                                if has_text && has_swapped {
-                                                    changed.store(true, Ordering::Release);
-                                                }
-                                            } else {
-                                                error!("Error displaying {cmd_str}: {:?}", e);
-                                                return false;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if delay_clear && !has_swapped {
-                                    if current_generation.load(Ordering::Acquire) != task_gen {
-                                        return true;
-                                    }
-                                    lines.replace_all(staged);
-                                    if let Ok(mut s) = string_state.lock() {
-                                        *s = None;
-                                    }
-                                    if let Ok(mut img) = image_state.lock()
-                                        && img.is_some()
-                                    {
-                                        *img = None;
-                                        image_id.fetch_add(1, Ordering::Release);
-                                    }
-                                    if let Ok(mut d) = diagram_sources_state.lock() {
-                                        d.clear();
-                                    }
-                                    if let Ok(mut d) = diagram_offsets_state.lock() {
-                                        d.clear();
-                                    }
-                                    current_diagram_idx_state.store(0, Ordering::Release);
-                                    changed.store(true, Ordering::Release);
-                                }
-
-                                changed.store(true, Ordering::Release);
-                                true
-                            });
-                            self.current = Some((child, handle))
-                        } else {
-                            error!("Failed to get stdout of preview command: {cmd}")
-                        }
-                    }
+                    self.run_command_preview(cmd, variables)
                 }
                 PreviewMessage::Stop => {
                     self.dispatch_kill();
@@ -1156,6 +879,269 @@ impl Previewer {
             }
         });
         self.current_media_task = Some(handle);
+    }
+
+    /// Runs a preview command and streams its output into `lines` from a background task
+    /// (re-rendering ANSI and Mermaid output), unless a newer preview made it stale.
+    fn run_command_preview(&mut self, cmd: String, variables: EnvVars) {
+        self.last = cmd.clone();
+        let mut cmd_builder = if let Some(s) = &self.config.shell
+            && !s.is_empty()
+        {
+            let mut iter = s.iter();
+            let mut program = Command::new(iter.next().unwrap());
+            program.args(iter).arg(&cmd);
+            program
+        } else if let Some(direct) = try_parse_simple_command(&cmd) {
+            direct
+        } else {
+            Command::from_script(&cmd)
+        };
+
+        cmd_builder
+            .envs(variables.iter().cloned())
+            .stdout(Stdio::piped())
+            .stdin(Stdio::null())
+            .stderr(Stdio::null());
+
+        #[cfg(not(target_os = "windows"))]
+        cmd_builder.detach();
+
+        if !self.config.delay_clear {
+            self.lines.clear();
+            self.changed.store(true, Ordering::Relaxed);
+        }
+
+        // we need the child handle
+        if let Some(mut child) = cmd_builder._spawn() {
+            let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+            if let Some(stdout) = child.stdout.take() {
+                let lines = self.lines.clone();
+                let mut guard = self.lines.read();
+                let changed = self.changed.clone();
+                let cmd_str = cmd.clone();
+                let string_state = self.string.clone();
+                let image_state = self.image.clone();
+                let image_id = self.image_id.clone();
+                let diagram_sources_state = self.diagram_sources.clone();
+                let diagram_offsets_state = self.diagram_offsets.clone();
+                let current_diagram_idx_state = self.current_diagram_idx.clone();
+                let current_generation = self.generation.clone();
+
+                let delay_clear = self.config.delay_clear;
+                let try_lossy = self.config.try_lossy;
+
+                // false => needs refresh (i.e. invalid utf-8)
+                let handle = tokio::spawn(async move {
+                    let mut reader = BufReader::new(stdout);
+                    let mut leftover = Vec::new();
+                    let mut buf = [0u8; 8192];
+                    let mut staged = Vec::new();
+                    let mut has_swapped = false;
+
+                    while let Ok(n) = std::io::Read::read(&mut reader, &mut buf) {
+                        if n == 0 || current_generation.load(Ordering::Acquire) != task_gen {
+                            break;
+                        }
+
+                        leftover.extend_from_slice(&buf[..n]);
+
+                        let valid_up_to = match std::str::from_utf8(&leftover) {
+                            Ok(_) => leftover.len(),
+                            Err(e) => e.valid_up_to(),
+                        };
+
+                        let split_at = leftover[..valid_up_to]
+                            .iter()
+                            .rposition(|&b| b == b'\n' || b == b'\r')
+                            .map(|pos| pos + 1)
+                            .unwrap_or(valid_up_to);
+
+                        let (valid_bytes, rest) = leftover.split_at(split_at);
+
+                        match valid_bytes.into_text() {
+                            Ok(text) => {
+                                let has_text = !text.lines.is_empty();
+                                if delay_clear && !has_swapped {
+                                    staged.extend(text.lines);
+                                    if staged.len() >= 500 {
+                                        if current_generation.load(Ordering::Acquire) != task_gen {
+                                            return true;
+                                        }
+                                        lines.replace_all(std::mem::take(&mut staged));
+                                        has_swapped = true;
+                                        guard = lines.read();
+                                        if let Ok(mut s) = string_state.lock() {
+                                            *s = None;
+                                        }
+                                        if let Ok(mut img) = image_state.lock()
+                                            && img.is_some()
+                                        {
+                                            *img = None;
+                                            image_id.fetch_add(1, Ordering::Release);
+                                        }
+                                        if let Ok(mut d) = diagram_sources_state.lock() {
+                                            d.clear();
+                                        }
+                                        if let Ok(mut d) = diagram_offsets_state.lock() {
+                                            d.clear();
+                                        }
+                                        current_diagram_idx_state.store(0, Ordering::Release);
+                                        changed.store(true, Ordering::Release);
+                                    }
+                                } else {
+                                    for line in text {
+                                        if current_generation.load(Ordering::Acquire) != task_gen
+                                            || lines.is_expired(&guard)
+                                        {
+                                            return true;
+                                        }
+                                        guard.push(line);
+                                    }
+                                    if has_text {
+                                        changed.store(true, Ordering::Release);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                if try_lossy {
+                                    let mut has_text = false;
+                                    for bytes in valid_bytes.split(|b| *b == b'\n') {
+                                        let line =
+                                            Line::from(String::from_utf8_lossy(bytes).into_owned());
+                                        if delay_clear && !has_swapped {
+                                            staged.push(line);
+                                        } else {
+                                            if current_generation.load(Ordering::Acquire)
+                                                != task_gen
+                                                || lines.is_expired(&guard)
+                                            {
+                                                return true;
+                                            }
+                                            guard.push(line);
+                                            has_text = true;
+                                        }
+                                    }
+                                    if delay_clear && !has_swapped && staged.len() >= 500 {
+                                        if current_generation.load(Ordering::Acquire) != task_gen {
+                                            return true;
+                                        }
+                                        lines.replace_all(std::mem::take(&mut staged));
+                                        has_swapped = true;
+                                        guard = lines.read();
+                                        if let Ok(mut s) = string_state.lock() {
+                                            *s = None;
+                                        }
+                                        if let Ok(mut img) = image_state.lock()
+                                            && img.is_some()
+                                        {
+                                            *img = None;
+                                            image_id.fetch_add(1, Ordering::Release);
+                                        }
+                                        if let Ok(mut d) = diagram_sources_state.lock() {
+                                            d.clear();
+                                        }
+                                        if let Ok(mut d) = diagram_offsets_state.lock() {
+                                            d.clear();
+                                        }
+                                        current_diagram_idx_state.store(0, Ordering::Release);
+                                        changed.store(true, Ordering::Release);
+                                    } else if has_text && has_swapped {
+                                        changed.store(true, Ordering::Release);
+                                    }
+                                } else {
+                                    error!("Error displaying {cmd_str}: {:?}", e);
+                                    return false;
+                                }
+                            }
+                        }
+
+                        leftover = rest.to_vec();
+                    }
+
+                    if current_generation.load(Ordering::Acquire) != task_gen {
+                        return true;
+                    }
+
+                    if !leftover.is_empty() {
+                        match leftover.into_text() {
+                            Ok(text) => {
+                                if delay_clear && !has_swapped {
+                                    staged.extend(text.lines);
+                                } else {
+                                    let has_text = !text.lines.is_empty();
+                                    for line in text {
+                                        if current_generation.load(Ordering::Acquire) != task_gen
+                                            || lines.is_expired(&guard)
+                                        {
+                                            return true;
+                                        }
+                                        guard.push(line);
+                                    }
+                                    if has_text {
+                                        changed.store(true, Ordering::Release);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                if try_lossy {
+                                    let mut has_text = false;
+                                    for bytes in leftover.split(|b| *b == b'\n') {
+                                        let line =
+                                            Line::from(String::from_utf8_lossy(bytes).into_owned());
+                                        if delay_clear && !has_swapped {
+                                            staged.push(line);
+                                        } else {
+                                            if lines.is_expired(&guard) {
+                                                return true;
+                                            }
+                                            guard.push(line);
+                                            has_text = true;
+                                        }
+                                    }
+                                    if has_text && has_swapped {
+                                        changed.store(true, Ordering::Release);
+                                    }
+                                } else {
+                                    error!("Error displaying {cmd_str}: {:?}", e);
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+
+                    if delay_clear && !has_swapped {
+                        if current_generation.load(Ordering::Acquire) != task_gen {
+                            return true;
+                        }
+                        lines.replace_all(staged);
+                        if let Ok(mut s) = string_state.lock() {
+                            *s = None;
+                        }
+                        if let Ok(mut img) = image_state.lock()
+                            && img.is_some()
+                        {
+                            *img = None;
+                            image_id.fetch_add(1, Ordering::Release);
+                        }
+                        if let Ok(mut d) = diagram_sources_state.lock() {
+                            d.clear();
+                        }
+                        if let Ok(mut d) = diagram_offsets_state.lock() {
+                            d.clear();
+                        }
+                        current_diagram_idx_state.store(0, Ordering::Release);
+                        changed.store(true, Ordering::Release);
+                    }
+
+                    changed.store(true, Ordering::Release);
+                    true
+                });
+                self.current = Some((child, handle))
+            } else {
+                error!("Failed to get stdout of preview command: {cmd}")
+            }
+        }
     }
 }
 
