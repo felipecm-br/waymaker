@@ -271,12 +271,6 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
         }
     };
 
-    let status_inline_label: Option<Line<'_>> = if picker_ui.query.config.status_inline {
-        Some(picker_ui.results.status_line())
-    } else {
-        None
-    };
-
     let nav_color = ui.config.nav.color;
     let nav_mode = ui.config.nav.active;
     let nav_do_blink = ui.config.nav.blink;
@@ -356,6 +350,109 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
         }
     }
 
+    draw_picker(
+        frame,
+        PickerCtx {
+            state,
+            ui,
+            picker_ui,
+            click,
+            breadcrumb_spans,
+            is_global_breadcrumb,
+            global_breadcrumb_rect,
+            breadcrumb,
+            input,
+            status,
+            results,
+            header,
+            parent_peek_rect,
+            nav_color,
+            input_focus_info,
+            results_focus_info,
+        },
+    );
+
+    draw_footer(
+        frame,
+        FooterCtx {
+            footer,
+            has_footer_separator,
+            preview,
+            picker_area,
+            parent_peek_rect,
+            show_sort_menu,
+            show_nav_hints,
+            is_filter_mode,
+            state,
+            ui,
+            preview_ui,
+            footer_ui,
+            picker_ui,
+        },
+    );
+    draw_preview(
+        frame,
+        preview_ui,
+        state,
+        picker_ui,
+        preview,
+        gap_area,
+        mouse_hover,
+    );
+    if let Some(x) = overlay_ui_ref {
+        x.draw(frame);
+    }
+    if crate::ui::no_color() {
+        crate::ui::strip_colors(frame.buffer_mut());
+    }
+}
+
+/// What [`draw_picker`] reads; field names are the `draw_frame` locals it was moved from.
+struct PickerCtx<'r, 'a, T: SSS, S: Selection> {
+    state: &'r mut State,
+    ui: &'r UI,
+    picker_ui: &'r mut PickerUI<'a, T, S>,
+    click: &'r mut Click,
+    breadcrumb_spans: Vec<Span<'static>>,
+    is_global_breadcrumb: bool,
+    global_breadcrumb_rect: Rect,
+    breadcrumb: Rect,
+    input: Rect,
+    status: Rect,
+    results: Rect,
+    header: Rect,
+    parent_peek_rect: Rect,
+    nav_color: Color,
+    input_focus_info: Option<FocusInfo>,
+    results_focus_info: Option<FocusInfo>,
+}
+
+/// Draws the picker column: breadcrumb, the query (or the live-input badge or a prompt),
+/// status, results, header and the parent-peek pane. Skipped while the preview is fullscreen.
+fn draw_picker<T: SSS, S: Selection>(frame: &mut Frame, cx: PickerCtx<'_, '_, T, S>) {
+    let PickerCtx {
+        state,
+        ui,
+        picker_ui,
+        click,
+        breadcrumb_spans,
+        is_global_breadcrumb,
+        global_breadcrumb_rect,
+        breadcrumb,
+        input,
+        status,
+        results,
+        header,
+        parent_peek_rect,
+        nav_color,
+        input_focus_info,
+        results_focus_info,
+    } = cx;
+    let status_inline_label: Option<Line<'_>> = if picker_ui.query.config.status_inline {
+        Some(picker_ui.results.status_line())
+    } else {
+        None
+    };
     if !state.preview_fullscreen {
         if picker_ui.breadcrumb_config.show && !breadcrumb_spans.is_empty() {
             let target_rect = if is_global_breadcrumb {
@@ -480,40 +577,6 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
                 state.parent_peek_cache.as_ref(),
             );
         }
-    }
-
-    draw_footer(
-        frame,
-        FooterCtx {
-            footer,
-            has_footer_separator,
-            preview,
-            picker_area,
-            parent_peek_rect,
-            show_sort_menu,
-            show_nav_hints,
-            is_filter_mode,
-            state,
-            ui,
-            preview_ui,
-            footer_ui,
-            picker_ui,
-        },
-    );
-    draw_preview(
-        frame,
-        preview_ui,
-        state,
-        picker_ui,
-        preview,
-        gap_area,
-        mouse_hover,
-    );
-    if let Some(x) = overlay_ui_ref {
-        x.draw(frame);
-    }
-    if crate::ui::no_color() {
-        crate::ui::strip_colors(frame.buffer_mut());
     }
 }
 
