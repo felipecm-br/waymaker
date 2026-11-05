@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-05
+
 ### 🔄 Changed
 
 - `ctrl-c` exits at once (new action `Abort`, exit code 130), like fzf, even with a message box open or items selected or marked. `Quit` keeps its step-by-step behaviour (close the action box, then clear selections, then yank and cut marks), so `esc` and `q` in the `jump` preset still unwind one step per press. Configs that bind `"ctrl-c" = "Quit"` keep the old behaviour; change them to `"Abort"`
