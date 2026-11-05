@@ -1,5 +1,6 @@
 ---
 source: waymaker-cli/tests/golden.rs
+assertion_line: 107
 expression: wm.styled_screen()
 ---
  0|
@@ -10,10 +11,10 @@ expression: wm.styled_screen()
  5| │   top.md                            │  └──  two.txt (2 B)
  6| │   alpha/one.txt                     │
  7| ───────────────────────────────────────┴──────────────────────────────────────────────────────────
- 8|  [/] Filter              [Space] Select          [,] Sort                [f] Frecency
- 9|  [b] Bookmarks           [*] Bookmark            [e] Edit                [a] Add
-10|  [r] Rename              [d] Trash               [y/x] Copy/Cut          [p/P] Paste
-11|  [u] Undo                [z/Z] Zip               [\] Pane                [C-p] Preview
+ 8|  / Filter                Space Select            , Sort                  f Frecency
+ 9|  b Bookmarks             m Bookmark              e Edit                  a Add
+10|  r Rename                d Trash                 y/x Copy/Cut            p/P Paste
+11|  u Undo                  z/Z Zip                 \ Pane                  C-p Preview
 12|
 13|
 14|
@@ -34,13 +35,13 @@ expression: wm.styled_screen()
 29|
 -- styles --
  1: 1 fg=6 bold | 2 fg=6 | 3-6 fg=6 bold
- 2: 1 fg=15 bold | 3-39 fg=0 bg=8 bold | 40-46 fg=8
+ 2: 1 fg=15 bold | 3-39 bold | 40-46 fg=8
  3: 1 fg=8 | 4 fg=4 | 40 fg=8 | 43-44 fg=4 | 45-50 fg=6 bold
  4: 1 fg=8 | 3 dim underline | 4 fg=4 dim underline | 5-11 dim underline | 12-39 fg=#555555 dim underline | 40 fg=8 dim | 43-46 fg=8 | 47-48 fg=7 | 56-61 fg=8
  5: 1 fg=8 dim | 3 dim underline | 4 fg=4 dim underline | 5-11 dim underline | 12-39 fg=#555555 dim underline | 40 fg=8 dim | 43-46 fg=8 | 47-48 fg=7 | 56-61 fg=8
  6: 1 fg=8 dim | 4 fg=7 dim | 6-18 dim | 40 fg=8 dim
  7: 1-98 fg=8 dim
- 8: 1-4 fg=6 bold | 5-11 fg=15 | 25-32 fg=3 bold | 33-39 fg=15 | 49-52 fg=3 bold | 53-57 fg=15 | 73-76 fg=6 bold | 77-85 fg=15
- 9: 1-4 fg=5 bold | 5-14 fg=15 | 25-28 fg=3 bold | 29-37 fg=15 | 49-52 fg=2 bold | 53-57 fg=15 | 73-76 fg=2 bold | 77-80 fg=15
-10: 1-4 fg=3 bold | 5-11 fg=15 | 25-28 fg=1 bold | 29-34 fg=15 | 49-54 fg=2 bold | 55-63 fg=15 | 73-78 fg=5 bold | 79-84 fg=15
-11: 1-4 fg=4 bold | 5-9 fg=15 | 25-30 fg=4 bold | 31-34 fg=15 | 49-52 fg=6 bold | 53-57 fg=15 | 73-78 fg=4 bold | 79-86 fg=15
+ 8: 1-2 fg=6 bold | 3-9 fg=8 | 25-30 fg=6 bold | 31-37 fg=8 | 49-50 fg=6 bold | 51-55 fg=8 | 73-74 fg=6 bold | 75-83 fg=8
+ 9: 1-2 fg=6 bold | 3-12 fg=8 | 25-26 fg=6 bold | 27-35 fg=8 | 49-50 fg=6 bold | 51-55 fg=8 | 73-74 fg=6 bold | 75-78 fg=8
+10: 1-2 fg=6 bold | 3-9 fg=8 | 25-26 fg=6 bold | 27-32 fg=8 | 49-52 fg=6 bold | 53-61 fg=8 | 73-76 fg=6 bold | 77-82 fg=8
+11: 1-2 fg=6 bold | 3-7 fg=8 | 25-28 fg=6 bold | 29-32 fg=8 | 49-50 fg=6 bold | 51-55 fg=8 | 73-76 fg=6 bold | 77-84 fg=8

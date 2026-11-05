@@ -44,7 +44,7 @@ reverse = false
 column_spacing = 2
 
 [results.current_style]
-bg = "darkgray"
+bg = "reset"
 modifier = "BOLD"
 
 [results.current_nav_bar_style]

@@ -2,6 +2,8 @@
 
 ### 🐛 Bug Fixes
 
+- Navigation-mode key hints drop the brackets and the six key colours: keys are cyan and bold, actions darkgray (as in the footer). The `jump` hint says `m Bookmark` (was `[*]`), and the filter-mode hint `C-u` now reads `Clear` (it clears the query since 0.7.0; ancestors are nav-mode `U`)
+- The `jump` and `pr` presets no longer draw the cursor row as an opaque black-on-darkgray bar; like the default config it is bold on the terminal background
 - A query made only of exclusions (`!apple`, `!a !b`) matched nothing; like fzf it now lists every item without those terms, in `wm -f` and in the picker (nucleo fork `b6b254c`, the upstream fix)
 - `wm.log` is appended to instead of rewritten at every start (and starts over past 5 MiB): a `wm` run by `wm` (a preview, `wm list`) used to wipe the running picker's log
 - With a Markdown file (or, with `--media`, an image) under the cursor, `wm` redrew the screen about 30 times a second while idle; the preview now renders once

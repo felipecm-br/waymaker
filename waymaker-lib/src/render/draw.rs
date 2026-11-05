@@ -430,72 +430,74 @@ pub(super) fn render_sort_menu(frame: &mut Frame, area: Rect, cfg: &crate::confi
     }
 }
 
+// Key hints: the key in one accent colour (cyan, bold) and its action in darkgray, without
+// brackets, so hints read as a calm, uniform grid; warm colours stay reserved for alerts.
 pub const BASIC_NAV_HINTS: &[(&str, &str, ratatui::style::Color)] = &[
-    ("[/]", "Filter", ratatui::style::Color::Cyan),
-    ("[j/k]", "Move", ratatui::style::Color::Yellow),
-    ("[J/K]", "Scroll", ratatui::style::Color::Blue),
-    ("[gg/G]", "Top/End", ratatui::style::Color::Yellow),
-    ("[C-p]", "Preview", ratatui::style::Color::Blue),
-    ("[,]", "Sort", ratatui::style::Color::Yellow),
-    ("[\\]", "Pane", ratatui::style::Color::Cyan),
-    ("[q/Esc]", "Back", ratatui::style::Color::Red),
+    ("/", "Filter", ratatui::style::Color::Cyan),
+    ("j/k", "Move", ratatui::style::Color::Cyan),
+    ("J/K", "Scroll", ratatui::style::Color::Cyan),
+    ("gg/G", "Top/End", ratatui::style::Color::Cyan),
+    ("C-p", "Preview", ratatui::style::Color::Cyan),
+    (",", "Sort", ratatui::style::Color::Cyan),
+    ("\\", "Pane", ratatui::style::Color::Cyan),
+    ("q/Esc", "Back", ratatui::style::Color::Cyan),
 ];
 
 pub const LIST_NAV_HINTS: &[(&str, &str, ratatui::style::Color)] = &[
-    ("[/]", "Filter", ratatui::style::Color::Cyan),
-    ("[j/k]", "Move", ratatui::style::Color::Yellow),
-    ("[Space]", "Select", ratatui::style::Color::Yellow),
-    ("[,]", "Sort", ratatui::style::Color::Yellow),
-    ("[J/K]", "Scroll", ratatui::style::Color::Blue),
-    ("[C-p]", "Preview", ratatui::style::Color::Blue),
-    ("[\\]", "Pane", ratatui::style::Color::Cyan),
-    ("[q/Esc]", "Back", ratatui::style::Color::Red),
+    ("/", "Filter", ratatui::style::Color::Cyan),
+    ("j/k", "Move", ratatui::style::Color::Cyan),
+    ("Space", "Select", ratatui::style::Color::Cyan),
+    (",", "Sort", ratatui::style::Color::Cyan),
+    ("J/K", "Scroll", ratatui::style::Color::Cyan),
+    ("C-p", "Preview", ratatui::style::Color::Cyan),
+    ("\\", "Pane", ratatui::style::Color::Cyan),
+    ("q/Esc", "Back", ratatui::style::Color::Cyan),
 ];
 
 pub const NAV_HINTS: &[(&str, &str, ratatui::style::Color)] = &[
-    ("[/]", "Filter", ratatui::style::Color::Cyan),
-    ("[Space]", "Select", ratatui::style::Color::Yellow),
-    ("[,]", "Sort", ratatui::style::Color::Yellow),
-    ("[f]", "Frecency", ratatui::style::Color::Cyan),
-    ("[b]", "Bookmarks", ratatui::style::Color::Magenta),
-    ("[*]", "Bookmark", ratatui::style::Color::Yellow),
-    ("[e]", "Edit", ratatui::style::Color::Green),
-    ("[a]", "Add", ratatui::style::Color::Green),
-    ("[r]", "Rename", ratatui::style::Color::Yellow),
-    ("[d]", "Trash", ratatui::style::Color::Red),
-    ("[y/x]", "Copy/Cut", ratatui::style::Color::Green),
-    ("[p/P]", "Paste", ratatui::style::Color::Magenta),
-    ("[u]", "Undo", ratatui::style::Color::Blue),
-    ("[z/Z]", "Zip", ratatui::style::Color::Blue),
-    ("[\\]", "Pane", ratatui::style::Color::Cyan),
-    ("[C-p]", "Preview", ratatui::style::Color::Blue),
+    ("/", "Filter", ratatui::style::Color::Cyan),
+    ("Space", "Select", ratatui::style::Color::Cyan),
+    (",", "Sort", ratatui::style::Color::Cyan),
+    ("f", "Frecency", ratatui::style::Color::Cyan),
+    ("b", "Bookmarks", ratatui::style::Color::Cyan),
+    ("m", "Bookmark", ratatui::style::Color::Cyan),
+    ("e", "Edit", ratatui::style::Color::Cyan),
+    ("a", "Add", ratatui::style::Color::Cyan),
+    ("r", "Rename", ratatui::style::Color::Cyan),
+    ("d", "Trash", ratatui::style::Color::Cyan),
+    ("y/x", "Copy/Cut", ratatui::style::Color::Cyan),
+    ("p/P", "Paste", ratatui::style::Color::Cyan),
+    ("u", "Undo", ratatui::style::Color::Cyan),
+    ("z/Z", "Zip", ratatui::style::Color::Cyan),
+    ("\\", "Pane", ratatui::style::Color::Cyan),
+    ("C-p", "Preview", ratatui::style::Color::Cyan),
 ];
 
 pub const PREVIEW_NAV_HINTS: &[(&str, &str, ratatui::style::Color)] = &[
-    ("[hjkl]", "Pan", ratatui::style::Color::Yellow),
-    ("[J/K]", "Jump15", ratatui::style::Color::Yellow),
-    ("[C-u/u]", "HalfUp", ratatui::style::Color::Yellow),
-    ("[C-d/d]", "HalfDn", ratatui::style::Color::Yellow),
-    ("[s]", "Diagram", ratatui::style::Color::Magenta),
-    ("[n/N]", "DiagIdx", ratatui::style::Color::Cyan),
-    ("[+/-]", "Zoom", ratatui::style::Color::Green),
-    ("[0/z]", "Reset", ratatui::style::Color::Blue),
-    ("[esc/enter]", "Back", ratatui::style::Color::Red),
+    ("hjkl", "Pan", ratatui::style::Color::Cyan),
+    ("J/K", "Jump15", ratatui::style::Color::Cyan),
+    ("C-u/u", "HalfUp", ratatui::style::Color::Cyan),
+    ("C-d/d", "HalfDn", ratatui::style::Color::Cyan),
+    ("s", "Diagram", ratatui::style::Color::Cyan),
+    ("n/N", "DiagIdx", ratatui::style::Color::Cyan),
+    ("+/-", "Zoom", ratatui::style::Color::Cyan),
+    ("0/z", "Reset", ratatui::style::Color::Cyan),
+    ("esc/enter", "Back", ratatui::style::Color::Cyan),
 ];
 
 pub const FILTER_NAV_HINTS: &[(&str, &str, ratatui::style::Color)] = &[
-    ("[Esc]", "Nav", ratatui::style::Color::Red),
-    ("[Tab]", "Cycle", ratatui::style::Color::Magenta),
-    ("[C-j/k]", "Move", ratatui::style::Color::Yellow),
-    ("[C-h/l]", "Dir", ratatui::style::Color::Cyan),
-    ("[C-u]", "Parents", ratatui::style::Color::Blue),
-    ("[C-d]", "Delete", ratatui::style::Color::Red),
-    ("[C-v]", "Insert", ratatui::style::Color::Green),
-    ("[C-e]", "Edit", ratatui::style::Color::Green),
-    ("[C-y]", "Copy", ratatui::style::Color::Magenta),
-    ("[C-p]", "Preview", ratatui::style::Color::Blue),
-    ("[Enter]", "Accept", ratatui::style::Color::Cyan),
-    ("[C-c]", "Quit", ratatui::style::Color::Red),
+    ("Esc", "Nav", ratatui::style::Color::Cyan),
+    ("Tab", "Cycle", ratatui::style::Color::Cyan),
+    ("C-j/k", "Move", ratatui::style::Color::Cyan),
+    ("C-h/l", "Dir", ratatui::style::Color::Cyan),
+    ("C-u", "Clear", ratatui::style::Color::Cyan),
+    ("C-d", "Delete", ratatui::style::Color::Cyan),
+    ("C-v", "Insert", ratatui::style::Color::Cyan),
+    ("C-e", "Edit", ratatui::style::Color::Cyan),
+    ("C-y", "Copy", ratatui::style::Color::Cyan),
+    ("C-p", "Preview", ratatui::style::Color::Cyan),
+    ("Enter", "Accept", ratatui::style::Color::Cyan),
+    ("C-c", "Quit", ratatui::style::Color::Cyan),
 ];
 
 pub(super) fn render_nav_hints(
@@ -537,7 +539,7 @@ pub(super) fn render_nav_hints(
 
         for (key, label, color) in hints {
             let label_owned = if preview_fullscreen
-                && *key == "[+/-]"
+                && *key == "+/-"
                 && let Some(pct) = zoom_pct
             {
                 format!("Zoom {pct}%")
@@ -578,7 +580,7 @@ pub(super) fn render_nav_hints(
                 if idx < hints.len() {
                     let (key, label, color) = hints[idx];
                     let label_owned = if preview_fullscreen
-                        && key == "[+/-]"
+                        && key == "+/-"
                         && let Some(pct) = zoom_pct
                     {
                         format!("Zoom {pct}%")
@@ -590,7 +592,7 @@ pub(super) fn render_nav_hints(
                         Style::default().fg(color).add_modifier(Modifier::BOLD),
                     );
                     let label_span =
-                        Span::styled(format!(" {label_owned}"), Style::default().fg(Color::White));
+                        Span::styled(format!(" {label_owned}"), Style::default().fg(Color::DarkGray));
                     let used_w = key_span.width() + label_span.width();
                     line_spans.push(key_span);
                     line_spans.push(label_span);

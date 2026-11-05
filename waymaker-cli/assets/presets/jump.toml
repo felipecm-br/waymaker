@@ -95,8 +95,7 @@ icon_style.fg = "#8999f1"
 fg = "white"
 
 [results.current_style]
-fg = "black"
-bg = "Darkgray"
+bg = "reset"
 modifier = "BOLD"
 
 [results.autoscroll]
