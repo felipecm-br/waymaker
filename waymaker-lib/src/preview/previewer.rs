@@ -306,454 +306,11 @@ impl Previewer {
                         continue;
                     }
                     PreviewMessage::Media(ref path) => {
-                        self.dispatch_kill();
-                        self.clear_diagrams();
-                        if !self.config.delay_clear {
-                            self.clear_image();
-                            self.clear_string();
-                            self.lines.clear();
-                        }
-                        self.last = path.clone();
-                        let path = path.clone();
-                        let image_state = self.image.clone();
-                        let string_state = self.string.clone();
-                        let image_id = self.image_id.clone();
-                        let changed = self.changed.clone();
-                        let event_tx = self.event_controller_tx.clone();
-                        let current_generation = self.generation.clone();
-
-                        let media_size = self.config.media_size;
-                        let rx = self.rx.clone();
-                        let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-                        let handle = tokio::spawn(async move {
-                            let is_stale = {
-                                let rx = rx.clone();
-                                let current_generation = current_generation.clone();
-                                move || {
-                                    rx.has_changed().unwrap_or(false)
-                                        || current_generation.load(Ordering::Acquire) != task_gen
-                                }
-                            };
-                            if is_stale() {
-                                return;
-                            }
-
-                            let img_result = if path.to_lowercase().ends_with(".pdf") {
-                                // PDF support using pdftoppm if available
-                                let pdf_scale = if media_size > 0 {
-                                    media_size.to_string()
-                                } else {
-                                    "1200".to_string()
-                                };
-                                let mut cmd = tokio::process::Command::new("pdftoppm");
-                                cmd.kill_on_drop(true);
-                                cmd.args([
-                                    "-jpeg",
-                                    "-r",
-                                    "150",
-                                    "-scale-to",
-                                    &pdf_scale,
-                                    "-f",
-                                    "1",
-                                    "-l",
-                                    "1",
-                                    &path,
-                                ]);
-                                if let Ok(_out) = cmd.output().await {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    let p = std::path::PathBuf::from(&path);
-                                    let stem = p
-                                        .file_stem()
-                                        .and_then(|s| s.to_str())
-                                        .unwrap_or("document");
-                                    let rendered = p.with_file_name(format!("{}-1.jpg", stem));
-                                    if rendered.exists() {
-                                        let img = image::open(&rendered).ok();
-                                        let _ = std::fs::remove_file(&rendered);
-                                        img
-                                    } else {
-                                        None
-                                    }
-                                } else {
-                                    None
-                                }
-                            } else if path.to_lowercase().ends_with(".mp4")
-                                || path.to_lowercase().ends_with(".mkv")
-                                || path.to_lowercase().ends_with(".webm")
-                                || path.to_lowercase().ends_with(".mov")
-                                || path.to_lowercase().ends_with(".avi")
-                                || path.to_lowercase().ends_with(".flv")
-                                || path.to_lowercase().ends_with(".m4v")
-                                || path.to_lowercase().ends_with(".wmv")
-                            {
-                                // Video support
-                                let media_size_str = if media_size > 0 {
-                                    media_size.to_string()
-                                } else {
-                                    "512".to_string()
-                                };
-                                let mut cmd = tokio::process::Command::new("ffmpegthumbnailer");
-                                cmd.kill_on_drop(true);
-                                cmd.args([
-                                    "-i",
-                                    &path,
-                                    "-s",
-                                    &media_size_str,
-                                    "-t",
-                                    "00:00:01",
-                                    "-c",
-                                    "jpeg",
-                                    "-q",
-                                    "10",
-                                    "-o",
-                                    "-",
-                                ]);
-                                if let Ok(out) = cmd.output().await {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    // ffmpegthumbnailer sometimes pollutes stdout with debug logs.
-                                    // We search for the JPEG start of image marker (FF D8 FF) and slice the buffer.
-                                    let data = &out.stdout;
-                                    let img_data = if let Some(pos) =
-                                        data.windows(3).position(|w| w == [0xff, 0xd8, 0xff])
-                                    {
-                                        &data[pos..]
-                                    } else {
-                                        data
-                                    };
-                                    image::load_from_memory(img_data).ok()
-                                } else {
-                                    None
-                                }
-                            } else {
-                                let path_for_task = path.clone();
-                                let is_stale_task = is_stale.clone();
-                                tokio::task::spawn_blocking(move || {
-                                    if is_stale_task() {
-                                        return None;
-                                    }
-                                    let img = image::open(&path_for_task).ok()?;
-                                    if is_stale_task() {
-                                        return None;
-                                    }
-                                    let max_dim = media_size;
-                                    if max_dim > 0
-                                        && (img.width() > max_dim || img.height() > max_dim)
-                                    {
-                                        Some(img.thumbnail(max_dim, max_dim))
-                                    } else {
-                                        Some(img)
-                                    }
-                                })
-                                .await
-                                .ok()
-                                .flatten()
-                            };
-
-                            if is_stale() {
-                                return;
-                            }
-
-                            if let Some(img) = img_result {
-                                if let Ok(mut guard) = image_state.lock() {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *guard = Some(img);
-                                    image_id.fetch_add(1, Ordering::Release);
-                                    changed.store(true, Ordering::Release);
-                                }
-                                if let Ok(mut str_guard) = string_state.lock() {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *str_guard = None;
-                                }
-                                if let Some(ref tx) = event_tx {
-                                    let _ = tx.send(crate::message::Event::PreviewChange);
-                                }
-                            }
-                        });
-                        self.current_media_task = Some(handle);
+                        self.start_media_preview(path);
                         continue;
                     }
                     PreviewMessage::Markdown(ref path, width) => {
-                        if !self.config.delay_clear {
-                            self.clear_image();
-                            self.clear_string();
-                            self.lines.clear();
-                        }
-                        self.dispatch_kill();
-                        // Clear any stale diagram offsets from previous preview
-                        if let Ok(mut offsets) = self.diagram_offsets.lock() {
-                            offsets.clear();
-                        }
-                        if let Ok(mut sources) = self.diagram_sources.lock() {
-                            sources.clear();
-                        }
-                        self.current_diagram_idx
-                            .store(0, std::sync::atomic::Ordering::Release);
-                        self.last = format!("{path}:{width:?}");
-                        let path = path.clone();
-                        let string_state = self.string.clone();
-                        let image_state = self.image.clone();
-                        let image_id = self.image_id.clone();
-                        let diagram_offsets_state = self.diagram_offsets.clone();
-                        let diagram_sources_state = self.diagram_sources.clone();
-                        let current_diagram_idx_state = self.current_diagram_idx.clone();
-                        let changed = self.changed.clone();
-                        let rx = self.rx.clone();
-                        let event_tx = self.event_controller_tx.clone();
-                        let current_generation = self.generation.clone();
-                        let media_enabled = self.config.media;
-                        let markdown_diagrams = self.config.markdown_diagrams;
-                        let inline_diagrams = self.config.inline_diagrams;
-                        let inline_images = self.config.inline_images;
-                        let diagram_theme = self.config.diagram_theme;
-                        let diagram_background = self.config.diagram_background;
-
-                        let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-                        let handle = tokio::task::spawn_blocking(move || {
-                            let is_stale = || {
-                                rx.has_changed().unwrap_or(false)
-                                    || current_generation.load(Ordering::Acquire) != task_gen
-                            };
-                            if is_stale() {
-                                return;
-                            }
-
-                            let p = std::path::Path::new(&path);
-                            let is_mermaid =
-                                p.extension().and_then(|e| e.to_str()).is_some_and(|ext| {
-                                    matches!(ext.to_lowercase().as_str(), "mmd" | "mermaid")
-                                });
-
-                            if is_mermaid {
-                                let content = std::fs::read_to_string(p).ok();
-                                if is_stale() {
-                                    return;
-                                }
-                                if let Some(ref c) = content
-                                    && let Ok(mut src_guard) = diagram_sources_state.lock()
-                                {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *src_guard = vec![c.clone()];
-                                }
-                                if is_stale() {
-                                    return;
-                                }
-                                current_diagram_idx_state
-                                    .store(0, std::sync::atomic::Ordering::Release);
-
-                                if markdown_diagrams
-                                    && inline_diagrams
-                                    && crate::utils::mermaid::is_kitty_supported()
-                                    && let Some(ref c) = content
-                                        && let Some(diag) = crate::utils::mermaid::render_mermaid_to_unicode_placeholders_with_options(
-                                            c,
-                                            width,
-                                            diagram_theme,
-                                            diagram_background,
-                                        ) {
-                                            if is_stale() {
-                                                return;
-                                            }
-                                            crate::utils::mermaid::transmit_kitty_image_idempotent(diag.image_id, &diag.transmission);
-                                            let mut lines = Vec::with_capacity(diag.lines.len() + 2);
-                                            lines.push(Line::default());
-                                            lines.extend(diag.lines);
-                                            lines.push(Line::default());
-                                            let rendered_text = Text::from(lines);
-                                            if is_stale() {
-                                                return;
-                                            }
-                                            if let Ok(mut guard) = string_state.lock() {
-                                                if is_stale() {
-                                                    return;
-                                                }
-                                                *guard = Some(rendered_text);
-                                                changed.store(true, Ordering::Release);
-                                            }
-                                            if let Ok(mut img_guard) = image_state.lock() {
-                                                if is_stale() {
-                                                    return;
-                                                }
-                                                *img_guard = None;
-                                                image_id.fetch_add(1, Ordering::Release);
-                                            }
-                                            if let Some(ref tx) = event_tx
-                                                && !is_stale() {
-                                                    let _ = tx.send(crate::message::Event::PreviewChange);
-                                                }
-                                            return;
-                                        }
-
-                                if media_enabled && markdown_diagrams {
-                                    // Try graphics-based rendering fallback (Kitty protocol)
-                                    let img = crate::utils::mermaid::render_mermaid_file_to_image_with_options(
-                                        p, 2.0, diagram_theme, diagram_background, // Scale 2.0 for high-DPI rendering
-                                    );
-
-                                    if is_stale() {
-                                        return;
-                                    }
-
-                                    if let Some(rendered_img) = img {
-                                        if let Ok(mut guard) = image_state.lock() {
-                                            if is_stale() {
-                                                return;
-                                            }
-                                            *guard = Some(rendered_img);
-                                            image_id.fetch_add(1, Ordering::Release);
-                                            changed.store(true, Ordering::Release);
-                                        }
-                                        if let Ok(mut str_guard) = string_state.lock() {
-                                            if is_stale() {
-                                                return;
-                                            }
-                                            *str_guard = None;
-                                        }
-                                        if let Some(ref tx) = event_tx
-                                            && !is_stale()
-                                        {
-                                            let _ = tx.send(crate::message::Event::PreviewChange);
-                                        }
-                                        return;
-                                    }
-                                    // Fall through to text rendering if image failed
-                                }
-
-                                let opts = crate::utils::mermaid::MermaidOptions {
-                                    max_width: width,
-                                    show_box: true,
-                                    title: Some("Mermaid Diagram".to_string()),
-                                    theme: diagram_theme,
-                                    background: diagram_background,
-                                    ..Default::default()
-                                };
-                                let rendered_text = match content {
-                                    Some(ref c) => crate::utils::mermaid::render_mermaid(c, &opts),
-                                    None => crate::utils::mermaid::render_mermaid_file(p, &opts)
-                                        .unwrap_or_else(|err| {
-                                            Text::from(format!("Error reading Mermaid file: {err}"))
-                                        }),
-                                };
-
-                                if is_stale() {
-                                    return;
-                                }
-                                if let Ok(mut guard) = string_state.lock() {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *guard = Some(rendered_text);
-                                    changed.store(true, Ordering::Release);
-                                }
-                                if let Ok(mut img_guard) = image_state.lock() {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *img_guard = None;
-                                    image_id.fetch_add(1, Ordering::Release);
-                                }
-                                if let Some(ref tx) = event_tx
-                                    && !is_stale()
-                                {
-                                    let _ = tx.send(crate::message::Event::PreviewChange);
-                                }
-                            } else {
-                                // Markdown file — render with diagram offset tracking
-                                let opts = crate::utils::markdown::MarkdownOptions {
-                                    max_width: width,
-                                    base_path: Some(p.to_path_buf()),
-                                    render_mermaid: markdown_diagrams,
-                                    inline_diagrams,
-                                    inline_images,
-                                    diagram_theme,
-                                    diagram_background,
-                                    ..Default::default()
-                                };
-                                let (rendered_text, offsets) =
-                                    crate::utils::markdown::render_markdown_file_with_diagram_offsets(
-                                        p, &opts,
-                                    )
-                                    .unwrap_or_else(|err| {
-                                        (
-                                            Text::from(format!("Error reading Markdown file: {err}")),
-                                            vec![],
-                                        )
-                                    });
-
-                                if is_stale() {
-                                    return;
-                                }
-
-                                // If media is enabled, extract and prepare diagram image
-                                let mut diag_img = None;
-                                let mut sources = Vec::new();
-                                if media_enabled && let Ok(content) = std::fs::read_to_string(p) {
-                                    let diagrams =
-                                        crate::utils::markdown::extract_mermaid_blocks(&content);
-                                    sources = diagrams.into_iter().map(|(_, s)| s).collect();
-                                    if let Some(first_diag) = sources.first() {
-                                        diag_img =
-                                                crate::utils::mermaid::render_mermaid_to_image_with_options(
-                                                    first_diag, 2.0, diagram_theme, diagram_background,
-                                                );
-                                    }
-                                }
-
-                                if is_stale() {
-                                    return;
-                                }
-
-                                if let Ok(mut img_guard) = image_state.lock() {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *img_guard = diag_img;
-                                    image_id.fetch_add(1, Ordering::Release);
-                                }
-                                if let Ok(mut src_guard) = diagram_sources_state.lock() {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *src_guard = sources;
-                                }
-                                if is_stale() {
-                                    return;
-                                }
-                                current_diagram_idx_state
-                                    .store(0, std::sync::atomic::Ordering::Release);
-
-                                // Store diagram offsets for navigation
-                                if let Ok(mut diag_guard) = diagram_offsets_state.lock() {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *diag_guard = offsets;
-                                }
-                                if let Ok(mut guard) = string_state.lock() {
-                                    if is_stale() {
-                                        return;
-                                    }
-                                    *guard = Some(rendered_text);
-                                    changed.store(true, Ordering::Release);
-                                }
-
-                                if let Some(ref tx) = event_tx
-                                    && !is_stale()
-                                {
-                                    let _ = tx.send(crate::message::Event::PreviewChange);
-                                }
-                            }
-                        });
-                        self.current_media_task = Some(handle);
+                        self.start_markdown_preview(path, width);
                         continue;
                     }
                     _ => {}
@@ -1141,6 +698,464 @@ impl Previewer {
                 true
             }
         });
+    }
+
+    /// Decodes an image, video thumbnail or PDF page in a background task into `image`, unless a
+    /// newer preview made it stale.
+    #[allow(clippy::ptr_arg)] // the arm binds `ref path: &String`; kept as moved
+    fn start_media_preview(&mut self, path: &String) {
+        self.dispatch_kill();
+        self.clear_diagrams();
+        if !self.config.delay_clear {
+            self.clear_image();
+            self.clear_string();
+            self.lines.clear();
+        }
+        self.last = path.clone();
+        let path = path.clone();
+        let image_state = self.image.clone();
+        let string_state = self.string.clone();
+        let image_id = self.image_id.clone();
+        let changed = self.changed.clone();
+        let event_tx = self.event_controller_tx.clone();
+        let current_generation = self.generation.clone();
+
+        let media_size = self.config.media_size;
+        let rx = self.rx.clone();
+        let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let handle = tokio::spawn(async move {
+            let is_stale = {
+                let rx = rx.clone();
+                let current_generation = current_generation.clone();
+                move || {
+                    rx.has_changed().unwrap_or(false)
+                        || current_generation.load(Ordering::Acquire) != task_gen
+                }
+            };
+            if is_stale() {
+                return;
+            }
+
+            let img_result = if path.to_lowercase().ends_with(".pdf") {
+                // PDF support using pdftoppm if available
+                let pdf_scale = if media_size > 0 {
+                    media_size.to_string()
+                } else {
+                    "1200".to_string()
+                };
+                let mut cmd = tokio::process::Command::new("pdftoppm");
+                cmd.kill_on_drop(true);
+                cmd.args([
+                    "-jpeg",
+                    "-r",
+                    "150",
+                    "-scale-to",
+                    &pdf_scale,
+                    "-f",
+                    "1",
+                    "-l",
+                    "1",
+                    &path,
+                ]);
+                if let Ok(_out) = cmd.output().await {
+                    if is_stale() {
+                        return;
+                    }
+                    let p = std::path::PathBuf::from(&path);
+                    let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("document");
+                    let rendered = p.with_file_name(format!("{}-1.jpg", stem));
+                    if rendered.exists() {
+                        let img = image::open(&rendered).ok();
+                        let _ = std::fs::remove_file(&rendered);
+                        img
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else if path.to_lowercase().ends_with(".mp4")
+                || path.to_lowercase().ends_with(".mkv")
+                || path.to_lowercase().ends_with(".webm")
+                || path.to_lowercase().ends_with(".mov")
+                || path.to_lowercase().ends_with(".avi")
+                || path.to_lowercase().ends_with(".flv")
+                || path.to_lowercase().ends_with(".m4v")
+                || path.to_lowercase().ends_with(".wmv")
+            {
+                // Video support
+                let media_size_str = if media_size > 0 {
+                    media_size.to_string()
+                } else {
+                    "512".to_string()
+                };
+                let mut cmd = tokio::process::Command::new("ffmpegthumbnailer");
+                cmd.kill_on_drop(true);
+                cmd.args([
+                    "-i",
+                    &path,
+                    "-s",
+                    &media_size_str,
+                    "-t",
+                    "00:00:01",
+                    "-c",
+                    "jpeg",
+                    "-q",
+                    "10",
+                    "-o",
+                    "-",
+                ]);
+                if let Ok(out) = cmd.output().await {
+                    if is_stale() {
+                        return;
+                    }
+                    // ffmpegthumbnailer sometimes pollutes stdout with debug logs.
+                    // We search for the JPEG start of image marker (FF D8 FF) and slice the buffer.
+                    let data = &out.stdout;
+                    let img_data =
+                        if let Some(pos) = data.windows(3).position(|w| w == [0xff, 0xd8, 0xff]) {
+                            &data[pos..]
+                        } else {
+                            data
+                        };
+                    image::load_from_memory(img_data).ok()
+                } else {
+                    None
+                }
+            } else {
+                let path_for_task = path.clone();
+                let is_stale_task = is_stale.clone();
+                tokio::task::spawn_blocking(move || {
+                    if is_stale_task() {
+                        return None;
+                    }
+                    let img = image::open(&path_for_task).ok()?;
+                    if is_stale_task() {
+                        return None;
+                    }
+                    let max_dim = media_size;
+                    if max_dim > 0 && (img.width() > max_dim || img.height() > max_dim) {
+                        Some(img.thumbnail(max_dim, max_dim))
+                    } else {
+                        Some(img)
+                    }
+                })
+                .await
+                .ok()
+                .flatten()
+            };
+
+            if is_stale() {
+                return;
+            }
+
+            if let Some(img) = img_result {
+                if let Ok(mut guard) = image_state.lock() {
+                    if is_stale() {
+                        return;
+                    }
+                    *guard = Some(img);
+                    image_id.fetch_add(1, Ordering::Release);
+                    changed.store(true, Ordering::Release);
+                }
+                if let Ok(mut str_guard) = string_state.lock() {
+                    if is_stale() {
+                        return;
+                    }
+                    *str_guard = None;
+                }
+                if let Some(ref tx) = event_tx {
+                    let _ = tx.send(crate::message::Event::PreviewChange);
+                }
+            }
+        });
+        self.current_media_task = Some(handle);
+    }
+
+    /// Renders a Markdown file (with its Mermaid diagrams) in a background task; the result lands in
+    /// `string` (or `image` for a diagram-only file) unless a newer preview made it stale.
+    #[allow(clippy::ptr_arg)] // the arm binds `ref path: &String`; kept as moved
+    fn start_markdown_preview(&mut self, path: &String, width: Option<usize>) {
+        if !self.config.delay_clear {
+            self.clear_image();
+            self.clear_string();
+            self.lines.clear();
+        }
+        self.dispatch_kill();
+        // Clear any stale diagram offsets from previous preview
+        if let Ok(mut offsets) = self.diagram_offsets.lock() {
+            offsets.clear();
+        }
+        if let Ok(mut sources) = self.diagram_sources.lock() {
+            sources.clear();
+        }
+        self.current_diagram_idx
+            .store(0, std::sync::atomic::Ordering::Release);
+        self.last = format!("{path}:{width:?}");
+        let path = path.clone();
+        let string_state = self.string.clone();
+        let image_state = self.image.clone();
+        let image_id = self.image_id.clone();
+        let diagram_offsets_state = self.diagram_offsets.clone();
+        let diagram_sources_state = self.diagram_sources.clone();
+        let current_diagram_idx_state = self.current_diagram_idx.clone();
+        let changed = self.changed.clone();
+        let rx = self.rx.clone();
+        let event_tx = self.event_controller_tx.clone();
+        let current_generation = self.generation.clone();
+        let media_enabled = self.config.media;
+        let markdown_diagrams = self.config.markdown_diagrams;
+        let inline_diagrams = self.config.inline_diagrams;
+        let inline_images = self.config.inline_images;
+        let diagram_theme = self.config.diagram_theme;
+        let diagram_background = self.config.diagram_background;
+
+        let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let handle = tokio::task::spawn_blocking(move || {
+            let is_stale = || {
+                rx.has_changed().unwrap_or(false)
+                    || current_generation.load(Ordering::Acquire) != task_gen
+            };
+            if is_stale() {
+                return;
+            }
+
+            let p = std::path::Path::new(&path);
+            let is_mermaid = p
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|ext| matches!(ext.to_lowercase().as_str(), "mmd" | "mermaid"));
+
+            if is_mermaid {
+                let content = std::fs::read_to_string(p).ok();
+                if is_stale() {
+                    return;
+                }
+                if let Some(ref c) = content
+                    && let Ok(mut src_guard) = diagram_sources_state.lock()
+                {
+                    if is_stale() {
+                        return;
+                    }
+                    *src_guard = vec![c.clone()];
+                }
+                if is_stale() {
+                    return;
+                }
+                current_diagram_idx_state.store(0, std::sync::atomic::Ordering::Release);
+
+                if markdown_diagrams
+                    && inline_diagrams
+                    && crate::utils::mermaid::is_kitty_supported()
+                    && let Some(ref c) = content
+                    && let Some(diag) =
+                        crate::utils::mermaid::render_mermaid_to_unicode_placeholders_with_options(
+                            c,
+                            width,
+                            diagram_theme,
+                            diagram_background,
+                        )
+                {
+                    if is_stale() {
+                        return;
+                    }
+                    crate::utils::mermaid::transmit_kitty_image_idempotent(
+                        diag.image_id,
+                        &diag.transmission,
+                    );
+                    let mut lines = Vec::with_capacity(diag.lines.len() + 2);
+                    lines.push(Line::default());
+                    lines.extend(diag.lines);
+                    lines.push(Line::default());
+                    let rendered_text = Text::from(lines);
+                    if is_stale() {
+                        return;
+                    }
+                    if let Ok(mut guard) = string_state.lock() {
+                        if is_stale() {
+                            return;
+                        }
+                        *guard = Some(rendered_text);
+                        changed.store(true, Ordering::Release);
+                    }
+                    if let Ok(mut img_guard) = image_state.lock() {
+                        if is_stale() {
+                            return;
+                        }
+                        *img_guard = None;
+                        image_id.fetch_add(1, Ordering::Release);
+                    }
+                    if let Some(ref tx) = event_tx
+                        && !is_stale()
+                    {
+                        let _ = tx.send(crate::message::Event::PreviewChange);
+                    }
+                    return;
+                }
+
+                if media_enabled && markdown_diagrams {
+                    // Try graphics-based rendering fallback (Kitty protocol)
+                    let img = crate::utils::mermaid::render_mermaid_file_to_image_with_options(
+                        p,
+                        2.0,
+                        diagram_theme,
+                        diagram_background, // Scale 2.0 for high-DPI rendering
+                    );
+
+                    if is_stale() {
+                        return;
+                    }
+
+                    if let Some(rendered_img) = img {
+                        if let Ok(mut guard) = image_state.lock() {
+                            if is_stale() {
+                                return;
+                            }
+                            *guard = Some(rendered_img);
+                            image_id.fetch_add(1, Ordering::Release);
+                            changed.store(true, Ordering::Release);
+                        }
+                        if let Ok(mut str_guard) = string_state.lock() {
+                            if is_stale() {
+                                return;
+                            }
+                            *str_guard = None;
+                        }
+                        if let Some(ref tx) = event_tx
+                            && !is_stale()
+                        {
+                            let _ = tx.send(crate::message::Event::PreviewChange);
+                        }
+                        return;
+                    }
+                    // Fall through to text rendering if image failed
+                }
+
+                let opts = crate::utils::mermaid::MermaidOptions {
+                    max_width: width,
+                    show_box: true,
+                    title: Some("Mermaid Diagram".to_string()),
+                    theme: diagram_theme,
+                    background: diagram_background,
+                    ..Default::default()
+                };
+                let rendered_text = match content {
+                    Some(ref c) => crate::utils::mermaid::render_mermaid(c, &opts),
+                    None => {
+                        crate::utils::mermaid::render_mermaid_file(p, &opts).unwrap_or_else(|err| {
+                            Text::from(format!("Error reading Mermaid file: {err}"))
+                        })
+                    }
+                };
+
+                if is_stale() {
+                    return;
+                }
+                if let Ok(mut guard) = string_state.lock() {
+                    if is_stale() {
+                        return;
+                    }
+                    *guard = Some(rendered_text);
+                    changed.store(true, Ordering::Release);
+                }
+                if let Ok(mut img_guard) = image_state.lock() {
+                    if is_stale() {
+                        return;
+                    }
+                    *img_guard = None;
+                    image_id.fetch_add(1, Ordering::Release);
+                }
+                if let Some(ref tx) = event_tx
+                    && !is_stale()
+                {
+                    let _ = tx.send(crate::message::Event::PreviewChange);
+                }
+            } else {
+                // Markdown file — render with diagram offset tracking
+                let opts = crate::utils::markdown::MarkdownOptions {
+                    max_width: width,
+                    base_path: Some(p.to_path_buf()),
+                    render_mermaid: markdown_diagrams,
+                    inline_diagrams,
+                    inline_images,
+                    diagram_theme,
+                    diagram_background,
+                    ..Default::default()
+                };
+                let (rendered_text, offsets) =
+                    crate::utils::markdown::render_markdown_file_with_diagram_offsets(p, &opts)
+                        .unwrap_or_else(|err| {
+                            (
+                                Text::from(format!("Error reading Markdown file: {err}")),
+                                vec![],
+                            )
+                        });
+
+                if is_stale() {
+                    return;
+                }
+
+                // If media is enabled, extract and prepare diagram image
+                let mut diag_img = None;
+                let mut sources = Vec::new();
+                if media_enabled && let Ok(content) = std::fs::read_to_string(p) {
+                    let diagrams = crate::utils::markdown::extract_mermaid_blocks(&content);
+                    sources = diagrams.into_iter().map(|(_, s)| s).collect();
+                    if let Some(first_diag) = sources.first() {
+                        diag_img = crate::utils::mermaid::render_mermaid_to_image_with_options(
+                            first_diag,
+                            2.0,
+                            diagram_theme,
+                            diagram_background,
+                        );
+                    }
+                }
+
+                if is_stale() {
+                    return;
+                }
+
+                if let Ok(mut img_guard) = image_state.lock() {
+                    if is_stale() {
+                        return;
+                    }
+                    *img_guard = diag_img;
+                    image_id.fetch_add(1, Ordering::Release);
+                }
+                if let Ok(mut src_guard) = diagram_sources_state.lock() {
+                    if is_stale() {
+                        return;
+                    }
+                    *src_guard = sources;
+                }
+                if is_stale() {
+                    return;
+                }
+                current_diagram_idx_state.store(0, std::sync::atomic::Ordering::Release);
+
+                // Store diagram offsets for navigation
+                if let Ok(mut diag_guard) = diagram_offsets_state.lock() {
+                    if is_stale() {
+                        return;
+                    }
+                    *diag_guard = offsets;
+                }
+                if let Ok(mut guard) = string_state.lock() {
+                    if is_stale() {
+                        return;
+                    }
+                    *guard = Some(rendered_text);
+                    changed.store(true, Ordering::Release);
+                }
+
+                if let Some(ref tx) = event_tx
+                    && !is_stale()
+                {
+                    let _ = tx.send(crate::message::Event::PreviewChange);
+                }
+            }
+        });
+        self.current_media_task = Some(handle);
     }
 }
 
