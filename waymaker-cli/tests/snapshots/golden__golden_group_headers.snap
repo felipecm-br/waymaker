@@ -1,15 +1,16 @@
 ---
 source: waymaker-cli/tests/golden.rs
+assertion_line: 171
 expression: wm.styled_screen()
 ---
  0|
- 1| >                           banana
+ 1| >                           carrot
  2|   4/4
- 3|  Fruit
- 4|   apple
- 5|   banana
- 6|  Veg
- 7|   carrot
+ 3|   apple
+ 4|   banana
+ 5|  Veg
+ 6|   carrot
+ 7|   leek
  8|    enter accept │ tab mark
  9|
 10|
@@ -17,7 +18,6 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-5 fg=2 italic
- 3: 2-6 fg=6 bold
- 5: 3-28 bold
- 6: 2-4 fg=6 dim
+ 5: 2-4 fg=6 bold
+ 6: 3-28 bold
  8: 1-3 fg=6 | 4-8 fg=6 bold | 9 fg=6 | 10-15 fg=8 | 16 fg=6 | 17 fg=8 | 18 fg=6 | 19-21 fg=6 bold | 22 fg=6 | 23-26 fg=8 | 27-28 fg=6

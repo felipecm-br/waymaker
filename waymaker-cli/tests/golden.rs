@@ -164,7 +164,7 @@ fn golden_group_headers() {
     let wm = Launch::new("# Fruit\napple\nbanana\n# Veg\ncarrot\nleek\n")
         .args(&["--group-prefix", "#"])
         .size(12, 60)
-        .ready("leek")
+        .ready("4/4") // the two header lines are not items
         .start();
     wm.send(DOWN);
     wm.send(DOWN);
@@ -189,7 +189,6 @@ fn golden_file_icons() {
     )
     .args(&["--icons"])
     .size(12, 60)
-    .ready("scripts/run.sh")
     .start();
     insta::assert_snapshot!(wm.styled_screen());
 }

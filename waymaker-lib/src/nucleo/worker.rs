@@ -390,9 +390,14 @@ impl<T: SSS> Worker<T> {
     }
 
     pub fn find(&mut self, line: &str) {
-        if self.sort_threshold.is_smart() {
-            let effective = self.sort_threshold.get_effective_threshold(line);
-            self.nucleo.set_stability(effective);
+        // With no query every item scores the same, and nucleo would break the tie by length,
+        // listing the shortest first; like fzf, an empty query keeps the input order instead.
+        // A query sorts by the configured threshold as before.
+        if line.trim().is_empty() {
+            self.nucleo.set_stability(u32::MAX);
+        } else {
+            self.nucleo
+                .set_stability(self.sort_threshold.get_effective_threshold(line));
         }
         let old_query = self.query.parse(line);
         if self.query == old_query {

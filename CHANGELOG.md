@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### 🔄 Changed
+
+- `ctrl-c` exits at once (new action `Abort`, exit code 130), like fzf, even with a message box open or items selected or marked. `Quit` keeps its step-by-step behaviour (close the action box, then clear selections, then yank and cut marks), so `esc` and `q` in the `jump` preset still unwind one step per press. Configs that bind `"ctrl-c" = "Quit"` keep the old behaviour; change them to `"Abort"`
+- With an empty query, items keep their input order, like fzf; they used to be listed shortest first. Typing a query sorts by match quality as before
+
 ## [0.7.1] - 2026-11-05
 
 ### 🐛 Bug Fixes

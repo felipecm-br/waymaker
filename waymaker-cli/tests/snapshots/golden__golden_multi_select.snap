@@ -4,18 +4,18 @@ assertion_line: 53
 expression: wm.styled_screen()
 ---
  0|
- 1| >                                          2  lime/29
+ 1| >                                          2  cherry/02
  2|   30/30
- 3| ▌ lime/09
- 4| ▌ lime/19
- 5|   lime/29
- 6|   apple/00
- 7|   mango/03
- 8|   grape/06
- 9|   melon/07
-10|   lemon/08
-11|   apple/10
-12|   mango/13
+ 3| ▌ apple/00
+ 4| ▌ banana/01
+ 5|   cherry/02
+ 6|   mango/03
+ 7|   orange/04
+ 8|   pineapple/05
+ 9|   grape/06
+10|   melon/07
+11|   lemon/08
+12|   lime/09
 13|    enter accept │ tab mark
 14|
 15|

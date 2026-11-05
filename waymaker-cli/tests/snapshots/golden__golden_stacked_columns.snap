@@ -1,15 +1,16 @@
 ---
 source: waymaker-cli/tests/golden.rs
+assertion_line: 159
 expression: wm.styled_screen()
 ---
  0|
- 1| >                                             beta
+ 1| >                                             alpha
  2|   4/4
- 3|   beta
- 4|   3M
- 5|   2025-12-31
- 6|   alpha
- 7|   12K
+ 3|   alpha
+ 4|   12K
+ 5|   2026-01-02
+ 6|   beta
+ 7|   3M
  8|    enter accept │ tab mark │ ctrl-p preview
  9|
 10|

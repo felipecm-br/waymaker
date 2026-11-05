@@ -157,6 +157,7 @@ jobs:
         shell: bash
         run: |
           python3 scripts/regress.py "$RUNNER_TEMP/wm-old" "$RUNNER_TEMP/wm-new" --markdown \
+            --old-config "$RUNNER_TEMP/base/waymaker-cli/assets/config.toml" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
   bench:

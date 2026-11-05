@@ -71,7 +71,7 @@ impl<'a> Launch<'a> {
         self.no_input = true;
         self
     }
-    /// Text that shows the picker is up (default: the last input item).
+    /// Text that shows the picker is up (default: the `N/N` counter for all N input lines).
     pub fn ready(mut self, text: &'a str) -> Self {
         self.ready = Some(text);
         self
@@ -175,9 +175,14 @@ impl Session {
             dir,
             size: (rows, cols),
         };
-        // Keys sent before the picker is up are lost, so wait for the last item.
-        let last_item = ready.unwrap_or_else(|| items.lines().last().unwrap_or_default());
-        session.wait_for(|text| text.contains(last_item));
+        // Keys sent before the picker is up are lost, so wait until every item is in: the
+        // status counter reads `N/N` (matched/total) for N input lines.
+        let count = items.lines().filter(|l| !l.is_empty()).count();
+        let loaded = format!("{count}/{count}");
+        let ready = ready.unwrap_or(&loaded);
+        // Check the screen as drawn, not the byte stream: ratatui redraws only changed cells, so
+        // `0/0` becoming `4/4` writes two lone `4`s and the text never appears in the bytes.
+        session.wait_for_screen(|text| text.contains(ready));
         session.wait_until_idle();
         session
     }

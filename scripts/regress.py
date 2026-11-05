@@ -11,8 +11,9 @@
   over 1.25x and 10 ms; p99: over 1.5x and 4 ms), since identical builds differ by more than
   15% at tens of milliseconds and by 3x at sub-millisecond p99s.
 
-Both binaries run with the shipped config (`waymaker-cli/assets/config.toml`) on a generated
-corpus, so results do not depend on the machine's own config. Exit status 1 on any failure.
+Both binaries run with the shipped config (`waymaker-cli/assets/config.toml`; OLD_WM can get its
+own with --old-config) on a generated corpus, so results do not depend on the machine's own
+config. Exit status 1 on any failure.
 """
 import argparse, os, re, resource, statistics, subprocess, sys, tempfile, time
 
@@ -26,11 +27,13 @@ def corpus(path, n):
         for i in range(1, n + 1):
             f.write(f"src/module_{i % 977}/file_{i}.rs path/to/something/{i * 7}\n")
 
+CONFIGS = {}  # binary -> the config it runs with (see --old-config)
+
 def run(binary, args, stdin_path):
     """(stdout bytes, seconds) of one run."""
     with open(stdin_path, "rb") as stdin:
         t = time.perf_counter()
-        p = subprocess.run([binary, "--config", CONFIG, *args], stdin=stdin,
+        p = subprocess.run([binary, "--config", CONFIGS.get(binary, CONFIG), *args], stdin=stdin,
                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         return p.stdout, time.perf_counter() - t
 
@@ -41,14 +44,14 @@ def peak_rss_mib(binary, args, stdin_path):
             "subprocess.run(sys.argv[1:-1],stdin=open(sys.argv[-1],'rb'),"
             "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);"
             "print(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss)")
-    out = subprocess.run([sys.executable, "-c", code, binary, "--config", CONFIG, *args, stdin_path],
+    out = subprocess.run([sys.executable, "-c", code, binary, "--config", CONFIGS.get(binary, CONFIG), *args, stdin_path],
                          capture_output=True, text=True, check=True).stdout
     kib = int(out.strip())
     return kib / 1024 if sys.platform != "darwin" else kib / (1024 * 1024)
 
 def p99_frame_ms(binary, stdin_path):
     with open(stdin_path, "rb") as stdin:
-        out = subprocess.run([binary, "--config", CONFIG, "--benchmark-input", "mod97"],
+        out = subprocess.run([binary, "--config", CONFIGS.get(binary, CONFIG), "--benchmark-input", "mod97"],
                              stdin=stdin, capture_output=True, text=True).stdout
     m = re.search(r"p99 Frametime:\s+([\d.]+)\s*ms", out)
     return float(m.group(1)) if m else float("nan")
@@ -59,7 +62,11 @@ def main():
     ap.add_argument("--lines", type=int, default=500_000)
     ap.add_argument("--runs", type=int, default=5)
     ap.add_argument("--markdown", action="store_true")
+    ap.add_argument("--old-config", help="config for OLD_WM (default: this checkout's); an older "
+                    "binary may not parse a newer config, e.g. one using an action added since")
     a = ap.parse_args()
+    if a.old_config:
+        CONFIGS[a.old] = a.old_config
 
     failures, warnings, rows = [], [], []
     with tempfile.TemporaryDirectory() as tmp:
