@@ -316,3 +316,23 @@ fn preview_file_subcommand_previews_directory_text_and_image() {
         img_text.contains("Image") || img_text.contains("PNG") || img_text.contains("test.png")
     );
 }
+
+#[test]
+fn markdown_preview_goes_idle() {
+    // A Markdown preview used to re-render in a loop (its render ends by announcing a preview
+    // change, which requested the same render again), redrawing ~30 times a second while idle.
+    let files: &[(&str, &str)] = &[
+        ("README.md", "# Demo\n\nA small project.\n"),
+        ("notes.txt", "x\n"),
+    ];
+    let wm = Launch::new("notes.txt\nREADME.md\n").files(files).start();
+    wm.send(DOWN); // waits until the screen has been quiet for 300 ms, or panics after 10 s
+    let before = wm.screen_text().len();
+    thread::sleep(Duration::from_secs(1));
+    assert_eq!(
+        wm.screen_text().len(),
+        before,
+        "wm kept redrawing an idle Markdown preview"
+    );
+    wm.send(ESC);
+}

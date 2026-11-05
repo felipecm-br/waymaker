@@ -230,7 +230,13 @@ impl Previewer {
             }
 
             if is_debouncable {
-                if !force_run && !self.config.always_trigger && self.last == key {
+                // `always_trigger` re-runs a preview command whose output may differ each time. A
+                // file render (Markdown, media) at the same width cannot, and re-rendering it is
+                // what makes it ping-pong: the render ends by sending `PreviewChange`, which asks
+                // for the same render again, so the picker redrew ~30 times a second while idle.
+                let renders_file =
+                    matches!(m, PreviewMessage::Media(_) | PreviewMessage::Markdown(..));
+                if !force_run && (!self.config.always_trigger || renders_file) && self.last == key {
                     continue;
                 }
 
