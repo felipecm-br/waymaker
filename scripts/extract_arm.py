@@ -50,4 +50,4 @@ else:
     out = "\n".join(src).rstrip("\n") + "\n\n" + "\n".join(fn) + "\n"
     open(a.file, "w").write(out)
 print(f"{a.name}: moved {len(body)} lines from {a.file}:{a.line}; " +
-      ", ".join(f"{k}={v}" for k, v in flags.items() if v) or "no control-flow keywords")
+      (", ".join(f"{k}={v}" for k, v in flags.items() if v) or "no control-flow keywords"))

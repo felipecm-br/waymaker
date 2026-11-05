@@ -7,7 +7,7 @@
 For each NAME, the body of `fn NAME` in the --new files (between its `{` line and the closing
 brace at the same indentation) must appear verbatim in an --old file, after applying --rename to the old text. Whitespace is
 ignored entirely, so rustfmt re-wrapping and re-indenting moved code does not count as a change
-(rustfmt never alters string literals). Exits 1 on any mismatch, with a diff against the closest
+(rustfmt never alters string literals), and neither is its `=> { expr }` to `=> expr,` rewrite. Exits 1 on any mismatch, with a diff against the closest
 old block.
 """
 import argparse, difflib, re, subprocess, sys
@@ -44,7 +44,10 @@ def body_of(name):
     sys.exit(f"fn {name} not found in {a.new}")
 
 def squash(lines):
-    return re.sub(r"\s+", "", "".join(lines))
+    text = re.sub(r"\s+", "", "".join(lines))
+    # rustfmt rewrites a match arm `=> { expr }` as `=> expr,` once it fits on one line.
+    text = re.sub(r"=>\{([^{};]*)\}", r"=>\1,", text)
+    return text.replace(",,", ",").replace(",}", "}")
 
 old_squashed = squash(old)
 
