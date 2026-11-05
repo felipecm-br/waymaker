@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-05
+
 ### ✨ Added
 
 - A second spinner marker: rows with `results.slow_spinner_prefix` animate with `results.slow_spinner` (default `hexfill`, a new Nerd Font spinner that fills and empties a honeycomb cell every 2.5 s), so one list can show fast and slow busy rows side by side
