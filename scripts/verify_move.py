@@ -17,6 +17,8 @@ ap.add_argument("--old", action="append", required=True)
 ap.add_argument("--new", action="append", required=True)
 ap.add_argument("--fn", action="append", required=True, dest="fns")
 ap.add_argument("--rename", action="append", default=[])
+ap.add_argument("--trim-head", type=int, default=0, help="new-body lines to skip at the start (a wrapper `match`)")
+ap.add_argument("--trim-tail", type=int, default=0, help="new-body lines to skip at the end")
 a = ap.parse_args()
 
 def norm(lines):
@@ -57,6 +59,7 @@ def find(seq, block):
 ok = True
 for name in a.fns:
     body = norm(body_of(name))
+    body = body[a.trim_head:len(body) - a.trim_tail]
     if find(old, body):
         print(f"{name}: {len(body)} lines moved verbatim")
         continue
