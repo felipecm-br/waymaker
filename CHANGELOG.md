@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-05
+
 ### 🐛 Bug Fixes
 
 - Navigation-mode key hints drop the brackets and the six key colours: keys are cyan and bold, actions darkgray (as in the footer). The `jump` hint says `m Bookmark` (was `[*]`), and the filter-mode hint `C-u` now reads `Clear` (it clears the query since 0.7.0; ancestors are nav-mode `U`)
@@ -8,6 +10,17 @@
 - A query made only of exclusions (`!apple`, `!a !b`) matched nothing; like fzf it now lists every item without those terms, in `wm -f` and in the picker (nucleo fork `b6b254c`, the upstream fix)
 - `wm.log` is appended to instead of rewritten at every start (and starts over past 5 MiB): a `wm` run by `wm` (a preview, `wm list`) used to wipe the running picker's log
 - With a Markdown file (or, with `--media`, an image) under the cursor, `wm` redrew the screen about 30 times a second while idle; the preview now renders once
+
+### 🧪 Testing
+
+- Golden frames: full styled-screen snapshots of the real `wm` in a pty (filter, scrolling, multi-select, no match, narrow terminal, Markdown preview, `jump`)
+- Key-contract tests for navigation mode (`l`/`h`, yank/paste/undo, source cycling) and a snapshot of every bind of the default config and all presets
+- CI `regress` job: the previous and the new binary must print identical `wm -f` output, use at most 10% more memory and not be much slower
+
+### 🔄 Changed
+
+- Internal refactors with no behaviour change, each checked line by line against the old code: `start` (1,250 → 455 lines), `handle_action` (1,108 → 581), `Previewer::run` (858 → 145), `draw_frame` (741 → 387), `handle_fm` (670 → 211), `handle_frecency_cli` (555 → 195)
+
 
 ## [0.7.0] - 2026-11-04
 
