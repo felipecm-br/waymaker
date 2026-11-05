@@ -380,6 +380,59 @@ mod tests {
         }
     }
 
+    /// Every bind of the default config and of each shipped preset (applied over the defaults,
+    /// as `-o <preset>` does), sorted, in one snapshot: a refactor cannot change a bind without
+    /// a reviewed diff in `src/snapshots/`. Accept intended changes with `cargo insta review`.
+    #[test]
+    fn test_bind_tables_snapshot() {
+        use waymaker_partial::Apply;
+
+        fn table(config: &Config) -> String {
+            let mut binds: Vec<String> = config
+                .binds
+                .iter()
+                .map(|(trigger, actions)| {
+                    let acts: Vec<String> = actions.0.iter().map(|a| a.to_string()).collect();
+                    format!("{:?} = {}", trigger.to_string(), acts.join(", "))
+                })
+                .collect();
+            binds.sort();
+            let mut nav: Vec<String> = config
+                .render
+                .ui
+                .nav
+                .binds
+                .iter()
+                .map(|(key, actions)| {
+                    let acts: Vec<String> = actions.0.iter().map(|a| a.to_string()).collect();
+                    format!("{key:?} = {}", acts.join(", "))
+                })
+                .collect();
+            nav.sort();
+            format!(
+                "[binds]\n{}\n[ui.nav.binds]\n{}\n",
+                binds.join("\n"),
+                nav.join("\n")
+            )
+        }
+
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
+        let mut presets = Vec::new();
+        toml_files(&assets.join("presets"), &mut presets);
+        presets.sort();
+
+        let mut out = format!("## config.toml\n{}", table(&Config::default()));
+        for path in presets {
+            let rel = path.strip_prefix(&assets).unwrap().display().to_string();
+            let partial: PartialConfig = toml::from_str(&std::fs::read_to_string(&path).unwrap())
+                .unwrap_or_else(|e| panic!("{rel}: {e}"));
+            let mut config = Config::default();
+            config.apply(partial);
+            out.push_str(&format!("\n## {rel}\n{}", table(&config)));
+        }
+        insta::assert_snapshot!(out);
+    }
+
     #[test]
     fn test_jump_preset_layering() {
         use waymaker::action::Action;
@@ -389,13 +442,8 @@ mod tests {
         let jump_str = include_str!("../assets/presets/jump.toml");
         let jump_partial: PartialConfig = toml::from_str(jump_str).unwrap();
 
+        // Shipped defaults only: a developer's own config must not change what this test sees.
         let mut config = Config::default();
-        if let Ok(user_str) = std::fs::read_to_string("/home/fecavmi/.config/waymaker/config.toml")
-            .or_else(|_| std::fs::read_to_string("/home/fecavmi/.config/matchmaker/config.toml"))
-            && let Ok(user_partial) = toml::from_str::<PartialConfig>(&user_str)
-        {
-            config.apply(user_partial);
-        }
         config.apply(jump_partial);
 
         // Check that 'tab' is present in nav_binds and binds
