@@ -67,6 +67,23 @@ impl Spinner {
         frames: &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
         fps: 12,
     };
+    /// A Nerd Font honeycomb cell that fills and empties, 2.5 s a cycle: slow enough to read
+    /// as "waiting" next to a fast spinner.
+    pub const HEXFILL: Spinner = Spinner {
+        frames: &[
+            "\u{f0ac3}",
+            "\u{f0ac4}",
+            "\u{f0ac5}",
+            "\u{f0ac6}",
+            "\u{f0ac7}",
+            "\u{f0ac8}",
+            "\u{f0ac7}",
+            "\u{f0ac6}",
+            "\u{f0ac5}",
+            "\u{f0ac4}",
+        ],
+        fps: 4,
+    };
 
     pub fn from_name(name: &str) -> &'static Spinner {
         match name {
@@ -84,6 +101,7 @@ impl Spinner {
             "nerd" => &Self::NERD,
             "nerdarc" => &Self::NERDARC,
             "minidot" => &Self::MINIDOT,
+            "hexfill" => &Self::HEXFILL,
             _ => &Self::DOT, // default
         }
     }
@@ -96,5 +114,21 @@ impl Spinner {
         let ms_per_frame = 1000 / (self.fps as u64);
         let current_frame = (ms / ms_per_frame) % (self.frames.len() as u64);
         self.frames[current_frame as usize]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Spinner;
+
+    #[test]
+    fn hexfill_fills_and_empties_slowly() {
+        let s = Spinner::from_name("hexfill");
+        assert_eq!(s.frames.len(), 10);
+        assert_eq!(s.fps, 4);
+        // Rises from the empty cell to the full one, then falls back without repeating either end.
+        assert_eq!(s.frames[0], "\u{f0ac3}");
+        assert_eq!(s.frames[5], "\u{f0ac8}");
+        assert!((1..5).all(|k| s.frames[k] == s.frames[10 - k]));
     }
 }

@@ -141,14 +141,25 @@ impl ResultsUI {
                 let mut icon_name = String::new();
                 let mut is_spinner = false;
                 let mut spinner_col_idx = 0;
+                // The marker found in the row and the spinner it animates.
+                let mut spinner_marker: &str = &self.config.spinner_prefix;
+                let mut spinner_name: &str = &self.config.spinner;
 
-                if !$row.is_empty() && !self.config.spinner_prefix.is_empty() {
-                    for (i, col_text) in $row.iter().enumerate() {
+                if !$row.is_empty() {
+                    let markers = [
+                        (&self.config.spinner_prefix, &self.config.spinner),
+                        (&self.config.slow_spinner_prefix, &self.config.slow_spinner),
+                    ];
+                    'find: for (i, col_text) in $row.iter().enumerate() {
                         let text_content = extract_col0_name(col_text);
-                        if text_content.contains(&self.config.spinner_prefix) {
-                            is_spinner = true;
-                            spinner_col_idx = i;
-                            break;
+                        for (marker, name) in markers {
+                            if !marker.is_empty() && text_content.contains(marker.as_str()) {
+                                is_spinner = true;
+                                spinner_col_idx = i;
+                                spinner_marker = marker;
+                                spinner_name = name;
+                                break 'find;
+                            }
                         }
                     }
                 }
@@ -156,23 +167,23 @@ impl ResultsUI {
                 if !$row.is_empty() {
                     icon_name = $columns[0].raw($item).into_owned();
                     if is_spinner && spinner_col_idx == 0 {
-                        icon_name = icon_name.replace(&self.config.spinner_prefix, "");
+                        icon_name = icon_name.replace(spinner_marker, "");
                     }
                 }
 
                 if is_spinner {
                     if self.config.spinner_inline {
-                        let frame = crate::spinner::Spinner::from_name(&self.config.spinner)
-                            .current_frame();
+                        let frame =
+                            crate::spinner::Spinner::from_name(spinner_name).current_frame();
                         crate::utils::text::replace_string_in_text(
                             &mut $row[spinner_col_idx],
-                            &self.config.spinner_prefix,
+                            spinner_marker,
                             &format!("{frame}"),
                         );
                     } else {
                         crate::utils::text::strip_string_from_text(
                             &mut $row[spinner_col_idx],
-                            &self.config.spinner_prefix,
+                            spinner_marker,
                         );
                     }
                 }
@@ -180,8 +191,7 @@ impl ResultsUI {
                 let is_cut = Self::is_path_in_set(&self.cut_paths, &icon_name, &cwd);
 
                 let prefix = if is_spinner && !self.config.spinner_inline {
-                    let frame =
-                        crate::spinner::Spinner::from_name(&self.config.spinner).current_frame();
+                    let frame = crate::spinner::Spinner::from_name(spinner_name).current_frame();
                     let f = format!("{frame} ");
                     crate::utils::string::fit_width(&f, self.config.multi_prefix.width())
                 } else if $is_selected || is_yanked || is_cut {

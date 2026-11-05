@@ -165,7 +165,9 @@ An unknown key or colour is skipped with a warning.
 
 ## Spinners and the unselected marker
 
-A row whose text starts with `results.spinner_prefix` shows an animated spinner in place of its prefix (the marker itself is stripped). Named spinners: `dot` (default), `line`, `jump`, `pulse`, `points`, `meter`, `hamburger`, `ellipsis`, `globe`, `moon`, `monkey`, `arc`, `nerd`, `nerdarc`, `minidot`.
+A row whose text starts with `results.spinner_prefix` shows an animated spinner in place of its prefix (the marker itself is stripped). Named spinners: `dot` (default), `line`, `jump`, `pulse`, `points`, `meter`, `hamburger`, `ellipsis`, `globe`, `moon`, `monkey`, `arc`, `nerd`, `nerdarc`, `minidot`, `hexfill`.
+
+`results.slow_spinner_prefix` is a second marker whose rows animate with `results.slow_spinner` (default `hexfill`, 2.5 s a cycle), so a list can tell a fast "thinking" row from a calm "waiting" one by rate alone.
 
 `results.unselected_prefix` (default two spaces) is the marker of rows that are not selected.
 

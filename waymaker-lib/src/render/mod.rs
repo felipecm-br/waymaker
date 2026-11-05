@@ -467,7 +467,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             state.needs_redraw = true;
         }
 
-        if !picker_ui.results.config.spinner_prefix.is_empty() {
+        if !picker_ui.results.config.spinner_prefix.is_empty()
+            || !picker_ui.results.config.slow_spinner_prefix.is_empty()
+        {
             state.needs_redraw = true;
         }
 

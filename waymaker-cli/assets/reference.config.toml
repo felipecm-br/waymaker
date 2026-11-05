@@ -395,9 +395,19 @@ spinner_prefix = ""
 
 # Animated spinner style:
 # Values: "dot", "line", "jump", "pulse", "points", "meter", "hamburger",
-#         "ellipsis", "globe", "moon", "monkey", "arc", "nerd", "nerdarc", "minidot"
+#         "ellipsis", "globe", "moon", "monkey", "arc", "nerd", "nerdarc", "minidot",
+#         "hexfill"
 # Default: "dot"
 spinner = "dot"
+
+# A second marker, animated with slow_spinner, for rows in a calmer busy state
+# (waiting on a build while others think, for example). Same placement as spinner_prefix.
+# Values: string | Default: ""
+slow_spinner_prefix = ""
+
+# Spinner style for slow_spinner_prefix rows (same names as spinner).
+# Default: "hexfill"
+slow_spinner = "hexfill"
 
 # Inlines the spinner inside text rather than placing it in the prefix column.
 # Values: true, false | Default: false

@@ -204,7 +204,9 @@ All colors and modifiers come from ratatui:
 - `default_prefix`: (string) Prefix for normal items.
 - `current_prefix`: (string) Prefix for the current item.
 - `spinner_prefix`: (string) Input prefix character that triggers spinner animation for the row (e.g. `?` or `@`).
-- `spinner`: (string) Named spinner frame set to animate (options: `dot`, `line`, `jump`, `pulse`, `points`, `meter`, `hamburger`, `ellipsis`, `globe`, `moon`, `monkey`, `arc`, `nerd`, `nerdarc`, `minidot`).
+- `spinner`: (string) Named spinner frame set to animate (options: `dot`, `line`, `jump`, `pulse`, `points`, `meter`, `hamburger`, `ellipsis`, `globe`, `moon`, `monkey`, `arc`, `nerd`, `nerdarc`, `minidot`, `hexfill`).
+- `slow_spinner_prefix`: (string) A second marker; its rows animate with `slow_spinner` instead (default: empty, off).
+- `slow_spinner`: (string) Named spinner for `slow_spinner_prefix` rows (default: `hexfill`, a Nerd Font cell that fills and empties every 2.5 s).
 - `style`: [Style Settings](#style-settings) (default).
 - `inactive_style`, `inactive`: [Style Settings](#style-settings) for inactive columns.
 - `inactive_current_style`, `inactive_current`: [Style Settings](#style-settings) for the current item in inactive columns.

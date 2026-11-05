@@ -1571,6 +1571,9 @@ pub struct ResultsConfig {
     pub spinner_prefix: String,
     pub spinner: String,
     pub spinner_inline: bool,
+    /// A second marker, animated with `slow_spinner`, for rows in a calmer busy state.
+    pub slow_spinner_prefix: String,
+    pub slow_spinner: String,
 
     #[serde(alias = "prefix")]
     #[partial(recurse)]
@@ -1740,6 +1743,8 @@ impl Default for ResultsConfig {
             spinner_prefix: "".to_string(),
             spinner: "dot".to_string(),
             spinner_inline: false,
+            slow_spinner_prefix: "".to_string(),
+            slow_spinner: "hexfill".to_string(),
             prefix_style: Default::default(),
             prefix_inactive_style: Default::default(),
             unselected_prefix_style: Default::default(),
