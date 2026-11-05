@@ -269,7 +269,7 @@ fn nav_bind_resolves_custom_semantic_confirm_action() {
 
 #[test]
 fn preview_file_subcommand_previews_directory_text_and_image() {
-    let bin = env!("CARGO_BIN_EXE_wm");
+    let bin = &wm_bin();
     let tmp = tempfile::tempdir().unwrap();
 
     // 1. Directory preview renders directory tree
@@ -469,7 +469,7 @@ fn filter_with_only_negative_terms_lists_the_rest() {
     // `!apple` alone used to match nothing (a pure negation scores 0, which was read as "no
     // match"); like fzf it lists every line without "apple".
     let run = |query: &str| {
-        let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_wm"))
+        let mut child = std::process::Command::new(wm_bin())
             .args([
                 "--config",
                 concat!(env!("CARGO_MANIFEST_DIR"), "/assets/config.toml"),

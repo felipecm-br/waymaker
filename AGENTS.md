@@ -40,6 +40,7 @@ Behaviour guards, all in `cargo test`:
 - `waymaker-cli/tests/golden.rs`: full styled-screen snapshots of the real binary (layout, cursor, colours). After an intended change, review it with `cargo insta review`; never accept snapshots blindly.
 - `test_bind_tables_snapshot` in `waymaker-cli/src/config.rs`: every bind of the default config and of each preset.
 - `waymaker-cli/tests/pty.rs`: key-sequence tests for the filter and for navigation mode (`jump`).
+- Set `WM_TEST_BIN=/path/to/wm` to run the end-to-end tests (`--test golden --test pty`) against another binary, e.g. a downloaded release.
 
 `scripts/regress.py OLD_WM NEW_WM` compares two release binaries (`wm -f` output, peak memory, speed); CI's `regress` job runs it against the base commit. Use it for any change to matching, ingest or rendering.
 

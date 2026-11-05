@@ -127,7 +127,7 @@ impl Session {
             r#"cd "$WM_TEST_DIR/work" && exec "$0" "$@" < "$WM_TEST_DIR/input" > "$WM_TEST_DIR/output""#
         };
         cmd.args(["-c", script]);
-        cmd.arg(env!("CARGO_BIN_EXE_wm"));
+        cmd.arg(wm_bin());
         // Debug builds otherwise load (and rewrite) the developer playground
         // config, dev.toml. --config with the shipped defaults is exactly what a
         // release build uses when the user has no config.
@@ -325,10 +325,19 @@ impl Session {
     }
 }
 
+/// The `wm` under test: `$WM_TEST_BIN` if set (e.g. a downloaded release, to check it against
+/// these tests), otherwise the binary cargo built for this test run.
+pub fn wm_bin() -> std::path::PathBuf {
+    std::env::var_os("WM_TEST_BIN")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| env!("CARGO_BIN_EXE_wm").into())
+}
+
 /// A clean environment: no user config, history or `WM_*` settings leak in.
 pub fn isolate_env(cmd: &mut CommandBuilder, dir: &Path) {
     // Presets and previews run `wm` by name: make that the binary under test, not an installed one.
-    let bin_dir = Path::new(env!("CARGO_BIN_EXE_wm")).parent().unwrap();
+    let bin = wm_bin();
+    let bin_dir = bin.parent().unwrap();
     cmd.env(
         "PATH",
         format!(
