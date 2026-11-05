@@ -149,7 +149,8 @@ Actions are the operations performed when a trigger is activated.
 | `CycleAll`        | Toggle selection for all items in the current view.        |
 | `ClearSelections` | Clear all active selections.                               |
 | `Accept`          | Accept the current selection and exit.                     |
-| `Quit(code)`      | Exit with the given exit code (default: 130).              |
+| `Quit(code)`      | Exit with the given exit code (default: 130); first closes the action box, then clears selections, yank and cut marks, one per press. |
+| `Abort(code)`     | Exit at once with the given exit code (default: 130), whatever is open or selected. `ctrl-c` is bound to it. |
 
 ### Navigation
 

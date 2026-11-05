@@ -87,7 +87,7 @@ separator = "light"
 "enter" = 'Become(sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --run {table} {bind})'
 "ctrl-y" = 'ExecuteSilent(printf "%s" {bind} | tmux load-buffer -w -)'
 "esc" = "Quit"
-"ctrl-c" = "Quit"
+"ctrl-c" = "Abort"
 "ctrl-j" = "Down"
 "ctrl-k" = "Up"
 

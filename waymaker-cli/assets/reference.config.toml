@@ -995,7 +995,8 @@ preset = "jump"
 # ==============================================================================
 # Syntax: "key" = "Action" or "key" = ["Action1", "Action2", ...]
 # Available actions:
-#   Quit(code)                 - Exit with return code (e.g. Quit(130))
+#   Quit(code)                 - Exit with return code (e.g. Quit(130)), after clearing selections and marks
+#   Abort(code)                - Exit at once with return code (default 130); bound to ctrl-c
 #   Accept                     - Accept current selection and print to output
 #   Toggle                     - Toggle multi-selection on current item
 #   Up(n) / Down(n)            - Move cursor up/down by n rows

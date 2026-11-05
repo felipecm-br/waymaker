@@ -106,7 +106,7 @@ percentage = 60
 "backtab"       = "@reloadprev"
 "shift-backtab" = "@reloadprev"
 "esc"           = "ToggleFocus"
-"ctrl-c"        = "Quit"
+"ctrl-c"        = "Abort"
 "ctrl-d"        = [ 'ExecuteAsync(wm session kill "{=}")', "SetQuery()", "Reload" ]
 ","             = []
 

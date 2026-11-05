@@ -109,6 +109,9 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             };
             return Flow::Exit(Ok(ret));
         }
+        Action::Abort(code) => {
+            return Flow::Exit(Err(MatchError::Abort(code)));
+        }
         Action::Quit(code) => {
             if state.live_input_active {
                 state.live_input_active = false;

@@ -1,5 +1,6 @@
 ---
 source: waymaker-cli/src/config.rs
+assertion_line: 433
 expression: out
 ---
 ## config.toml
@@ -62,7 +63,7 @@ expression: out
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -181,7 +182,7 @@ expression: out
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -492,7 +493,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-e" = @set local
 "Ctrl-g" = @set global
@@ -618,7 +619,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -756,7 +757,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -875,7 +876,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -1030,7 +1031,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -1173,7 +1174,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -1338,7 +1339,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -1462,7 +1463,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -1641,7 +1642,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = @restart_all, Reload
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -1793,7 +1794,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-e" = @exec
 "Ctrl-g" = Pos(-1)
@@ -1962,7 +1963,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rmi
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -2092,7 +2093,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -2215,7 +2216,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -2342,7 +2343,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -2462,7 +2463,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -2581,7 +2582,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -2710,7 +2711,7 @@ git --paginate log --graph --decorate=short --date=short \
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -2837,7 +2838,7 @@ done;
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-f" = @force-add, Reload
 "Ctrl-g" = Pos(-1)
@@ -2963,7 +2964,7 @@ fi)
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -3794,7 +3795,7 @@ fi
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
 "Ctrl-b" = @save-staged
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -4462,7 +4463,7 @@ false
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = @add_remote, Reload
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -4622,7 +4623,7 @@ false
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
 "Ctrl-b" = @bookmarks
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-e" = Execute(nvim {+})
 "Ctrl-f" = @dirs
@@ -4788,7 +4789,7 @@ false
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -4912,7 +4913,7 @@ false
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -5036,7 +5037,7 @@ false
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -5163,7 +5164,7 @@ false
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -5391,7 +5392,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -5580,7 +5581,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = #go to binary, ExecuteOrConfirm(
         label={label}; eval "$RESOLVE_TARGET"
@@ -5718,7 +5719,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -5837,7 +5838,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -6027,7 +6028,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = SwitchPreview
 "Ctrl-h" = DeleteWord
@@ -6146,7 +6147,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-f" = ReloadNext
 "Ctrl-g" = Pos(-1)
@@ -6266,7 +6267,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -6384,7 +6385,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = ExecuteSilent(eval $OPENcmd $(dirname -- {+path}))
 "Ctrl-f" = #find, BecomeOrResume(printf '%s\n' {+path} | ob-files)
 "Ctrl-g" = Pos(-1)
@@ -6549,7 +6550,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -6669,7 +6670,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
 "Ctrl-b" = ExecuteSilent(gh pr view --web "{=number}")
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = Execute(gh pr diff "{=number}")
 "Ctrl-e" = ExecuteSilent(gh pr view --web "{=number}")
 "Ctrl-g" = Pos(-1)
@@ -6911,7 +6912,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = #kill group, ExecuteOrConfirm(
         pids=({+2})
@@ -7090,7 +7091,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = PreviewHalfPageDown
 "Ctrl-e" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")
 "Ctrl-g" = Pos(-1)
@@ -7234,7 +7235,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = ExecuteAsync(wm session kill "{=}"), SetQuery(), Reload
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -7363,7 +7364,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -7502,7 +7503,7 @@ esac
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -7629,7 +7630,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -7749,7 +7750,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -7869,7 +7870,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -8001,7 +8002,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -8142,7 +8143,7 @@ esac
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -8268,7 +8269,7 @@ esac
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -8399,7 +8400,7 @@ fi
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -8526,7 +8527,7 @@ esac
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -8677,7 +8678,7 @@ esac
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -8796,7 +8797,7 @@ esac
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord
@@ -9115,7 +9116,7 @@ esac
 "Ctrl-Tab" = @next
 "Ctrl-]" = ExpandPreview(2)
 "Ctrl-a" = CycleAll
-"Ctrl-c" = Quit
+"Ctrl-c" = Abort
 "Ctrl-d" = @rm
 "Ctrl-g" = Pos(-1)
 "Ctrl-h" = DeleteWord

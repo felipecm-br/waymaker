@@ -16,6 +16,7 @@ pub(super) fn action_from_null<A: ActionExt>(action: Action<NullActionExt>) -> O
         Action::ClearSelections => Action::ClearSelections,
         Action::Accept => Action::Accept,
         Action::Quit(x) => Action::Quit(x),
+        Action::Abort(x) => Action::Abort(x),
         Action::Unwind(x) => Action::Unwind(x),
         Action::ToggleWrap => Action::ToggleWrap,
         Action::ToggleActionBox => Action::ToggleActionBox,
@@ -357,7 +358,7 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
                 return;
             }
             "ctrl-c" => {
-                out.push(RenderCommand::Action(Action::Quit(130)));
+                out.push(RenderCommand::Action(Action::Abort(130)));
                 return;
             }
             k if k.eq_ignore_ascii_case("esc") || (preview_fullscreen && k == "enter") => {

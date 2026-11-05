@@ -29,8 +29,11 @@ pub enum Action<A: ActionExt = NullActionExt> {
     ClearSelections,
     /// Accept current selection
     Accept,
-    /// Quit with code
+    /// Quit with code. A cascade: it first closes the action box, then clears selections, yank
+    /// marks and cut marks, and exits once there is nothing left to clear.
     Quit(i32),
+    /// Exit at once with code (default 130), whatever is open or selected: what `ctrl-c` does.
+    Abort(i32),
     /// Unwind active state in cascade or quit with code
     Unwind(i32),
 
@@ -522,7 +525,7 @@ enum_from_str_display!(
     CopyAsync, Copy, ChDir;
 
     defaults:
-    (Up, 1), (Down, 1), (PreviewUp, 1), (PreviewDown, 1), (Quit, 130), (Unwind, 130), (Overlay, 0), (Print, String::new()), (Help, String::new()), (Reload, String::new()), (PreviewScroll, 1), (PreviewHScroll, 1), (HScroll, 0), (VScroll, 0), (ExpandPreview, 1), (ShrinkPreview, 1);
+    (Up, 1), (Down, 1), (PreviewUp, 1), (PreviewDown, 1), (Quit, 130), (Abort, 130), (Unwind, 130), (Overlay, 0), (Print, String::new()), (Help, String::new()), (Reload, String::new()), (PreviewScroll, 1), (PreviewHScroll, 1), (HScroll, 0), (VScroll, 0), (ExpandPreview, 1), (ShrinkPreview, 1);
 
     options:
     SwitchPreview, SetPreview, ToggleColumn, ShowColumn, Sort

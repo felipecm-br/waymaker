@@ -410,11 +410,7 @@ fn jump_yank_paste_then_undo() {
     }
     assert!(!pasted.exists(), "u did not undo the paste");
     assert!(work.join("top.md").exists());
-    // Quit (ctrl-c, and `q` in nav mode) is a cascade: it closes the "Undone ..." box, then
-    // clears the restored yank marks, then exits. See ctrl_c_quits_at_once.
-    for _ in 0..3 {
-        wm.send("\x03");
-    }
+    wm.send("\x03"); // ctrl-c (Abort) exits at once; see ctrl_c_quits_at_once
     assert_eq!(wm.finish().0, 130);
 }
 
@@ -432,11 +428,9 @@ fn after_undo() -> Session {
 }
 
 #[test]
-#[ignore = "open question: ctrl-c runs the Quit cascade instead of exiting at once"]
 fn ctrl_c_quits_at_once() {
-    // Quit closes the action box, then clears selections, yank marks and cut marks before it
-    // exits, so after an undo ctrl-c (and nav-mode `q`) needs three presses, and up to five in
-    // general. fzf and most TUIs exit on the first ctrl-c; `esc` (@unwind) is the cascade.
+    // ctrl-c is Abort: it exits on the first press even with the "Undone ..." box up and a yank
+    // mark restored, where Quit (`q` in nav mode) clears those first, one press each.
     let wm = after_undo();
     wm.send("\x03");
     assert_eq!(wm.finish().0, 130);

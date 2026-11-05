@@ -44,7 +44,7 @@ border.padding = [2, 0]
 
 [binds]
 # UI
-"ctrl-c" = "Quit"
+"ctrl-c" = "Abort"
 "esc" = "@unwind"
 "enter" = "Accept"
 "ctrl-a" = "CycleAll"

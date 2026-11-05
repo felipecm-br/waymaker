@@ -67,7 +67,7 @@ max = 120
 
 [binds]
 # Essentia
-"ctrl-c" = "Quit"
+"ctrl-c" = "Abort"
 "esc" = "@unwind"
 "enter" = "@accept"
 "ctrl-enter" = "@accept_2"
