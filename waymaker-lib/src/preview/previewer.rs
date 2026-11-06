@@ -933,9 +933,19 @@ impl Previewer {
 
                 // false => needs refresh (i.e. invalid utf-8)
                 let handle = tokio::spawn(async move {
-                    let mut reader = BufReader::new(stdout);
+                    // Blocking reads on a thread of their own, so this task can notice a quiet
+                    // command: see the timeout below.
+                    let (chunk_tx, mut chunk_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
+                    std::thread::spawn(move || {
+                        let mut reader = BufReader::new(stdout);
+                        let mut buf = [0u8; 8192];
+                        while let Ok(n) = std::io::Read::read(&mut reader, &mut buf) {
+                            if n == 0 || chunk_tx.blocking_send(buf[..n].to_vec()).is_err() {
+                                break;
+                            }
+                        }
+                    });
                     let mut leftover = Vec::new();
-                    let mut buf = [0u8; 8192];
                     let mut staged = Vec::new();
                     let mut has_swapped = false;
                     // What the new output replaces when it is swapped in: the previous text, image
@@ -959,12 +969,35 @@ impl Previewer {
                         current_diagram_idx_state.store(0, Ordering::Release);
                     };
 
-                    while let Ok(n) = std::io::Read::read(&mut reader, &mut buf) {
-                        if n == 0 || current_generation.load(Ordering::Acquire) != task_gen {
+                    loop {
+                        let chunk =
+                            match tokio::time::timeout(STAGED_SWAP_AFTER, chunk_rx.recv()).await {
+                                Ok(Some(chunk)) => chunk,
+                                Ok(None) => break, // end of output
+                                Err(_) => {
+                                    if current_generation.load(Ordering::Acquire) != task_gen {
+                                        break; // a newer preview took over
+                                    }
+                                    // The command went quiet with output still staged (delay_clear):
+                                    // show it now rather than when it exits or reaches 500 lines.
+                                    if delay_clear && !has_swapped && !staged.is_empty() {
+                                        if current_generation.load(Ordering::Acquire) != task_gen {
+                                            return true;
+                                        }
+                                        lines.replace_all(std::mem::take(&mut staged));
+                                        has_swapped = true;
+                                        guard = lines.read();
+                                        clear_other_views();
+                                        changed.store(true, Ordering::Release);
+                                    }
+                                    continue;
+                                }
+                            };
+                        if current_generation.load(Ordering::Acquire) != task_gen {
                             break;
                         }
 
-                        leftover.extend_from_slice(&buf[..n]);
+                        leftover.extend_from_slice(&chunk);
                         clean_invalid_utf8_lines(&mut leftover, try_lossy, false);
 
                         let valid_up_to = match std::str::from_utf8(&leftover) {
@@ -1564,6 +1597,11 @@ mod tests {
         );
     }
 }
+
+/// With `delay_clear`, a command preview's output is staged (the previous preview stays up)
+/// until it has 500 lines or ends; a command that goes quiet this long with output staged has
+/// it shown anyway, so slow and streaming commands are not blank while they run.
+const STAGED_SWAP_AFTER: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// Cleans invalid UTF-8 out of the complete lines of `buf` (all of it at `eof`), so the
 /// decoder never waits on bytes that can never become valid: each invalid sequence becomes

@@ -1397,11 +1397,10 @@ fn preview_cmd_shows_the_current_item_after_fast_moves() {
     );
 }
 
-/// BUG/design: with `previewer.delay_clear` (the default) a preview command's output is staged
-/// until it has 500 lines or exits, so a slow or streaming command (`tail -f`, a long build)
-/// shows nothing at all while it runs.
+/// With `previewer.delay_clear` (the default) output is staged until it has 500 lines or the
+/// command exits; a command that goes quiet with output staged has it shown after a moment, so
+/// a slow or streaming command (`tail -f`, a long build) is not blank while it runs.
 #[test]
-#[ignore = "known issue: delay_clear hides a running preview's output until 500 lines or exit"]
 fn preview_cmd_streams_before_exit_with_delay_clear() {
     let wm = cmd_preview(&["p.l", "x=sh -c \"echo streamed hello; sleep 30\""], "3/3");
     wm.wait_for_screen(|s| s.contains("streamed hello"));

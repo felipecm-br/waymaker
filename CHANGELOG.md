@@ -11,6 +11,7 @@
 - `Prompt` and `Confirm` lost the typed text: `{input}` in their command was filled in when the box opened (empty). It is now filled in on Enter, shell-quoted
 - `SetHeader` / `PushHeader` and the footer equivalents showed only at the next key press
 - Jumping to the end of a preview (`PreviewJump`, and tail mode) stopped one line short when the title sits on the first line
+- With `previewer.delay_clear` (the default) a preview command showed nothing until it had printed 500 lines or exited, so slow and streaming commands (`tail -f`, a build) looked blank; output staged when the command goes quiet for 200 ms is now shown
 - A command preview with invalid UTF-8 froze at the bad byte until the command exited, and `previewer.try_lossy` never applied; bad bytes now show as U+FFFD with `try_lossy` and are dropped otherwise
 
 ### 🧪 Testing
