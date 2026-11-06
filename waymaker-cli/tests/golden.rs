@@ -1406,3 +1406,24 @@ fn preview_cmd_streams_before_exit_with_delay_clear() {
     let wm = cmd_preview(&["p.l", "x=sh -c \"echo streamed hello; sleep 30\""], "3/3");
     wm.wait_for_screen(|s| s.contains("streamed hello"));
 }
+
+#[test]
+fn golden_cli_push_footer_adds_a_column() {
+    // PushHeader / PushFooter append a column, aligned with the result columns (binds.md).
+    // Records current behaviour: once the footer has two columns, its hint bar is squeezed into
+    // the first result column and cut mid-word ("ente"), like the pushed text ("seco").
+    let wm = Launch::new(TABLE)
+        .args(&[
+            "columns.split=\\s+",
+            "b.f1",
+            "PushHeader(second col header)",
+            "b.f2",
+            "PushFooter(second col footer)",
+        ])
+        .size(12, 100)
+        .ready("delta")
+        .start();
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
