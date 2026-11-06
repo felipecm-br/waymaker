@@ -398,3 +398,326 @@ fn golden_reverse_wrapped_scrolled() {
     }
     insta::assert_snapshot!(wm.styled_screen());
 }
+
+// ---- make_table: tiers, symlinks, separators, row connection, nav bar, vscroll ----
+
+/// Directories, files at two depths and symlinks: `jump` sorts them into tiers and shows link
+/// targets.
+const TREE: &[(&str, &str)] = &[
+    ("docs/", ""),
+    ("src/", ""),
+    ("src/main.rs", "fn main() {}\n"),
+    ("Cargo.toml", "[package]\n"),
+    ("README.md", "# readme\n"),
+    ("link_to_src", "-> src"),
+    ("link_to_readme", "-> README.md"),
+];
+
+fn jump(args: &'static [&'static str], rows: u16, cols: u16) -> Session {
+    Launch::new("")
+        .files(TREE)
+        .no_input()
+        .args(args)
+        .size(rows, cols)
+        .ready("README.md")
+        .start()
+}
+
+#[test]
+fn golden_jump_symlinks_underline_tiers() {
+    let wm = jump(&["-o", "jump"], 40, 100);
+    wm.send("j");
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_jump_light_tier_separator() {
+    let wm = jump(&["-o", "jump", "results.tier.separator=light"], 40, 100);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_jump_light_tier_separator_stacked() {
+    let wm = jump(
+        &[
+            "-o",
+            "jump",
+            "results.tier.separator=light",
+            "results.stacked_columns=true",
+        ],
+        40,
+        100,
+    );
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_jump_double_nav_bar() {
+    let wm = jump(&["-o", "jump", "results.current_nav_bar=Double"], 40, 100);
+    wm.send("j");
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_jump_wrapped_tiers_scrolled() {
+    // Long names wrap, so scrolling cuts the top row next to an underlined tier boundary.
+    let files: Vec<(String, &str)> = (0..6)
+        .map(|i| {
+            (
+                format!("dir_{i}_with_a_name_long_enough_to_wrap_in_the_list/"),
+                "",
+            )
+        })
+        .chain((0..6).map(|i| {
+            (
+                format!("file_{i}_with_a_name_long_enough_to_wrap_in_the_list.txt"),
+                "x\n",
+            )
+        }))
+        .collect();
+    let files: Vec<(&str, &str)> = files.iter().map(|(p, c)| (p.as_str(), *c)).collect();
+    let wm = Launch::new("")
+        .files(&files)
+        .no_input()
+        .args(&["-o", "jump", "results.wrap=true"])
+        .size(40, 70)
+        .ready("dir_0")
+        .start();
+    for _ in 0..7 {
+        wm.send("j");
+    }
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_row_separator_scrolled() {
+    let items = items();
+    let wm = Launch::new(&items)
+        .args(&["results.separator=light"])
+        .size(16, 60)
+        .start();
+    for _ in 0..8 {
+        wm.send(DOWN);
+    }
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_row_connection_capped() {
+    let wm = Launch::new(TABLE)
+        .args(&["columns.split=\\s+", "results.row_connection=Capped"])
+        .size(12, 80)
+        .ready("delta")
+        .start();
+    wm.send(DOWN);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_vscroll_current_only() {
+    // alt-down (VScroll(-1)) scrolls the wrapped text of the current row only.
+    let items = long_items();
+    let wm = Launch::new(&items)
+        .args(&["results.wrap=true", "results.vscroll_current_only=true"])
+        .size(24, 60)
+        .ready("entry_00")
+        .start();
+    wm.send(DOWN);
+    wm.send("\x1b[1;3B");
+    wm.send("\x1b[1;3B");
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_row_connection_capped_stacked() {
+    let wm = Launch::new(TABLE)
+        .args(&[
+            "columns.split=\\s+",
+            "results.row_connection=Capped",
+            "results.stacked_columns=true",
+        ])
+        .size(16, 80)
+        .ready("4/4")
+        .start();
+    wm.send(DOWN);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_vscroll_current_only_stacked() {
+    let items = stacked_items();
+    let wm = Launch::new(&items)
+        .args(&[
+            "columns.split=\\s\\s+",
+            "results.stacked_columns=true",
+            "results.wrap=true",
+            "results.vscroll_current_only=true",
+        ])
+        .size(30, 80)
+        .ready("20/20")
+        .start();
+    wm.send("\x1b[1;3B");
+    wm.send("\x1b[1;3B");
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+// ---- Mouse (render/mouse.rs): SGR sequences, 1-based column;row ----
+
+fn press(x: u16, y: u16) -> String {
+    format!("\x1b[<0;{x};{y}M")
+}
+fn release(x: u16, y: u16) -> String {
+    format!("\x1b[<0;{x};{y}m")
+}
+fn drag(x: u16, y: u16) -> String {
+    format!("\x1b[<32;{x};{y}M")
+}
+fn wheel(code: u8, x: u16, y: u16) -> String {
+    format!("\x1b[<{code};{x};{y}M")
+}
+const WHEEL_UP: u8 = 64;
+const WHEEL_DOWN: u8 = 65;
+const WHEEL_LEFT: u8 = 66;
+const WHEEL_RIGHT: u8 = 67;
+
+#[test]
+fn golden_mouse_wheel_scrolls_results() {
+    let items = items();
+    let wm = Launch::new(&items).size(16, 60).start();
+    for _ in 0..4 {
+        wm.send(&wheel(WHEEL_DOWN, 5, 6));
+    }
+    wm.send(&wheel(WHEEL_UP, 5, 6));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_mouse_click_moves_cursor() {
+    let items = items();
+    let wm = Launch::new(&items).size(16, 60).start();
+    // Row 4 (1-based) is the first item; click the third.
+    wm.send(&press(5, 6));
+    wm.send(&release(5, 6));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn mouse_click_then_enter_accepts_the_clicked_item() {
+    let items = items();
+    let wm = Launch::new(&items).size(16, 60).start();
+    wm.send(&press(5, 6));
+    wm.send(&release(5, 6));
+    wm.send(ENTER);
+    let (code, out) = wm.finish();
+    assert_eq!((code, out.as_str()), (0, "cherry/02\n"));
+}
+
+#[test]
+fn golden_mouse_click_in_reverse_layout() {
+    let items = items();
+    let wm = Launch::new(&items)
+        .args(&["results.reverse=true"])
+        .size(16, 60)
+        .start();
+    // Reverse layout lists upwards: row 6 (1-based) is banana/01.
+    wm.send(&press(5, 6));
+    wm.send(&release(5, 6));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_mouse_click_in_query_moves_the_caret() {
+    let items = items();
+    let wm = Launch::new(&items).size(16, 60).start();
+    wm.send("aple");
+    // Row 2 is " > aple": one column of padding, then "> ". Click on the "p" (column 5).
+    wm.send(&press(5, 2));
+    wm.send(&release(5, 2));
+    wm.send("p");
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_mouse_wheel_scrolls_horizontally() {
+    let items: String = (0..6)
+        .map(|i| format!("{i}_{}\n", "abcdefghij".repeat(8)))
+        .collect();
+    let wm = Launch::new(&items)
+        .args(&["results.wrap=false"])
+        .size(12, 50)
+        .ready("6/6")
+        .start();
+    for _ in 0..3 {
+        wm.send(&wheel(WHEEL_RIGHT, 5, 4));
+    }
+    wm.send(&wheel(WHEEL_LEFT, 5, 4));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+fn drag_preview(args: &'static [&'static str], from: (u16, u16), to: (u16, u16)) -> Session {
+    let wm = Launch::new("README.md\nnotes.txt\nsrc/lib.rs\nsrc/main.rs\n")
+        .files(FILES)
+        .args(args)
+        .size(40, 120)
+        .start();
+    wm.send(&press(from.0, from.1));
+    wm.send(&drag((from.0 + to.0) / 2, (from.1 + to.1) / 2));
+    wm.send(&drag(to.0, to.1));
+    wm.send(&release(to.0, to.1));
+    wm
+}
+
+#[test]
+fn golden_mouse_drag_gap_grows_preview() {
+    // The default layout has a one-column drag gap at the preview's left edge.
+    let wm = drag_preview(&[], (72, 8), (52, 8));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_mouse_drag_gap_shrinks_preview() {
+    let wm = drag_preview(&[], (72, 8), (92, 8));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_mouse_drag_edge_without_gap() {
+    // `gap=0`: the first `drag_width` columns of the preview are the handle instead.
+    let wm = drag_preview(&["p.l", "gap=0", "preview.drag_width=2"], (72, 8), (52, 8));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_mouse_wheel_scrolls_preview() {
+    let wm = Launch::new("long.txt\n")
+        .files(&[("long.txt", LONG_TEXT)])
+        .size(20, 100)
+        .ready("line 01")
+        .start();
+    for _ in 0..3 {
+        wm.send(&wheel(WHEEL_DOWN, 80, 6));
+    }
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+const LONG_TEXT: &str = "line 01\nline 02\nline 03\nline 04\nline 05\nline 06\nline 07\nline 08\nline 09\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\n";
+
+#[test]
+fn golden_mouse_drag_gap_left_preview() {
+    // Preview on the left: its gap is its last column, and dragging right grows it.
+    let wm = drag_preview(&["p.l", "side=left"], (49, 8), (69, 8));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_mouse_click_status_and_footer() {
+    // Neither has click interactions by default: the clicks must leave the screen unchanged.
+    let items = items();
+    let wm = Launch::new(&items).size(16, 60).start();
+    wm.send(DOWN);
+    wm.send(&press(4, 3));
+    wm.send(&release(4, 3));
+    wm.send(&press(6, 9));
+    wm.send(&release(6, 9));
+    insta::assert_snapshot!(wm.styled_screen());
+}

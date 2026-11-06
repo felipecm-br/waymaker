@@ -83,7 +83,7 @@ impl<'a> Launch<'a> {
         self
     }
     /// Files (`path`, `contents`) to create in the working directory; a path ending in `/` is
-    /// a directory.
+    /// a directory, and contents `-> target` make a symlink to `target`.
     pub fn files(mut self, files: &'a [(&'a str, &'a str)]) -> Self {
         self.files = files;
         self
@@ -126,6 +126,11 @@ impl Session {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             if path.to_string_lossy().ends_with('/') {
                 std::fs::create_dir_all(&path).unwrap();
+            } else if let Some(target) = contents.strip_prefix("-> ") {
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(target, &path).unwrap();
+                #[cfg(not(unix))]
+                panic!("symlinks are only created on unix: {target}");
             } else {
                 std::fs::write(&path, contents).unwrap();
             }

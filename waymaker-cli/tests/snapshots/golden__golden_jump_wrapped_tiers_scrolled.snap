@@ -1,0 +1,62 @@
+---
+source: waymaker-cli/tests/golden.rs
+assertion_line: 489
+expression: wm.styled_screen()
+---
+ 0|
+ 1| ~/work
+ 2| │   g_enough_to_wrap_in_t↵│file_1_with_a_name_long_enough_to_wrap_i
+ 3| │   he_list/              │     1 x
+ 4| │   file_0_with_a_name_lo↵│
+ 5| │   ng_enough_to_wrap_in_↵│
+ 6| │   the_list.txt          │
+ 7| │   file_1_with_a_name_lo↵│
+ 8| │   ng_enough_to_wrap_in_↵│
+ 9| │   the_list.txt          │
+10| │   file_2_with_a_name_lo↵│
+11| │   ng_enough_to_wrap_in_↵│
+12| ───────────────────────────┴────────────────────────────────────────
+13|  / Filter         Space Select     , Sort           f Frecency
+14|  b Bookmarks      m Bookmark       e Edit           a Add
+15|  r Rename         d Trash          y/x Copy/Cut     p/P Paste
+16|  u Undo           z/Z Zip          \ Pane           C-p Preview
+17|
+18|
+19|
+20|
+21|
+22|
+23|
+24|
+25|
+26|
+27|
+28|
+29|
+30|
+31|
+32|
+33|
+34|
+35|
+36|
+37|
+38|
+39|
+-- styles --
+ 1: 1 fg=6 bold | 2 fg=6 | 3-6 fg=6 bold
+ 2: 1 fg=8 | 4 fg=4 | 27 fg=8 dim | 28-68 fg=8
+ 3: 1 fg=8 | 4 fg=4 | 28 fg=8 | 31-34 fg=246 | 36 fg=231
+ 4: 1 fg=8 | 4 fg=7 | 27 fg=8 dim | 28 fg=8
+ 5: 1 fg=8 | 4 fg=7 | 27 fg=8 dim | 28 fg=8
+ 6: 1 fg=8 | 4 fg=7 | 28 fg=8
+ 7: 1 fg=15 bold | 3-26 bold | 27-28 fg=8 dim
+ 8: 1 fg=15 bold | 3-26 bold | 27-28 fg=8 dim
+ 9: 1 fg=15 bold | 3-27 bold | 28 fg=8 dim
+10: 1 fg=8 dim | 4 fg=7 | 27-28 fg=8 dim
+11: 1 fg=8 dim | 4 fg=7 | 27-28 fg=8 dim
+12: 1-68 fg=8 dim
+13: 1-2 fg=6 bold | 3-9 fg=8 | 18-23 fg=6 bold | 24-30 fg=8 | 35-36 fg=6 bold | 37-41 fg=8 | 52-53 fg=6 bold | 54-62 fg=8
+14: 1-2 fg=6 bold | 3-12 fg=8 | 18-19 fg=6 bold | 20-28 fg=8 | 35-36 fg=6 bold | 37-41 fg=8 | 52-53 fg=6 bold | 54-57 fg=8
+15: 1-2 fg=6 bold | 3-9 fg=8 | 18-19 fg=6 bold | 20-25 fg=8 | 35-38 fg=6 bold | 39-47 fg=8 | 52-55 fg=6 bold | 56-61 fg=8
+16: 1-2 fg=6 bold | 3-7 fg=8 | 18-21 fg=6 bold | 22-25 fg=8 | 35-36 fg=6 bold | 37-41 fg=8 | 52-55 fg=6 bold | 56-63 fg=8

@@ -1,0 +1,50 @@
+---
+source: waymaker-cli/tests/golden.rs
+assertion_line: 708
+expression: wm.styled_screen()
+---
+ 0|
+ 1| README.md                                                           >
+ 2| # Demo                                                                4/4
+ 3|                                                                       README.md
+ 4| A small project.                                                      notes.txt
+ 5|                                                                       src/lib.rs
+ 6|                                                                       src/main.rs
+ 7|
+ 8|
+ 9|
+10|
+11|
+12|
+13|
+14|
+15|
+16|
+17|
+18|
+19|
+20|
+21|
+22|                                                                        enter accept │ tab mark │ ctrl-p preview
+23|
+24|
+25|
+26|
+27|
+28|
+29|
+30|
+31|
+32|
+33|
+34|
+35|
+36|
+37|
+38|
+39|
+-- styles --
+ 1: 69-70 fg=7
+ 2: 1-6 fg=6 bold | 69-73 fg=2 italic
+ 3: 71-118 bold
+22: 69-71 fg=6 | 72-76 fg=6 bold | 77 fg=6 | 78-83 fg=8 | 84 fg=6 | 85 fg=8 | 86 fg=6 | 87-89 fg=6 bold | 90 fg=6 | 91-94 fg=8 | 95 fg=6 | 96 fg=8 | 97 fg=6 | 98-103 fg=6 bold | 104 fg=6 | 105-111 fg=8 | 112-118 fg=6
