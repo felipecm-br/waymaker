@@ -215,7 +215,11 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
 pub(super) fn show_action_box(state: &mut MMState<'_, '_>, prompt: &str, initial: &str) {
     state.picker_ui.action_visible = true;
     waymaker::ACTION_BOX_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
-    state.picker_ui.action.set(Some(initial.to_string()), 0);
+    // Caret after the prefilled text (set clamps it to the end), so typing edits the name.
+    state
+        .picker_ui
+        .action
+        .set(Some(initial.to_string()), u16::MAX);
     state
         .picker_ui
         .action
@@ -225,7 +229,11 @@ pub(super) fn show_action_box(state: &mut MMState<'_, '_>, prompt: &str, initial
 pub(super) fn show_styled_action_box(state: &mut MMState<'_, '_>, prompt: &str, initial: &str) {
     state.picker_ui.action_visible = true;
     waymaker::ACTION_BOX_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
-    state.picker_ui.action.set(Some(initial.to_string()), 0);
+    // Caret after the prefilled text (set clamps it to the end), so typing edits the name.
+    state
+        .picker_ui
+        .action
+        .set(Some(initial.to_string()), u16::MAX);
     state
         .picker_ui
         .action

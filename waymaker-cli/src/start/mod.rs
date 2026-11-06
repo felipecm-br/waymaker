@@ -471,6 +471,7 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     def_sem("@paste", Action::Custom(MMAction::FmPaste));
     def_sem("@paste_into", Action::Custom(MMAction::FmPasteInto));
     def_sem("@paste_target", Action::Custom(MMAction::FmPasteInto));
+    define_used_builtin_aliases(&mut config.binds);
 
     config.binds.check_cycles().map_err(anyhow::Error::msg)?;
     config.binds.retain(|_, actions| !actions.is_empty());
@@ -486,6 +487,36 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     debug!("Config computed: {config:?}");
 
     Ok(config)
+}
+
+/// Defines each built-in alias (`@create`, `@rename`, `@delete`, ...) that a bind uses and the
+/// config does not define itself. The event loop resolves `@alias` actions against the bind map
+/// when it starts and drops every bind it cannot resolve, so without this a `[binds]` key bound
+/// to a built-in file-manager alias would do nothing.
+fn define_used_builtin_aliases(binds: &mut BindMap<MMAction>) {
+    use waymaker::binds::{Trigger, TriggerKind};
+    let used: Vec<String> = binds
+        .values()
+        .flat_map(|actions| actions.iter())
+        .filter_map(|a| match a {
+            Action::Semantic(name) => Some(name.clone()),
+            _ => None,
+        })
+        .collect();
+    for name in used {
+        let defined = binds
+            .keys()
+            .any(|t| matches!(&t.kind, TriggerKind::Semantic(s) if *s == name));
+        if !defined && let Some(actions) = handlers::builtin_alias(&name) {
+            binds.insert(
+                Trigger {
+                    kind: TriggerKind::Semantic(name),
+                    mode: String::new(),
+                },
+                actions,
+            );
+        }
+    }
 }
 
 pub static COMMAND_ARGS: Mutex<Vec<std::ffi::OsString>> = Mutex::new(Vec::new());

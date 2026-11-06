@@ -464,6 +464,11 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                 prompt_input.cancel();
                 tui.redraw();
                 return Flow::Continue;
+            } else if *action_visible && !action_input.is_empty() {
+                // Like the query: the first Cancel (ctrl-u) clears the typed text, the next
+                // one closes the box.
+                action_input.set(Some(String::new()), 0);
+                tui.redraw();
             } else if *action_visible {
                 *action_visible = false;
                 action_input.cancel();

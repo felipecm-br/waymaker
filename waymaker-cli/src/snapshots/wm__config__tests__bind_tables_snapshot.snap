@@ -4681,7 +4681,9 @@ false
 "K" = PreviewUp(5)
 "P" = @paste_into
 "U" = Reload(curr="$(pwd)"; while [ "$curr" != "/" ] && [ -n "$curr" ]; do curr="$(dirname "$curr")"; echo "$curr"; done), Cancel, Pos(0)
+"Z" = @unzip
 "\\" = ToggleParentPeek
+"a" = @create
 "alt-h" = ChDir(..), Cancel, Reload, FocusNav
 "alt-j" = Down
 "alt-k" = Up
@@ -4704,6 +4706,7 @@ false
 "ctrl-shift-j" = PreviewDown(5)
 "ctrl-shift-k" = PreviewUp(5)
 "ctrl-v" = @paste_into
+"d" = @delete
 "e" = Execute(nvim {+})
 "esc" = Quit
 "f" = @dirs
@@ -4719,6 +4722,7 @@ false
 "m" = @bookmark
 "p" = @paste
 "q" = Quit
+"r" = @rename
 "right" = ChDir({=}), Cancel, Reload, Pos(0), FocusNav
 "shift-backtab" = @reloadprev
 "shift-j" = PreviewDown(5)
@@ -4727,6 +4731,7 @@ false
 "u" = @undo
 "x" = @cut
 "y" = @yank
+"z" = @zip
 "|" = ToggleParentPeek
 
 ## presets/kill.toml

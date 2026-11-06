@@ -237,7 +237,11 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
                 results.status_config.show as u16
             }), // status
             Constraint::Length(header.height()), // header
-            if let Some(max_rows) = results.config.max_rows {
+            // A fixed results height can take every row, and the layout would then squeeze
+            // the action box to nothing; while the box is open the results take what is left.
+            if let Some(max_rows) = results.config.max_rows
+                && !*action_visible
+            {
                 Constraint::Length(max_rows)
             } else {
                 Constraint::Fill(1)

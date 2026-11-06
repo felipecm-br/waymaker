@@ -490,31 +490,13 @@ fn filter_with_only_negative_terms_lists_the_rest() {
 
 // ---- File manager (action/fm.rs): create, rename, trash, cut, zip, undo/redo ----
 //
-// The jump preset advertises a/r/d/z/Z but does not bind them, and a `[binds]` key bound to a
-// built-in file-manager alias such as `@create` is dropped at startup (only aliases registered
-// with def_sem survive resolve_semantics). `[ui.nav.binds]` reaches the CLI aliaser, so these
-// tests bind the keys there.
-
-const FM_BINDS: &[&str] = &[
-    "-o",
-    "jump",
-    "ui.nav.binds.a",
-    "@create",
-    "ui.nav.binds.r",
-    "@rename",
-    "ui.nav.binds.d",
-    "@delete",
-    "ui.nav.binds.z",
-    "@zip",
-    "ui.nav.binds.w", // an override path cannot name an uppercase key such as Z
-    "@unzip",
-];
+// The jump preset's own keys: a create, r rename, d trash, z zip, Z unzip, y/x/p/P, u undo.
 
 fn fm() -> Session {
     Launch::new("")
         .files(TREE)
         .no_input()
-        .args(FM_BINDS)
+        .args(&["-o", "jump"])
         .size(50, 100)
         .ready("top.md")
         .start()
@@ -547,9 +529,9 @@ fn fm_create_file_then_undo() {
     abort(wm);
 }
 
-/// BUG: ctrl-r (`@redo` in jump) redoes nothing, after undoing a create or a paste.
+/// The "Undone ..." info box must not swallow the nav keys: ctrl-r (`@redo` in jump) used to
+/// fall through to the global ctrl-r (`@reload`) while it was up.
 #[test]
-#[ignore = "known bug: redo does not redo"]
 fn fm_redo_after_undo() {
     let wm = fm();
     let new = wm.dir.path().join("work/new.txt");
@@ -593,32 +575,29 @@ fn fm_create_is_cancelled_by_esc() {
 
 #[test]
 fn fm_rename_then_undo() {
-    // The box is prefilled with the name and the caret sits at its start, so typed text is
-    // prepended (see fm_rename_caret_starts_at_the_end).
     let wm = fm();
     let work = wm.dir.path().join("work");
     nav_to(&wm, "top.md");
     wm.send("r");
-    wm.send("NEW_");
+    wm.send("\x15"); // ctrl-u: clear the prefilled name
+    wm.send("renamed.md");
     wm.send(ENTER);
     eventually("top.md renamed", || {
-        work.join("NEW_top.md").is_file() && !work.join("top.md").exists()
+        work.join("renamed.md").is_file() && !work.join("top.md").exists()
     });
     assert_eq!(
-        std::fs::read_to_string(work.join("NEW_top.md")).unwrap(),
+        std::fs::read_to_string(work.join("renamed.md")).unwrap(),
         "# top\n"
     );
     wm.send("u");
     eventually("undo restores top.md", || {
-        work.join("top.md").is_file() && !work.join("NEW_top.md").exists()
+        work.join("top.md").is_file() && !work.join("renamed.md").exists()
     });
     abort(wm);
 }
 
-/// BUG: the rename box puts the caret before the prefilled name; End, Backspace and ctrl-u do
-/// nothing there, so a file can only gain a prefix. Expected: caret at the end.
+/// The rename box is prefilled with the name and the caret starts after it.
 #[test]
-#[ignore = "known bug: rename caret starts before the prefilled name"]
 fn fm_rename_caret_starts_at_the_end() {
     let wm = fm();
     let work = wm.dir.path().join("work");
@@ -640,7 +619,7 @@ fn fm_trash_moves_to_the_xdg_trash_and_undo_restores() {
     let work = wm.dir.path().join("work");
     let trashed = wm.dir.path().join("XDG_DATA_HOME/Trash/files/top.md");
     nav_to(&wm, "top.md");
-    wm.send("d"); // the "top.md? (Enter/Esc)" box is not drawn in jump; see fm_action_box_is_drawn
+    wm.send("d");
     wm.send(ENTER);
     eventually("top.md trashed", || {
         !work.join("top.md").exists() && trashed.is_file()
@@ -676,10 +655,9 @@ fn fm_trash_is_cancelled_by_esc() {
     assert!(out.trim_end().ends_with("top.md"), "{out:?}");
 }
 
-/// BUG: in jump the action box (create, rename, trash confirm, zip) is never drawn, so its
-/// prompt and the typed text are invisible.
+/// jump fixes the results height (`results.max`), which used to squeeze the action box to zero
+/// rows, so its prompt and the typed text were invisible.
 #[test]
-#[ignore = "known bug: the action box is not drawn in jump"]
 fn fm_action_box_is_drawn() {
     let wm = fm();
     nav_to(&wm, "top.md");
@@ -744,7 +722,7 @@ fn fm_zip_then_unzip() {
     eventually("alpha.zip written", || work.join("alpha.zip").is_file());
     std::fs::remove_dir_all(work.join("alpha")).unwrap();
     nav_to(&wm, "alpha.zip");
-    wm.send("w");
+    wm.send("Z");
     wm.send(ENTER); // default target: alpha
     // The archive keeps its top-level alpha/ and is extracted into a new alpha/, so the file
     // lands one level deeper than it was zipped from.
@@ -754,19 +732,18 @@ fn fm_zip_then_unzip() {
     abort(wm);
 }
 
-/// BUG: the shipped `"F2" = "@rename"` does nothing. EventLoop::with_binds runs
-/// resolve_semantics, which drops any bind whose `@alias` the bind map cannot resolve, and the
-/// built-in file-manager aliases (create, rename, delete, zip, ...) are only known to the CLI's
-/// builtin_alias at dispatch time. Only those registered with def_sem (dirs, bookmark,
-/// paste, ...) survive.
+/// The shipped `"F2" = "@rename"`: a `[binds]` key bound to a built-in file-manager alias.
+/// EventLoop::with_binds drops binds whose `@alias` the bind map cannot resolve, so the CLI
+/// defines the built-in aliases a config uses (define_used_builtin_aliases).
 #[test]
-#[ignore = "known bug: [binds] keys bound to built-in fm aliases are dropped"]
 fn default_f2_renames_the_current_file() {
     let wm = Launch::new("top.md\n").files(TREE).size(20, 80).start();
     let work = wm.dir.path().join("work");
     wm.send("\x1bOQ"); // F2
-    wm.send("X");
+    wm.send(BACKSPACE);
+    wm.send(BACKSPACE);
+    wm.send("txt");
     wm.send(ENTER);
-    eventually("F2 renamed top.md", || work.join("Xtop.md").is_file());
+    eventually("F2 renamed top.md", || work.join("top.txt").is_file());
     abort(wm);
 }

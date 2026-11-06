@@ -191,7 +191,10 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     &mut buffer,
                     state.focus,
                     &ui.config.nav.binds,
-                    picker_ui.action_visible
+                    // An input box (create, rename, ...) takes the keys; an info box such as
+                    // "Undone ..." does not, so ctrl-r still reaches @redo after an undo.
+                    (picker_ui.action_visible
+                        && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed))
                         || overlay_ui.as_ref().is_some_and(|o| o.index().is_some()),
                     &mut state.pending_nav_key,
                     &mut state.sort_menu_active,
