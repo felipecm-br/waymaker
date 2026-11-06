@@ -289,79 +289,6 @@ impl ResultsUI {
         let end = self.bottom + self.height as u32;
         let as_cols = !self.config.stacked_columns;
 
-        let get_border_char = |_is_first: bool,
-                               _is_last: bool,
-                               border_type: ratatui::widgets::BorderType|
-         -> &'static str {
-            match border_type {
-                ratatui::widgets::BorderType::Plain | ratatui::widgets::BorderType::Rounded => "│",
-                ratatui::widgets::BorderType::Double => "║",
-                ratatui::widgets::BorderType::Thick => "█",
-                ratatui::widgets::BorderType::QuadrantOutside => "▌",
-                ratatui::widgets::BorderType::QuadrantInside => "▐",
-                _ => "│",
-            }
-        };
-
-        let current_nav_bar = self.config.current_nav_bar;
-        let get_nav_bar_span = |is_first: bool,
-                                is_last: bool,
-                                is_current: bool,
-                                is_yanked: bool,
-                                is_cut: bool|
-         -> Option<ratatui::text::Span<'static>> {
-            nav_bar_style.as_ref().map(|(border_type, style)| {
-                let bt = if is_current {
-                    current_nav_bar.unwrap_or(*border_type)
-                } else {
-                    *border_type
-                };
-                let mut st = *style;
-                if is_cut {
-                    st = st.fg(ratatui::style::Color::Red);
-                } else if is_yanked {
-                    st = st.fg(ratatui::style::Color::Yellow);
-                }
-                let ch = get_border_char(is_first, is_last, bt);
-                ratatui::text::Span::styled(ch, st)
-            })
-        };
-
-        let multi_prefix = self.config.multi_prefix.clone();
-        let nav_bar_multi_prefixes = nav_bar_style.as_ref().map(|(border_type, _)| {
-            let rest: String = multi_prefix.chars().skip(1).collect();
-            let make = |is_first: bool, is_last: bool| -> String {
-                let border_char = get_border_char(is_first, is_last, *border_type);
-                if multi_prefix.chars().next().is_some() {
-                    format!("{}{}", border_char, rest)
-                } else {
-                    format!("{} ", border_char)
-                }
-            };
-            (
-                make(true, true),
-                make(true, false),
-                make(false, true),
-                make(false, false),
-            )
-        });
-
-        let get_dynamic_multi_prefix = |is_first: bool, is_last: bool| -> String {
-            if let Some((both, first, last, mid)) = &nav_bar_multi_prefixes {
-                if is_first && is_last {
-                    both.clone()
-                } else if is_first {
-                    first.clone()
-                } else if is_last {
-                    last.clone()
-                } else {
-                    mid.clone()
-                }
-            } else {
-                multi_prefix.clone()
-            }
-        };
-
         let width_limits = if as_cols {
             self.max_widths()
         } else {
@@ -435,33 +362,7 @@ impl ResultsUI {
             self.cursor = self.cursor.min(results.len().saturating_sub(1) as u16);
         }
 
-        let tier_sep_style = self.config.tier.style;
         let is_underline_mode = self.config.tier.separator == HorizontalSeparator::Underline;
-        let apply_tier_underline =
-            |t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize| {
-                if let Some(last_line) = t.lines.last_mut() {
-                    let cur_w = last_line.width();
-                    if cur_w < target_w {
-                        let pad_style = if let Some(fg) = tier_sep_style.fg {
-                            Style::default()
-                                .fg(fg)
-                                .underline_color(fg)
-                                .add_modifier(Modifier::UNDERLINED)
-                        } else {
-                            Style::default().add_modifier(Modifier::UNDERLINED)
-                        };
-                        last_line
-                            .spans
-                            .push(Span::styled(" ".repeat(target_w - cur_w), pad_style));
-                    }
-                    for span in last_line.spans.iter_mut().skip(skip_spans) {
-                        span.style = span.style.add_modifier(Modifier::UNDERLINED);
-                        if let Some(fg) = tier_sep_style.fg {
-                            span.style = span.style.underline_color(fg);
-                        }
-                    }
-                }
-            };
 
         let mut rows = vec![];
         let mut total_height = 0;
@@ -470,67 +371,35 @@ impl ResultsUI {
             return Table::new(rows, widths);
         }
 
-        let height_of = |t: &(
-            Option<crate::nucleo::GroupHeader>,
-            Vec<ratatui::text::Text<'a>>,
-            _,
-        )| {
-            let group_h = match &t.0 {
-                Some(crate::nucleo::GroupHeader::Named(_)) => 1,
-                Some(crate::nucleo::GroupHeader::TierSeparator) => u16::from(!matches!(
-                    self.config.tier.separator,
-                    HorizontalSeparator::None | HorizontalSeparator::Underline
-                )),
-                None => 0,
-            };
-            group_h
-                + self._hr()
-                + if as_cols {
-                    t.1.iter()
-                        .map(|t| t.height() as u16)
-                        .max()
-                        .unwrap_or_default()
-                } else {
-                    t.1.iter().map(|t| t.height() as u16).sum::<u16>()
-                }
-        };
-
         let effective_active_col = if widths.get(active_column).copied().unwrap_or(0) == 0 {
             widths.iter().position(|&w| w != 0).unwrap_or(active_column)
         } else {
             active_column
         };
-
-        let style_text = |mut t: ratatui::text::Text<'a>, x: usize, is_current_row: bool| {
-            let is_active_col = effective_active_col == x;
-            match self.config.row_connection {
-                RowConnectionStyle::Disjoint => {
-                    if is_active_col {
-                        t = t.style(if is_current_row {
-                            self.config.current_style
-                        } else {
-                            self.config.style
-                        });
-                    } else {
-                        t = t.style(if is_current_row {
-                            self.config.inactive_current_style
-                        } else {
-                            self.config.inactive_style
-                        });
-                    }
-                }
-                RowConnectionStyle::Capped => {
-                    if is_active_col {
-                        t = t.style(if is_current_row {
-                            self.config.current_style
-                        } else {
-                            self.config.style
-                        });
-                    }
-                }
-                RowConnectionStyle::Full => {}
-            }
-            t
+        let styler = RowStyler::new(
+            &self.config,
+            nav_bar_style,
+            effective_active_col,
+            as_cols,
+            self._hr(),
+        );
+        let get_nav_bar_span =
+            |is_first: bool, is_last: bool, is_current: bool, is_yanked: bool, is_cut: bool| {
+                styler.nav_bar_span(is_first, is_last, is_current, is_yanked, is_cut)
+            };
+        let get_dynamic_multi_prefix =
+            |is_first: bool, is_last: bool| styler.dynamic_multi_prefix(is_first, is_last);
+        let apply_tier_underline =
+            |t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize| {
+                styler.tier_underline(t, target_w, skip_spans)
+            };
+        let height_of = |t: &(
+            Option<crate::nucleo::GroupHeader>,
+            Vec<ratatui::text::Text<'a>>,
+            _,
+        )| styler.height_of(&t.0, &t.1);
+        let style_text = |t: ratatui::text::Text<'a>, x: usize, is_current_row: bool| {
+            styler.style_text(t, x, is_current_row)
         };
 
         // log::trace!("results initial: {}, {}, {}, {}, {}", self.bottom, self.cursor, total_height, self.height, results.len());
@@ -1562,5 +1431,213 @@ impl ResultsUI {
 
     fn _hr(&self) -> u16 {
         !matches!(self.config.separator, HorizontalSeparator::None) as u16
+    }
+}
+
+/// The nav-bar glyph for a border type.
+fn nav_border_char(border_type: ratatui::widgets::BorderType) -> &'static str {
+    match border_type {
+        ratatui::widgets::BorderType::Plain | ratatui::widgets::BorderType::Rounded => "│",
+        ratatui::widgets::BorderType::Double => "║",
+        ratatui::widgets::BorderType::Thick => "█",
+        ratatui::widgets::BorderType::QuadrantOutside => "▌",
+        ratatui::widgets::BorderType::QuadrantInside => "▐",
+        _ => "│",
+    }
+}
+
+/// What make_table needs, per frame, to style a row: copied out of the config so the row code
+/// can take it alongside `&mut self`.
+struct RowStyler {
+    nav_bar_style: Option<(ratatui::widgets::BorderType, Style)>,
+    current_nav_bar: Option<ratatui::widgets::BorderType>,
+    multi_prefix: String,
+    /// The multi-select prefix with the nav bar as its first cell: (both, first, last, mid).
+    nav_bar_multi_prefixes: Option<(String, String, String, String)>,
+    tier_sep_style: crate::config::StyleSetting,
+    tier_separator: HorizontalSeparator,
+    row_connection: RowConnectionStyle,
+    style: crate::config::StyleSetting,
+    current_style: crate::config::StyleSetting,
+    inactive_style: crate::config::StyleSetting,
+    inactive_current_style: crate::config::StyleSetting,
+    effective_active_col: usize,
+    as_cols: bool,
+    hr: u16,
+}
+
+impl RowStyler {
+    fn new(
+        config: &crate::config::ResultsConfig,
+        nav_bar_style: Option<(ratatui::widgets::BorderType, Style)>,
+        effective_active_col: usize,
+        as_cols: bool,
+        hr: u16,
+    ) -> Self {
+        let multi_prefix = config.multi_prefix.clone();
+        let nav_bar_multi_prefixes = nav_bar_style.as_ref().map(|(border_type, _)| {
+            let rest: String = multi_prefix.chars().skip(1).collect();
+            let make = |_is_first: bool, _is_last: bool| -> String {
+                let border_char = nav_border_char(*border_type);
+                if multi_prefix.chars().next().is_some() {
+                    format!("{}{}", border_char, rest)
+                } else {
+                    format!("{} ", border_char)
+                }
+            };
+            (
+                make(true, true),
+                make(true, false),
+                make(false, true),
+                make(false, false),
+            )
+        });
+        Self {
+            nav_bar_style,
+            current_nav_bar: config.current_nav_bar,
+            multi_prefix,
+            nav_bar_multi_prefixes,
+            tier_sep_style: config.tier.style,
+            tier_separator: config.tier.separator,
+            row_connection: config.row_connection.clone(),
+            style: config.style,
+            current_style: config.current_style,
+            inactive_style: config.inactive_style,
+            inactive_current_style: config.inactive_current_style,
+            effective_active_col,
+            as_cols,
+            hr,
+        }
+    }
+
+    fn nav_bar_span(
+        &self,
+        _is_first: bool,
+        _is_last: bool,
+        is_current: bool,
+        is_yanked: bool,
+        is_cut: bool,
+    ) -> Option<ratatui::text::Span<'static>> {
+        self.nav_bar_style.as_ref().map(|(border_type, style)| {
+            let bt = if is_current {
+                self.current_nav_bar.unwrap_or(*border_type)
+            } else {
+                *border_type
+            };
+            let mut st = *style;
+            if is_cut {
+                st = st.fg(ratatui::style::Color::Red);
+            } else if is_yanked {
+                st = st.fg(ratatui::style::Color::Yellow);
+            }
+            let ch = nav_border_char(bt);
+            ratatui::text::Span::styled(ch, st)
+        })
+    }
+
+    fn dynamic_multi_prefix(&self, is_first: bool, is_last: bool) -> String {
+        if let Some((both, first, last, mid)) = &self.nav_bar_multi_prefixes {
+            if is_first && is_last {
+                both.clone()
+            } else if is_first {
+                first.clone()
+            } else if is_last {
+                last.clone()
+            } else {
+                mid.clone()
+            }
+        } else {
+            self.multi_prefix.clone()
+        }
+    }
+
+    /// Underlines the last line of `t` (padded to `target_w`) to mark a tier boundary.
+    fn tier_underline(&self, t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize) {
+        let tier_sep_style = self.tier_sep_style;
+        if let Some(last_line) = t.lines.last_mut() {
+            let cur_w = last_line.width();
+            if cur_w < target_w {
+                let pad_style = if let Some(fg) = tier_sep_style.fg {
+                    Style::default()
+                        .fg(fg)
+                        .underline_color(fg)
+                        .add_modifier(Modifier::UNDERLINED)
+                } else {
+                    Style::default().add_modifier(Modifier::UNDERLINED)
+                };
+                last_line
+                    .spans
+                    .push(Span::styled(" ".repeat(target_w - cur_w), pad_style));
+            }
+            for span in last_line.spans.iter_mut().skip(skip_spans) {
+                span.style = span.style.add_modifier(Modifier::UNDERLINED);
+                if let Some(fg) = tier_sep_style.fg {
+                    span.style = span.style.underline_color(fg);
+                }
+            }
+        }
+    }
+
+    /// Rows a result takes: its group header, the row separator, and its columns.
+    fn height_of(
+        &self,
+        group: &Option<crate::nucleo::GroupHeader>,
+        cols: &[ratatui::text::Text<'_>],
+    ) -> u16 {
+        let group_h = match group {
+            Some(crate::nucleo::GroupHeader::Named(_)) => 1,
+            Some(crate::nucleo::GroupHeader::TierSeparator) => u16::from(!matches!(
+                self.tier_separator,
+                HorizontalSeparator::None | HorizontalSeparator::Underline
+            )),
+            None => 0,
+        };
+        group_h
+            + self.hr
+            + if self.as_cols {
+                cols.iter()
+                    .map(|t| t.height() as u16)
+                    .max()
+                    .unwrap_or_default()
+            } else {
+                cols.iter().map(|t| t.height() as u16).sum::<u16>()
+            }
+    }
+
+    fn style_text<'t>(
+        &self,
+        mut t: ratatui::text::Text<'t>,
+        x: usize,
+        is_current_row: bool,
+    ) -> ratatui::text::Text<'t> {
+        let is_active_col = self.effective_active_col == x;
+        match self.row_connection {
+            RowConnectionStyle::Disjoint => {
+                if is_active_col {
+                    t = t.style(if is_current_row {
+                        self.current_style
+                    } else {
+                        self.style
+                    });
+                } else {
+                    t = t.style(if is_current_row {
+                        self.inactive_current_style
+                    } else {
+                        self.inactive_style
+                    });
+                }
+            }
+            RowConnectionStyle::Capped => {
+                if is_active_col {
+                    t = t.style(if is_current_row {
+                        self.current_style
+                    } else {
+                        self.style
+                    });
+                }
+            }
+            RowConnectionStyle::Full => {}
+        }
+        t
     }
 }
