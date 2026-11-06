@@ -376,6 +376,74 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     Ok(config)
 }
 
+/// The start directory (`[start.directory]`): a path, or a script that prints one (`exec`).
+/// With `force`, failing to switch is fatal.
+fn enter_start_directory(directory: EnvValue, envs: &HashMap<String, String>) {
+    if !directory.value.is_empty() {
+        let EnvValue { value, force, exec } = directory;
+
+        let mut failed = false;
+        if exec {
+            if let Some(new_d) = Command::from_script(&value)
+                .envs(envs)
+                .read_to_string()
+                ._elog()
+            {
+                let new_d = Path::new(new_d.trim()).to_path_buf();
+                if new_d.exists() {
+                    failed = set_current_dir(&new_d)
+                        .prefix(format!("Failed to switch to {new_d:?}"))
+                        ._wbog()
+                        .is_some();
+                } else {
+                    ebog!("Directory does not exist: {}", new_d.display());
+                    failed = true;
+                }
+            } else {
+                ebog!("Failed to execute script for directory: {}", value);
+                failed = true;
+            }
+        } else {
+            let path = expand_tilde(value.into());
+            set_current_dir(&path)
+                .prefix(format!("Failed to switch to {path:?}"))
+                ._wbog();
+        }
+
+        if failed && force {
+            std::process::exit(1);
+        }
+    }
+}
+
+/// All of the input at once, for `--sort`: stdin, the built-in walker, or the start command.
+fn read_all_input(
+    no_read: bool,
+    command: &str,
+    walker_config: &waymaker::config::WalkerConfig,
+    envs: HashMap<String, String>,
+) -> Vec<u8> {
+    if !std::io::stdin().is_terminal() && !no_read {
+        let mut buf = Vec::new();
+        std::io::stdin().read_to_end(&mut buf).ok();
+        buf
+    } else if is_default_file_walker_command(command) {
+        let walker = waymaker::walker::AsyncWalker::new(walker_config.to_options("."));
+        let items = walker.collect_sync();
+        items.join("\n").into_bytes()
+    } else if !command.is_empty() {
+        Command::from_script(command)
+            .envs(envs)
+            .args(&*COMMAND_ARGS.lock().unwrap())
+            .output()
+            .map(|o| o.stdout)
+            .unwrap_or_default()
+    } else {
+        eprintln!("error: no input detected.");
+        std::process::exit(99)
+    }
+}
+
 /// Warns about config that silently does not do what it looks like: a column named like a
 /// built-in template value, and a plain character bound under [binds].
 fn warn_config_pitfalls(config: &Config) {
@@ -719,41 +787,7 @@ pub async fn start(
         let _ = store.add(&cwd.to_string_lossy());
     }
 
-    if !directory.value.is_empty() {
-        let EnvValue { value, force, exec } = directory;
-
-        let mut failed = false;
-        if exec {
-            if let Some(new_d) = Command::from_script(&value)
-                .envs(&envs)
-                .read_to_string()
-                ._elog()
-            {
-                let new_d = Path::new(new_d.trim()).to_path_buf();
-                if new_d.exists() {
-                    failed = set_current_dir(&new_d)
-                        .prefix(format!("Failed to switch to {new_d:?}"))
-                        ._wbog()
-                        .is_some();
-                } else {
-                    ebog!("Directory does not exist: {}", new_d.display());
-                    failed = true;
-                }
-            } else {
-                ebog!("Failed to execute script for directory: {}", value);
-                failed = true;
-            }
-        } else {
-            let path = expand_tilde(value.into());
-            set_current_dir(&path)
-                .prefix(format!("Failed to switch to {path:?}"))
-                ._wbog();
-        }
-
-        if failed && force {
-            std::process::exit(1);
-        }
-    }
+    enter_start_directory(directory, &envs);
 
     // ---------------------------------
 
@@ -974,25 +1008,7 @@ pub async fn start(
     let handle = if sort {
         // Collect all input, sort alphabetically, then inject in sorted order.
         let sep = separator.or(input_separator).unwrap_or('\n');
-        let raw: Vec<u8> = if !std::io::stdin().is_terminal() && !no_read {
-            let mut buf = Vec::new();
-            std::io::stdin().read_to_end(&mut buf).ok();
-            buf
-        } else if is_default_file_walker_command(&command) {
-            let walker = waymaker::walker::AsyncWalker::new(walker_config.to_options("."));
-            let items = walker.collect_sync();
-            items.join("\n").into_bytes()
-        } else if !command.is_empty() {
-            Command::from_script(&command)
-                .envs(envs)
-                .args(&*COMMAND_ARGS.lock().unwrap())
-                .output()
-                .map(|o| o.stdout)
-                .unwrap_or_default()
-        } else {
-            eprintln!("error: no input detected.");
-            std::process::exit(99)
-        };
+        let raw: Vec<u8> = read_all_input(no_read, &command, &walker_config, envs);
 
         let text = String::from_utf8_lossy(&raw);
         let mut lines: Vec<&str> = text.split(sep).collect();
