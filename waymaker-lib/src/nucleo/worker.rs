@@ -2827,6 +2827,98 @@ mod tests {
         );
     }
 
+    /// The metadata sorts read the files: sizes and mtimes are set so each order is distinct
+    /// from the name order (big < mid < small by name).
+    #[test]
+    fn test_worker_metadata_sort_orders() {
+        use crate::action::SortOrder;
+        use std::time::{Duration, SystemTime};
+
+        let dir = std::env::temp_dir().join(format!(
+            "wm-sort-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        // (name, size, mtime seconds after the epoch); created in this order.
+        let files = [("mid", 50, 3_000), ("small", 1, 1_000), ("big", 900, 2_000)];
+        let mut worker = Worker::<String>::new_single_column();
+        let injector = worker.nucleo.injector();
+        for (name, size, secs) in files {
+            let path = dir.join(name);
+            std::fs::write(&path, vec![b'x'; size]).unwrap();
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(secs))
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(5)); // distinct birth times
+            injector.push(path.to_string_lossy().into_owned(), |item, cols| {
+                cols[0] = item.clone().into();
+            });
+        }
+        // A missing file sorts as the epoch / size 0 instead of being dropped.
+        injector.push(
+            dir.join("gone").to_string_lossy().into_owned(),
+            |item, cols| {
+                cols[0] = item.clone().into();
+            },
+        );
+        worker.nucleo.set_stability(u32::MAX);
+        worker.nucleo.tick(10);
+        let mut matcher = Matcher::default();
+
+        let mut order = |sort| {
+            worker.set_sort_order(Some(sort));
+            let (results, _, _, _) = worker.results(
+                0,
+                10,
+                &[200],
+                false,
+                0,
+                Style::default(),
+                &mut matcher,
+                AutoscrollSettings::default(),
+                0,
+                (0, false),
+                true,
+                false,
+            );
+            results
+                .iter()
+                .map(|r| r.2.rsplit('/').next().unwrap().to_string())
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(order(SortOrder::Modified), ["gone", "small", "big", "mid"]);
+        assert_eq!(
+            order(SortOrder::ModifiedReverse),
+            ["mid", "big", "small", "gone"]
+        );
+        assert_eq!(order(SortOrder::Size), ["gone", "small", "mid", "big"]);
+        assert_eq!(
+            order(SortOrder::SizeReverse),
+            ["big", "mid", "small", "gone"]
+        );
+        // Birth time where the filesystem records it, else the mtime: either way "gone" is
+        // first and the three files keep one consistent order.
+        let created = order(SortOrder::Created);
+        assert_eq!(created[0], "gone");
+        assert!(
+            created[1..] == ["mid", "small", "big"] || created[1..] == ["small", "big", "mid"],
+            "{created:?}"
+        );
+        let mut reverse = order(SortOrder::CreatedReverse);
+        reverse.reverse();
+        assert_eq!(reverse, created);
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn test_awt_type_ordering() {
         use crate::Matchmaker;

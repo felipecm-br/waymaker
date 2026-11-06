@@ -952,3 +952,180 @@ fn preview_toggle_diagram_and_zoom() {
     wm.send(F2);
     wm.wait_for_screen(|s| s.contains("[1/2 · 125%]"));
 }
+
+// ---- handle_action (render/actions.rs): actions bound to F1..F3 ----
+
+fn bound(items: &str, args: &'static [&'static str]) -> Session {
+    Launch::new(Box::leak(items.to_string().into_boxed_str()))
+        .args(args)
+        .size(16, 60)
+        .start()
+}
+
+/// Wait until `wm` (or a command it ran) has created `name` in the working directory.
+fn wait_for_file(wm: &Session, name: &str) -> std::path::PathBuf {
+    let path = wm.dir.path().join("work").join(name);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !path.exists() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "{name} never appeared"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    path
+}
+
+#[test]
+fn golden_action_toggle_wrap() {
+    let wm = Launch::new(Box::leak(long_items().into_boxed_str()))
+        .args(&["b.f1", "ToggleWrap"])
+        .size(16, 60)
+        .ready("entry_00")
+        .start();
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_toggle_footer_and_header() {
+    let wm = bound(&items(), &["b.f1", "ToggleFooter", "b.f2", "ToggleHeader"]);
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_toggle_action_box() {
+    let wm = bound(&items(), &["b.f1", "ToggleActionBox"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_toggle_action_box_then_esc() {
+    let wm = bound(&items(), &["b.f1", "ToggleActionBox"]);
+    wm.send(F1);
+    wm.send(ESC);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_query_pos() {
+    let wm = bound(&items(), &["b.f1", "QueryPos(1)"]);
+    wm.send("ale");
+    wm.send(F1);
+    wm.send("p");
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_sort_alphabetical() {
+    let wm = bound(&items(), &["b.f1", "Sort(Alphabetical)"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_sort_menu() {
+    let wm = bound(&items(), &["b.f1", "SortMenu"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_prompt_input() {
+    let wm = bound(&items(), &["b.f1", "PromptInput(touch {q})"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_prompt_input_then_esc() {
+    let wm = bound(&items(), &["b.f1", "PromptInput(touch {q})"]);
+    wm.send(F1);
+    wm.send(ESC);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_action_live_input_then_esc() {
+    // While live input is open wm keeps redrawing, so it never goes idle: send without
+    // waiting and watch for the LIVE badge instead.
+    let wm = bound(&items(), &["b.f1", "LiveInput(echo {q})"]);
+    wm.send_raw(F1);
+    wm.wait_for_screen(|s| s.contains("LIVE"));
+    wm.send_raw("ab");
+    wm.send_raw(ESC);
+    wm.wait_for_screen(|s| !s.contains("LIVE"));
+    wm.wait_until_idle();
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn action_execute_runs_the_command() {
+    let wm = bound(&items(), &["b.f1", "Execute(touch ran_execute)"]);
+    wm.send(F1);
+    wait_for_file(&wm, "ran_execute");
+}
+
+#[test]
+fn action_execute_silent_runs_the_command() {
+    let wm = bound(&items(), &["b.f1", "ExecuteSilent(touch ran_silent)"]);
+    wm.send(F1);
+    wait_for_file(&wm, "ran_silent");
+}
+
+#[test]
+fn action_execute_async_runs_the_command() {
+    let wm = bound(&items(), &["b.f1", "ExecuteAsync(touch ran_async)"]);
+    wm.send(F1);
+    wait_for_file(&wm, "ran_async");
+}
+
+#[test]
+fn action_execute_substitutes_the_current_item() {
+    let wm = bound(&items(), &["b.f1", "ExecuteSilent(echo {} > current)"]);
+    wm.send(DOWN);
+    wm.send(F1);
+    let path = wait_for_file(&wm, "current");
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    assert_eq!(std::fs::read_to_string(path).unwrap(), "banana/01\n");
+}
+
+#[test]
+fn action_store_is_visible_to_later_commands() {
+    let wm = bound(
+        &items(),
+        &[
+            "b.f1",
+            "Store(kept)",
+            "b.f2",
+            "ExecuteSilent(echo $WM_STORE > stored)",
+        ],
+    );
+    wm.send(F1);
+    wm.send(F2);
+    let path = wait_for_file(&wm, "stored");
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    assert_eq!(std::fs::read_to_string(path).unwrap(), "kept\n");
+}
+
+#[test]
+fn action_print_then_accept() {
+    let wm = bound(&items(), &["b.f1", "Print(printed {})"]);
+    wm.send(F1);
+    wm.send(ENTER);
+    let (code, out) = wm.finish();
+    // `{}` is shell-quoted in templates, Print included; the accepted item follows.
+    assert_eq!((code, out.as_str()), (0, "printed 'apple/00'\napple/00\n"));
+}
+
+#[test]
+fn action_become_replaces_wm() {
+    let wm = bound(&items(), &["b.f1", "Become(echo became {})"]);
+    wm.send(DOWN);
+    wm.send_raw(F1);
+    let (code, out) = wm.finish();
+    assert_eq!((code, out.as_str()), (0, "became banana/01\n"));
+}

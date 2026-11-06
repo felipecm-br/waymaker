@@ -1,0 +1,30 @@
+---
+source: waymaker-cli/tests/golden.rs
+assertion_line: 987
+expression: wm.styled_screen()
+---
+ 0|
+ 1| >                           entry_00 lorem ipsum dolor sit
+ 2|   20/20                     amet consectetur adipiscing
+ 3|   entry_00 lorem ipsum dolo↵elit sed do eiusmod tempor
+ 4|   r sit amet consectetur ad↵
+ 5|   ipiscing elit sed do eius↵
+ 6|   mod tempor
+ 7|   entry_01 lorem ipsum dolo↵
+ 8|    enter accept │ tab mark
+ 9|
+10|
+11|
+12|
+13|
+14|
+15|
+-- styles --
+ 1: 1-2 fg=7
+ 2: 1-7 fg=2 italic
+ 3: 3-27 bold | 28 fg=8 dim
+ 4: 3-27 bold | 28 fg=8 dim
+ 5: 3-27 bold | 28 fg=8 dim
+ 6: 3-28 bold
+ 7: 28 fg=8 dim
+ 8: 1-3 fg=6 | 4-8 fg=6 bold | 9 fg=6 | 10-15 fg=8 | 16 fg=6 | 17 fg=8 | 18 fg=6 | 19-21 fg=6 bold | 22 fg=6 | 23-26 fg=8 | 27-28 fg=6
