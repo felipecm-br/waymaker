@@ -938,6 +938,26 @@ impl Previewer {
                     let mut buf = [0u8; 8192];
                     let mut staged = Vec::new();
                     let mut has_swapped = false;
+                    // What the new output replaces when it is swapped in: the previous text, image
+                    // and diagrams.
+                    let clear_other_views = || {
+                        if let Ok(mut s) = string_state.lock() {
+                            *s = None;
+                        }
+                        if let Ok(mut img) = image_state.lock()
+                            && img.is_some()
+                        {
+                            *img = None;
+                            image_id.fetch_add(1, Ordering::Release);
+                        }
+                        if let Ok(mut d) = diagram_sources_state.lock() {
+                            d.clear();
+                        }
+                        if let Ok(mut d) = diagram_offsets_state.lock() {
+                            d.clear();
+                        }
+                        current_diagram_idx_state.store(0, Ordering::Release);
+                    };
 
                     while let Ok(n) = std::io::Read::read(&mut reader, &mut buf) {
                         if n == 0 || current_generation.load(Ordering::Acquire) != task_gen {
@@ -972,22 +992,7 @@ impl Previewer {
                                         lines.replace_all(std::mem::take(&mut staged));
                                         has_swapped = true;
                                         guard = lines.read();
-                                        if let Ok(mut s) = string_state.lock() {
-                                            *s = None;
-                                        }
-                                        if let Ok(mut img) = image_state.lock()
-                                            && img.is_some()
-                                        {
-                                            *img = None;
-                                            image_id.fetch_add(1, Ordering::Release);
-                                        }
-                                        if let Ok(mut d) = diagram_sources_state.lock() {
-                                            d.clear();
-                                        }
-                                        if let Ok(mut d) = diagram_offsets_state.lock() {
-                                            d.clear();
-                                        }
-                                        current_diagram_idx_state.store(0, Ordering::Release);
+                                        clear_other_views();
                                         changed.store(true, Ordering::Release);
                                     }
                                 } else {
@@ -1030,22 +1035,7 @@ impl Previewer {
                                         lines.replace_all(std::mem::take(&mut staged));
                                         has_swapped = true;
                                         guard = lines.read();
-                                        if let Ok(mut s) = string_state.lock() {
-                                            *s = None;
-                                        }
-                                        if let Ok(mut img) = image_state.lock()
-                                            && img.is_some()
-                                        {
-                                            *img = None;
-                                            image_id.fetch_add(1, Ordering::Release);
-                                        }
-                                        if let Ok(mut d) = diagram_sources_state.lock() {
-                                            d.clear();
-                                        }
-                                        if let Ok(mut d) = diagram_offsets_state.lock() {
-                                            d.clear();
-                                        }
-                                        current_diagram_idx_state.store(0, Ordering::Release);
+                                        clear_other_views();
                                         changed.store(true, Ordering::Release);
                                     } else if has_text && has_swapped {
                                         changed.store(true, Ordering::Release);
@@ -1117,22 +1107,7 @@ impl Previewer {
                             return true;
                         }
                         lines.replace_all(staged);
-                        if let Ok(mut s) = string_state.lock() {
-                            *s = None;
-                        }
-                        if let Ok(mut img) = image_state.lock()
-                            && img.is_some()
-                        {
-                            *img = None;
-                            image_id.fetch_add(1, Ordering::Release);
-                        }
-                        if let Ok(mut d) = diagram_sources_state.lock() {
-                            d.clear();
-                        }
-                        if let Ok(mut d) = diagram_offsets_state.lock() {
-                            d.clear();
-                        }
-                        current_diagram_idx_state.store(0, Ordering::Release);
+                        clear_other_views();
                         changed.store(true, Ordering::Release);
                     }
 
