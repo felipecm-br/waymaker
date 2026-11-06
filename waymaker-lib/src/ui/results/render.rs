@@ -796,6 +796,438 @@ impl ResultsUI {
         (start_index, total_height)
     }
 
+    /// Pushes the rows from `start_index` on, with their group headers, separators, prefixes and
+    /// styles, until the table is full. Returns the row counter and the height left over.
+    #[allow(clippy::too_many_arguments)]
+    fn push_visible_rows<'a, T: SSS, S: Selection>(
+        &mut self,
+        styler: &RowStyler,
+        results: &mut crate::nucleo::WorkerResults<'a, T>,
+        start_index: u16,
+        rows: &mut Vec<Row<'a>>,
+        click: &mut Click,
+        selector: &Selector<T, S>,
+        columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
+        cwd: &std::path::Path,
+        widths: &[u16],
+        as_cols: bool,
+        is_underline_mode: bool,
+        active_group_name: &Option<std::sync::Arc<str>>,
+        active_column: usize,
+        mut i: usize,
+        mut remaining_height: u16,
+    ) -> (usize, u16) {
+        let get_nav_bar_span =
+            |is_first: bool, is_last: bool, is_current: bool, is_yanked: bool, is_cut: bool| {
+                styler.nav_bar_span(is_first, is_last, is_current, is_yanked, is_cut)
+            };
+        let get_dynamic_multi_prefix =
+            |is_first: bool, is_last: bool| styler.dynamic_multi_prefix(is_first, is_last);
+        let apply_tier_underline =
+            |t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize| {
+                styler.tier_underline(t, target_w, skip_spans)
+            };
+        let style_text = |t: ratatui::text::Text<'a>, x: usize, is_current_row: bool| {
+            styler.style_text(t, x, is_current_row)
+        };
+
+        let mut drain_iter = results.drain(start_index as usize..).peekable();
+        while let Some((group, mut row, item)) = drain_iter.next() {
+            // note that the index changes *next* frame
+            if let Click::ResultPos(c) = click {
+                let c = if self.reverse() {
+                    self.height.saturating_sub(*c).saturating_sub(1)
+                } else {
+                    *c
+                };
+                if self.height - remaining_height > c {
+                    let idx = self.bottom + i as u32 - 1;
+                    log::debug!(
+                        "Mapped click position to index: {c} -> {idx} with remaining {remaining_height}",
+                    );
+                    *click = Click::ResultIdx(idx);
+                }
+            }
+
+            // insert group header or tier separator
+            if let Some(ref group) = group
+                && remaining_height > 0
+            {
+                let is_first = rows.is_empty();
+                let is_last = remaining_height <= 1;
+                let nav_bar_span = get_nav_bar_span(is_first, is_last, false, false, false);
+
+                let row_opt =
+                    self.group_header_row(group, nav_bar_span, active_group_name, as_cols, widths);
+
+                if let Some(row) = row_opt {
+                    rows.push(row);
+                    remaining_height = remaining_height.saturating_sub(1);
+                }
+            }
+            if remaining_height == 0 {
+                break;
+            }
+
+            // insert hr
+            if let Some(hr) = self.hr()
+                && remaining_height > 0
+            {
+                rows.push(hr);
+                remaining_height -= self._hr();
+            }
+            if remaining_height == 0 {
+                break;
+            }
+
+            if self.is_current(i) {
+                self.cursor_above = self.height - remaining_height;
+            }
+
+            // determine prefix
+            let is_selected = selector.contains(item);
+            let is_first = rows.is_empty();
+            let is_last_in_results = drain_iter.peek().is_none();
+            let h = if as_cols {
+                row.iter()
+                    .map(|t| t.height() as u16)
+                    .max()
+                    .unwrap_or_default()
+            } else {
+                row.iter().map(|t| t.height() as u16).sum::<u16>()
+            };
+            let is_last = is_last_in_results || (remaining_height <= h);
+            let is_current_row = self.is_current(i);
+            let (prefix, icon_name_hz, is_spinner, spinner_col_idx, is_yanked, is_cut) = self
+                .row_prefix(
+                    &mut row,
+                    is_selected,
+                    i,
+                    item,
+                    columns,
+                    is_first,
+                    is_last,
+                    cwd,
+                    &get_dynamic_multi_prefix,
+                );
+            let nav_bar_span =
+                get_nav_bar_span(is_first, is_last, is_current_row, is_yanked, is_cut);
+            let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name_hz, cwd);
+            let b_color = if is_pinned || self.mode_index == 2 {
+                Some(bookmark_color(&self.config, &icon_name_hz))
+            } else {
+                None
+            };
+
+            if as_cols {
+                // scroll down
+                if self.is_current(i) && self.config.vscroll_current_only && self.vscroll > 0 {
+                    for (x, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
+                        if self.col.is_none() || self.col() == Some(x) {
+                            let scroll = self.vscroll as usize;
+
+                            if scroll < t.lines.len() {
+                                t.lines = t.lines.split_off(scroll);
+                            } else {
+                                t.lines.clear();
+                            }
+                        }
+                    }
+                }
+
+                let mut height = row
+                    .iter()
+                    .map(|t| t.height() as u16)
+                    .max()
+                    .unwrap_or_default();
+
+                if remaining_height < height {
+                    height = remaining_height;
+
+                    for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
+                        clip_text_lines(t, height, self.reverse());
+                    }
+                }
+                remaining_height -= height;
+
+                // same as above
+                let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
+                let target_prefix_col =
+                    if is_spinner && widths.get(spinner_col_idx).copied().unwrap_or(0) != 0 {
+                        spinner_col_idx
+                    } else {
+                        first_visible
+                    };
+
+                let last_visible = widths
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .find_map(|(i, w)| (*w != 0).then_some(i));
+
+                let mut row_texts: Vec<_> = row
+                    .iter()
+                    .take(last_visible.map(|x| x + 1).unwrap_or(0))
+                    .cloned()
+                    // highlight
+                    .enumerate()
+                    .map(|(x, mut t)| {
+                        t = style_text(t, x, self.is_current(i));
+                        if let Some(color) = b_color {
+                            apply_bookmark_text_style(&mut t, color);
+                        }
+
+                        // prefix after hscroll
+                        if x == target_prefix_col {
+                            prefix_span(
+                                &mut t,
+                                prefix.clone(),
+                                self.active_prefix_style(
+                                    &icon_name_hz,
+                                    is_selected,
+                                    is_spinner,
+                                    cwd,
+                                ),
+                                self.inactive_prefix_style(
+                                    &icon_name_hz,
+                                    is_selected && !is_current_row,
+                                    is_spinner,
+                                    cwd,
+                                ),
+                                is_current_row,
+                                if !is_selected {
+                                    nav_bar_span.clone()
+                                } else {
+                                    None
+                                },
+                                self.config.current_style,
+                                self.config.current_nav_bar_style,
+                            );
+                            if self.config.icons {
+                                insert_icon_span(
+                                    &mut t,
+                                    &icon_name_hz,
+                                    !is_selected && nav_bar_span.is_some(),
+                                    is_current_row,
+                                    self.config.uncolor_current_icon,
+                                    self.config.invert_current_icon,
+                                    self.config.current_icon_style,
+                                    is_pinned,
+                                    is_yanked,
+                                    is_cut,
+                                    self.mode_index,
+                                    &self.config,
+                                    self.get_flash_op(&icon_name_hz, cwd),
+                                );
+                            }
+                            if self.config.symlink.active {
+                                maybe_append_symlink_target(
+                                    &mut t,
+                                    &icon_name_hz,
+                                    self.config.symlink.style.into(),
+                                    widths[target_prefix_col],
+                                );
+                            }
+                        };
+                        t
+                    })
+                    .collect();
+
+                if self.config.right_align_last && row_texts.len() > 1 {
+                    row_texts.last_mut().unwrap().alignment = Some(Alignment::Right)
+                }
+
+                if is_underline_mode
+                    && matches!(
+                        drain_iter.peek(),
+                        Some((Some(crate::nucleo::GroupHeader::TierSeparator), _, _))
+                    )
+                {
+                    let total_allocated: u16 = widths.iter().sum();
+                    let total_available = self.width.saturating_sub(self.column_spacing_width());
+                    let surplus = total_available.saturating_sub(total_allocated);
+                    let num_cols = row_texts.len();
+                    let has_nav = !is_selected && nav_bar_span.is_some();
+                    let prefix_skip = if has_nav { 2 } else { 1 };
+                    for (col_idx, t) in row_texts.iter_mut().enumerate() {
+                        let is_last_col = col_idx == num_cols.saturating_sub(1);
+                        let base_w = widths.get(col_idx).copied().unwrap_or(0);
+                        let target_w = if is_last_col {
+                            base_w + surplus
+                        } else {
+                            base_w
+                        } as usize;
+                        let skip = if col_idx == target_prefix_col {
+                            prefix_skip
+                        } else {
+                            0
+                        };
+                        apply_tier_underline(t, target_w, skip);
+                    }
+                }
+
+                // push
+                let mut row = Row::new(row_texts).height(height);
+
+                if self.is_current(i) {
+                    match self.config.row_connection {
+                        RowConnectionStyle::Capped => {
+                            row = row.style(self.config.inactive_current_style)
+                        }
+                        RowConnectionStyle::Full => row = row.style(self.config.current_style),
+                        _ => {}
+                    }
+                } else if is_selected {
+                    row = row.style(Style::from(self.config.selected_style));
+                }
+
+                rows.push(row);
+            } else {
+                let mut push = vec![];
+                let mut vscroll_to_skip = if self.is_current(i) && self.config.vscroll_current_only
+                {
+                    self.vscroll as usize
+                } else {
+                    0
+                };
+
+                for (x, mut col) in row.into_iter().enumerate() {
+                    if vscroll_to_skip > 0 {
+                        let col_height = col.lines.len();
+                        if vscroll_to_skip >= col_height {
+                            vscroll_to_skip -= col_height;
+                            continue;
+                        } else {
+                            col.lines = col.lines.split_off(vscroll_to_skip);
+                            vscroll_to_skip = 0;
+                        }
+                    }
+
+                    let mut height = col.height() as u16;
+
+                    if remaining_height == 0 {
+                        break;
+                    } else if remaining_height < height {
+                        height = remaining_height;
+                        clip_text_lines(&mut col, remaining_height, self.reverse());
+                    }
+                    remaining_height -= height;
+
+                    if let Some(color) = b_color {
+                        apply_bookmark_text_style(&mut col, color);
+                    }
+
+                    let is_current_row = self.is_current(i);
+                    prefix_span(
+                        &mut col,
+                        prefix.clone(),
+                        self.active_prefix_style(&icon_name_hz, is_selected, is_spinner, cwd),
+                        self.inactive_prefix_style(
+                            &icon_name_hz,
+                            is_selected && !is_current_row,
+                            is_spinner,
+                            cwd,
+                        ),
+                        is_current_row,
+                        if !is_selected {
+                            nav_bar_span.clone()
+                        } else {
+                            None
+                        },
+                        self.config.current_style,
+                        self.config.current_nav_bar_style,
+                    );
+                    if self.config.icons && x == 0 {
+                        insert_icon_span(
+                            &mut col,
+                            &icon_name_hz,
+                            !is_selected && nav_bar_span.is_some(),
+                            is_current_row,
+                            self.config.uncolor_current_icon,
+                            self.config.invert_current_icon,
+                            self.config.current_icon_style,
+                            is_pinned,
+                            is_yanked,
+                            is_cut,
+                            self.mode_index,
+                            &self.config,
+                            self.get_flash_op(&icon_name_hz, cwd),
+                        );
+                    }
+                    if self.config.symlink.active && x == 0 {
+                        maybe_append_symlink_target(
+                            &mut col,
+                            &icon_name_hz,
+                            self.config.symlink.style.into(),
+                            self.width,
+                        );
+                    }
+
+                    let is_active_col = active_column == x;
+
+                    match self.config.row_connection {
+                        RowConnectionStyle::Disjoint => {
+                            if is_active_col {
+                                col = col.style(if is_current_row {
+                                    self.config.current_style
+                                } else {
+                                    self.config.style
+                                });
+                            } else {
+                                col = col.style(if is_current_row {
+                                    self.config.inactive_current_style
+                                } else {
+                                    self.config.inactive_style
+                                });
+                            }
+                        }
+                        RowConnectionStyle::Capped => {
+                            if is_active_col {
+                                col = col.style(if is_current_row {
+                                    self.config.current_style
+                                } else {
+                                    self.config.style
+                                });
+                            }
+                        }
+                        RowConnectionStyle::Full => {}
+                    }
+
+                    if is_underline_mode
+                        && matches!(
+                            drain_iter.peek(),
+                            Some((Some(crate::nucleo::GroupHeader::TierSeparator), _, _))
+                        )
+                    {
+                        let target_w = self.width as usize;
+                        let has_nav = !is_selected && nav_bar_span.is_some();
+                        let prefix_skip = if has_nav { 2 } else { 1 };
+                        let skip = if x == 0 { prefix_skip } else { 0 };
+                        apply_tier_underline(&mut col, target_w, skip);
+                    }
+
+                    // push
+                    let mut row = Row::new(vec![col]).height(height);
+                    if is_current_row {
+                        match self.config.row_connection {
+                            RowConnectionStyle::Capped => {
+                                row = row.style(self.config.inactive_current_style)
+                            }
+                            RowConnectionStyle::Full => row = row.style(self.config.current_style),
+                            _ => {}
+                        }
+                    } else if is_selected {
+                        row = row.style(Style::from(self.config.selected_style));
+                    }
+                    push.push(row);
+                }
+                rows.extend(push);
+            }
+            i += 1;
+        }
+        (i, remaining_height)
+    }
+
     pub fn make_table<'a, T: SSS>(
         &mut self,
         active_column: usize,
@@ -907,24 +1339,11 @@ impl ResultsUI {
             as_cols,
             self._hr(),
         );
-        let get_nav_bar_span =
-            |is_first: bool, is_last: bool, is_current: bool, is_yanked: bool, is_cut: bool| {
-                styler.nav_bar_span(is_first, is_last, is_current, is_yanked, is_cut)
-            };
-        let get_dynamic_multi_prefix =
-            |is_first: bool, is_last: bool| styler.dynamic_multi_prefix(is_first, is_last);
-        let apply_tier_underline =
-            |t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize| {
-                styler.tier_underline(t, target_w, skip_spans)
-            };
         let height_of = |t: &(
             Option<crate::nucleo::GroupHeader>,
             Vec<ratatui::text::Text<'a>>,
             _,
         )| styler.height_of(&t.0, &t.1);
-        let style_text = |t: ratatui::text::Text<'a>, x: usize, is_current_row: bool| {
-            styler.style_text(t, x, is_current_row)
-        };
 
         // log::trace!("results initial: {}, {}, {}, {}, {}", self.bottom, self.cursor, total_height, self.height, results.len());
         let h_at_cursor = height_of(&results[self.cursor as usize]);
@@ -965,9 +1384,9 @@ impl ResultsUI {
         );
 
         // topside padding is not self-correcting, and can only do its best to stay at #padding lines without obscuring cursor on cursor movement events.
-        let mut remaining_height = self.height.saturating_sub(total_height);
+        let remaining_height = self.height.saturating_sub(total_height);
 
-        let mut i = self.bottom_clip.is_some() as usize;
+        let i = self.bottom_clip.is_some() as usize;
 
         let active_group_name: Option<std::sync::Arc<str>> = if !self.cursor_disabled {
             let mut curr = None;
@@ -987,405 +1406,23 @@ impl ResultsUI {
             None
         };
 
-        let mut drain_iter = results.drain(start_index as usize..).peekable();
-        while let Some((group, mut row, item)) = drain_iter.next() {
-            // note that the index changes *next* frame
-            if let Click::ResultPos(c) = click {
-                let c = if self.reverse() {
-                    self.height.saturating_sub(*c).saturating_sub(1)
-                } else {
-                    *c
-                };
-                if self.height - remaining_height > c {
-                    let idx = self.bottom + i as u32 - 1;
-                    log::debug!(
-                        "Mapped click position to index: {c} -> {idx} with remaining {remaining_height}",
-                    );
-                    *click = Click::ResultIdx(idx);
-                }
-            }
-
-            // insert group header or tier separator
-            if let Some(ref group) = group
-                && remaining_height > 0
-            {
-                let is_first = rows.is_empty();
-                let is_last = remaining_height <= 1;
-                let nav_bar_span = get_nav_bar_span(is_first, is_last, false, false, false);
-
-                let row_opt = self.group_header_row(
-                    group,
-                    nav_bar_span,
-                    &active_group_name,
-                    as_cols,
-                    &widths,
-                );
-
-                if let Some(row) = row_opt {
-                    rows.push(row);
-                    remaining_height = remaining_height.saturating_sub(1);
-                }
-            }
-            if remaining_height == 0 {
-                break;
-            }
-
-            // insert hr
-            if let Some(hr) = self.hr()
-                && remaining_height > 0
-            {
-                rows.push(hr);
-                remaining_height -= self._hr();
-            }
-            if remaining_height == 0 {
-                break;
-            }
-
-            if self.is_current(i) {
-                self.cursor_above = self.height - remaining_height;
-            }
-
-            // determine prefix
-            let is_selected = selector.contains(item);
-            let is_first = rows.is_empty();
-            let is_last_in_results = drain_iter.peek().is_none();
-            let h = if as_cols {
-                row.iter()
-                    .map(|t| t.height() as u16)
-                    .max()
-                    .unwrap_or_default()
-            } else {
-                row.iter().map(|t| t.height() as u16).sum::<u16>()
-            };
-            let is_last = is_last_in_results || (remaining_height <= h);
-            let is_current_row = self.is_current(i);
-            let (prefix, icon_name_hz, is_spinner, spinner_col_idx, is_yanked, is_cut) = self
-                .row_prefix(
-                    &mut row,
-                    is_selected,
-                    i,
-                    item,
-                    &columns,
-                    is_first,
-                    is_last,
-                    &cwd,
-                    &get_dynamic_multi_prefix,
-                );
-            let nav_bar_span =
-                get_nav_bar_span(is_first, is_last, is_current_row, is_yanked, is_cut);
-            let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name_hz, &cwd);
-            let b_color = if is_pinned || self.mode_index == 2 {
-                Some(bookmark_color(&self.config, &icon_name_hz))
-            } else {
-                None
-            };
-
-            if as_cols {
-                // scroll down
-                if self.is_current(i) && self.config.vscroll_current_only && self.vscroll > 0 {
-                    for (x, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
-                        if self.col.is_none() || self.col() == Some(x) {
-                            let scroll = self.vscroll as usize;
-
-                            if scroll < t.lines.len() {
-                                t.lines = t.lines.split_off(scroll);
-                            } else {
-                                t.lines.clear();
-                            }
-                        }
-                    }
-                }
-
-                let mut height = row
-                    .iter()
-                    .map(|t| t.height() as u16)
-                    .max()
-                    .unwrap_or_default();
-
-                if remaining_height < height {
-                    height = remaining_height;
-
-                    for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
-                        clip_text_lines(t, height, self.reverse());
-                    }
-                }
-                remaining_height -= height;
-
-                // same as above
-                let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
-                let target_prefix_col =
-                    if is_spinner && widths.get(spinner_col_idx).copied().unwrap_or(0) != 0 {
-                        spinner_col_idx
-                    } else {
-                        first_visible
-                    };
-
-                let last_visible = widths
-                    .iter()
-                    .enumerate()
-                    .rev()
-                    .find_map(|(i, w)| (*w != 0).then_some(i));
-
-                let mut row_texts: Vec<_> = row
-                    .iter()
-                    .take(last_visible.map(|x| x + 1).unwrap_or(0))
-                    .cloned()
-                    // highlight
-                    .enumerate()
-                    .map(|(x, mut t)| {
-                        t = style_text(t, x, self.is_current(i));
-                        if let Some(color) = b_color {
-                            apply_bookmark_text_style(&mut t, color);
-                        }
-
-                        // prefix after hscroll
-                        if x == target_prefix_col {
-                            prefix_span(
-                                &mut t,
-                                prefix.clone(),
-                                self.active_prefix_style(
-                                    &icon_name_hz,
-                                    is_selected,
-                                    is_spinner,
-                                    &cwd,
-                                ),
-                                self.inactive_prefix_style(
-                                    &icon_name_hz,
-                                    is_selected && !is_current_row,
-                                    is_spinner,
-                                    &cwd,
-                                ),
-                                is_current_row,
-                                if !is_selected {
-                                    nav_bar_span.clone()
-                                } else {
-                                    None
-                                },
-                                self.config.current_style,
-                                self.config.current_nav_bar_style,
-                            );
-                            if self.config.icons {
-                                insert_icon_span(
-                                    &mut t,
-                                    &icon_name_hz,
-                                    !is_selected && nav_bar_span.is_some(),
-                                    is_current_row,
-                                    self.config.uncolor_current_icon,
-                                    self.config.invert_current_icon,
-                                    self.config.current_icon_style,
-                                    is_pinned,
-                                    is_yanked,
-                                    is_cut,
-                                    self.mode_index,
-                                    &self.config,
-                                    self.get_flash_op(&icon_name_hz, &cwd),
-                                );
-                            }
-                            if self.config.symlink.active {
-                                maybe_append_symlink_target(
-                                    &mut t,
-                                    &icon_name_hz,
-                                    self.config.symlink.style.into(),
-                                    widths[target_prefix_col],
-                                );
-                            }
-                        };
-                        t
-                    })
-                    .collect();
-
-                if self.config.right_align_last && row_texts.len() > 1 {
-                    row_texts.last_mut().unwrap().alignment = Some(Alignment::Right)
-                }
-
-                if is_underline_mode
-                    && matches!(
-                        drain_iter.peek(),
-                        Some((Some(crate::nucleo::GroupHeader::TierSeparator), _, _))
-                    )
-                {
-                    let total_allocated: u16 = widths.iter().sum();
-                    let total_available = self.width.saturating_sub(self.column_spacing_width());
-                    let surplus = total_available.saturating_sub(total_allocated);
-                    let num_cols = row_texts.len();
-                    let has_nav = !is_selected && nav_bar_span.is_some();
-                    let prefix_skip = if has_nav { 2 } else { 1 };
-                    for (col_idx, t) in row_texts.iter_mut().enumerate() {
-                        let is_last_col = col_idx == num_cols.saturating_sub(1);
-                        let base_w = widths.get(col_idx).copied().unwrap_or(0);
-                        let target_w = if is_last_col {
-                            base_w + surplus
-                        } else {
-                            base_w
-                        } as usize;
-                        let skip = if col_idx == target_prefix_col {
-                            prefix_skip
-                        } else {
-                            0
-                        };
-                        apply_tier_underline(t, target_w, skip);
-                    }
-                }
-
-                // push
-                let mut row = Row::new(row_texts).height(height);
-
-                if self.is_current(i) {
-                    match self.config.row_connection {
-                        RowConnectionStyle::Capped => {
-                            row = row.style(self.config.inactive_current_style)
-                        }
-                        RowConnectionStyle::Full => row = row.style(self.config.current_style),
-                        _ => {}
-                    }
-                } else if is_selected {
-                    row = row.style(Style::from(self.config.selected_style));
-                }
-
-                rows.push(row);
-            } else {
-                let mut push = vec![];
-                let mut vscroll_to_skip = if self.is_current(i) && self.config.vscroll_current_only
-                {
-                    self.vscroll as usize
-                } else {
-                    0
-                };
-
-                for (x, mut col) in row.into_iter().enumerate() {
-                    if vscroll_to_skip > 0 {
-                        let col_height = col.lines.len();
-                        if vscroll_to_skip >= col_height {
-                            vscroll_to_skip -= col_height;
-                            continue;
-                        } else {
-                            col.lines = col.lines.split_off(vscroll_to_skip);
-                            vscroll_to_skip = 0;
-                        }
-                    }
-
-                    let mut height = col.height() as u16;
-
-                    if remaining_height == 0 {
-                        break;
-                    } else if remaining_height < height {
-                        height = remaining_height;
-                        clip_text_lines(&mut col, remaining_height, self.reverse());
-                    }
-                    remaining_height -= height;
-
-                    if let Some(color) = b_color {
-                        apply_bookmark_text_style(&mut col, color);
-                    }
-
-                    let is_current_row = self.is_current(i);
-                    prefix_span(
-                        &mut col,
-                        prefix.clone(),
-                        self.active_prefix_style(&icon_name_hz, is_selected, is_spinner, &cwd),
-                        self.inactive_prefix_style(
-                            &icon_name_hz,
-                            is_selected && !is_current_row,
-                            is_spinner,
-                            &cwd,
-                        ),
-                        is_current_row,
-                        if !is_selected {
-                            nav_bar_span.clone()
-                        } else {
-                            None
-                        },
-                        self.config.current_style,
-                        self.config.current_nav_bar_style,
-                    );
-                    if self.config.icons && x == 0 {
-                        insert_icon_span(
-                            &mut col,
-                            &icon_name_hz,
-                            !is_selected && nav_bar_span.is_some(),
-                            is_current_row,
-                            self.config.uncolor_current_icon,
-                            self.config.invert_current_icon,
-                            self.config.current_icon_style,
-                            is_pinned,
-                            is_yanked,
-                            is_cut,
-                            self.mode_index,
-                            &self.config,
-                            self.get_flash_op(&icon_name_hz, &cwd),
-                        );
-                    }
-                    if self.config.symlink.active && x == 0 {
-                        maybe_append_symlink_target(
-                            &mut col,
-                            &icon_name_hz,
-                            self.config.symlink.style.into(),
-                            self.width,
-                        );
-                    }
-
-                    let is_active_col = active_column == x;
-
-                    match self.config.row_connection {
-                        RowConnectionStyle::Disjoint => {
-                            if is_active_col {
-                                col = col.style(if is_current_row {
-                                    self.config.current_style
-                                } else {
-                                    self.config.style
-                                });
-                            } else {
-                                col = col.style(if is_current_row {
-                                    self.config.inactive_current_style
-                                } else {
-                                    self.config.inactive_style
-                                });
-                            }
-                        }
-                        RowConnectionStyle::Capped => {
-                            if is_active_col {
-                                col = col.style(if is_current_row {
-                                    self.config.current_style
-                                } else {
-                                    self.config.style
-                                });
-                            }
-                        }
-                        RowConnectionStyle::Full => {}
-                    }
-
-                    if is_underline_mode
-                        && matches!(
-                            drain_iter.peek(),
-                            Some((Some(crate::nucleo::GroupHeader::TierSeparator), _, _))
-                        )
-                    {
-                        let target_w = self.width as usize;
-                        let has_nav = !is_selected && nav_bar_span.is_some();
-                        let prefix_skip = if has_nav { 2 } else { 1 };
-                        let skip = if x == 0 { prefix_skip } else { 0 };
-                        apply_tier_underline(&mut col, target_w, skip);
-                    }
-
-                    // push
-                    let mut row = Row::new(vec![col]).height(height);
-                    if is_current_row {
-                        match self.config.row_connection {
-                            RowConnectionStyle::Capped => {
-                                row = row.style(self.config.inactive_current_style)
-                            }
-                            RowConnectionStyle::Full => row = row.style(self.config.current_style),
-                            _ => {}
-                        }
-                    } else if is_selected {
-                        row = row.style(Style::from(self.config.selected_style));
-                    }
-                    push.push(row);
-                }
-                rows.extend(push);
-            }
-            i += 1;
-        }
+        let (i, remaining_height) = self.push_visible_rows(
+            &styler,
+            &mut results,
+            start_index,
+            &mut rows,
+            click,
+            selector,
+            &columns,
+            &cwd,
+            &widths,
+            as_cols,
+            is_underline_mode,
+            &active_group_name,
+            active_column,
+            i,
+            remaining_height,
+        );
 
         // doesn't loop back after results is exhausted so we have to set here
         if let Click::ResultPos(_c) = click {
