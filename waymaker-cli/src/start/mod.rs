@@ -157,68 +157,14 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         );
     }
 
-    // `{key}`, `{q}`, ... resolve to built-ins before columns: say so where the user sees it.
-    for col in &config.columns.names {
-        let name: &str = &col.name;
-        if waymaker::config::RESERVED_TEMPLATE_NAMES.contains(&name) {
-            wbog!(
-                "Column '{name}' shares its name with a built-in template value: `{{{name}}}` will not expand to this column. Rename it."
-            );
-        }
-    }
-
-    // A bare printable key under [binds] fires while the query is typed: the character never
-    // reaches the query (and `* = @bookmark` bookmarked whatever line was highlighted).
-    // `"," = []` unbinds the key, which is fine.
-    for (trigger, actions) in &config.binds {
-        if !actions.0.is_empty()
-            && let Some(c) = trigger.bare_printable_char()
-        {
-            wbog!(
-                "[binds] '{trigger}' is a plain character: it runs its action instead of typing '{c}' into the query. Bind a chord (ctrl-…, F1) instead, or move it to [ui.nav.binds]."
-            );
-        }
-    }
+    warn_config_pitfalls(&config);
 
     if config.start.command.default.base_command.is_none() {
         config.start.command.default.base_command =
             Some(config.start.command.default.command.clone());
     }
 
-    // Apply matching directory / path rules (from config.toml and loaded presets)
-    let current_dir = std::env::current_dir().unwrap_or_default();
-    let rules = config.rule.clone();
-    for rule in &rules {
-        if rule.path.matches(&current_dir) {
-            if let Some(ref p) = rule.preset {
-                let mut preset_path = p.clone();
-                if preset_path.is_relative() && preset_path.extension().is_none() {
-                    let main_p = presets_path().join(&preset_path).join("main.toml");
-                    preset_path = if !main_p.exists() {
-                        presets_path().join(preset_path.with_extension("toml"))
-                    } else {
-                        main_p
-                    };
-                }
-                if let Ok(preset_config) = load_type(&preset_path, |s| parse_warn(s, &preset_path))
-                {
-                    config.apply(preset_config);
-                }
-            }
-            config.apply(rule.override_config.clone());
-        }
-    }
-
-    if !config.folder_rules.is_empty() {
-        config
-            .render
-            .ui
-            .folder_rules
-            .extend(config.folder_rules.clone());
-    }
-    if config.default_sort.is_some() {
-        config.render.ui.default_sort = config.default_sort;
-    }
+    apply_path_rules(&mut config);
 
     if crate::paths::dev_mode() {
         config.tui.clear_on_exit = false;
@@ -423,6 +369,82 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         exit(0);
     }
 
+    config = finalize_binds(config)?;
+
+    debug!("Config computed: {config:?}");
+
+    Ok(config)
+}
+
+/// Warns about config that silently does not do what it looks like: a column named like a
+/// built-in template value, and a plain character bound under [binds].
+fn warn_config_pitfalls(config: &Config) {
+    // `{key}`, `{q}`, ... resolve to built-ins before columns: say so where the user sees it.
+    for col in &config.columns.names {
+        let name: &str = &col.name;
+        if waymaker::config::RESERVED_TEMPLATE_NAMES.contains(&name) {
+            wbog!(
+                "Column '{name}' shares its name with a built-in template value: `{{{name}}}` will not expand to this column. Rename it."
+            );
+        }
+    }
+
+    // A bare printable key under [binds] fires while the query is typed: the character never
+    // reaches the query (and `* = @bookmark` bookmarked whatever line was highlighted).
+    // `"," = []` unbinds the key, which is fine.
+    for (trigger, actions) in &config.binds {
+        if !actions.0.is_empty()
+            && let Some(c) = trigger.bare_printable_char()
+        {
+            wbog!(
+                "[binds] '{trigger}' is a plain character: it runs its action instead of typing '{c}' into the query. Bind a chord (ctrl-…, F1) instead, or move it to [ui.nav.binds]."
+            );
+        }
+    }
+}
+
+/// Applies the `[[rule]]`s whose path matches the working directory (their preset, then their
+/// overrides), and the folder rules and default sort.
+fn apply_path_rules(config: &mut Config) {
+    // Apply matching directory / path rules (from config.toml and loaded presets)
+    let current_dir = std::env::current_dir().unwrap_or_default();
+    let rules = config.rule.clone();
+    for rule in &rules {
+        if rule.path.matches(&current_dir) {
+            if let Some(ref p) = rule.preset {
+                let mut preset_path = p.clone();
+                if preset_path.is_relative() && preset_path.extension().is_none() {
+                    let main_p = presets_path().join(&preset_path).join("main.toml");
+                    preset_path = if !main_p.exists() {
+                        presets_path().join(preset_path.with_extension("toml"))
+                    } else {
+                        main_p
+                    };
+                }
+                if let Ok(preset_config) = load_type(&preset_path, |s| parse_warn(s, &preset_path))
+                {
+                    config.apply(preset_config);
+                }
+            }
+            config.apply(rule.override_config.clone());
+        }
+    }
+
+    if !config.folder_rules.is_empty() {
+        config
+            .render
+            .ui
+            .folder_rules
+            .extend(config.folder_rules.clone());
+    }
+    if config.default_sort.is_some() {
+        config.render.ui.default_sort = config.default_sort;
+    }
+}
+
+/// Completes the binds: the defaults under the config's, `/` and shift-enter in navigation mode,
+/// the built-in semantic aliases, then the cycle check and validation of CLI actions.
+fn finalize_binds(mut config: Config) -> anyhow::Result<Config> {
     // check binds
     let slash_trigger = "/".parse().expect("slash trigger should parse");
     let user_has_slash = config.binds.contains_key(&slash_trigger);
@@ -483,9 +505,6 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
             }
         }
     }
-
-    debug!("Config computed: {config:?}");
-
     Ok(config)
 }
 
