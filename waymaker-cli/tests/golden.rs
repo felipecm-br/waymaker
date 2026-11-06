@@ -800,18 +800,18 @@ fn golden_preview_unwrapped_scroll_down() {
     insta::assert_snapshot!(wm.styled_screen());
 }
 
-/// BUG: `PreviewHScroll` moves no text. `PreviewUI` passes its scroll offset to the text
-/// `Paragraph` only when wrapping (ui/preview.rs), and a wrapped paragraph ignores the
-/// horizontal offset, so text previews never scroll sideways in either mode.
+/// PreviewHScroll shifts unwrapped text (the offset used to reach the Paragraph only when
+/// wrapping, where it is ignored).
 #[test]
-#[ignore = "known bug: PreviewHScroll does not scroll text previews"]
 fn preview_hscroll_shifts_unwrapped_text() {
-    let wm = preview_session(&["b.f1", "PreviewHScroll(5)", "b.f2", "TogglePreviewWrap"]);
+    let wm = preview_session(&["b.f1", "PreviewHScroll(10)", "b.f2", "TogglePreviewWrap"]);
     wm.send(F2);
     wm.send(F1);
-    // Scrolled 5 columns, "line 05 wide wide ..." no longer shows its "line " prefix.
-    let screen = wm.screen_text();
-    assert!(!screen.contains("line 05 wide"), "{screen}");
+    // 10 columns is past "line 05" with or without a line-number gutter (bat adds one when the
+    // host has it), and the wide tail of the line is still in view.
+    let screen = wm.current_screen();
+    assert!(!screen.contains("line 05"), "{screen}");
+    assert!(screen.contains("wide wide"), "{screen}");
 }
 
 #[test]

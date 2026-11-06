@@ -1514,11 +1514,10 @@ impl PreviewUI {
             preview = preview.block(block);
         }
         if self.config.wrap {
-            preview = preview
-                .wrap(Wrap { trim: false })
-                .scroll(self.scroll.into());
+            preview = preview.wrap(Wrap { trim: false });
         }
-        preview
+        // PreviewScroll / PreviewHScroll; the horizontal part only moves unwrapped text.
+        preview.scroll(self.scroll.into())
     }
 
     /// Draw the optional preview scrollbar on the right border of `area`.
