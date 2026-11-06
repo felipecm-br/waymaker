@@ -8,6 +8,10 @@
 - Rename and zip put the caret before the prefilled name, so typing could only add a prefix; the caret now starts at the end. `ctrl-u` in the box clears the text, and a second press closes it
 - `ctrl-r` (redo) in `jump` reloaded the list instead of redoing while the "Undone ..." message was up, which is always right after an undo
 - `PreviewHScroll` never scrolled a text preview; it now scrolls unwrapped text
+- `Prompt` and `Confirm` lost the typed text: `{input}` in their command was filled in when the box opened (empty). It is now filled in on Enter, shell-quoted
+- `SetHeader` / `PushHeader` and the footer equivalents showed only at the next key press
+- Jumping to the end of a preview (`PreviewJump`, and tail mode) stopped one line short when the title sits on the first line
+- A command preview with invalid UTF-8 froze at the bad byte until the command exited, and `previewer.try_lossy` never applied; bad bytes now show as U+FFFD with `try_lossy` and are dropped otherwise
 
 ### 🧪 Testing
 
