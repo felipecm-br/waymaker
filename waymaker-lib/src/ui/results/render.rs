@@ -25,16 +25,8 @@ use crate::{
 };
 
 impl ResultsUI {
-    pub fn make_table<'a, T: SSS>(
-        &mut self,
-        active_column: usize,
-        worker: &'a mut Worker<T>,
-        selector: &mut Selector<T, impl Selection>,
-        matcher: &mut nucleo::Matcher,
-        click: &mut Click,
-        nav_bar_style: Option<(ratatui::widgets::BorderType, ratatui::style::Style)>,
-        freeze_snapshot: bool,
-    ) -> Table<'a> {
+    /// Moves the cursor to `results.pos` once enough items have arrived.
+    fn apply_initial_pos<T: SSS>(&mut self, worker: &mut Worker<T>) {
         if let Some(pos) = self.initial_pos {
             let (_, status) = Worker::new_snapshot(&mut worker.nucleo);
             self.status = status;
@@ -57,6 +49,154 @@ impl ResultsUI {
                 self.initial_pos = None;
             }
         }
+    }
+
+    /// Widens the first visible column for indentation, group headers and symlink targets.
+    fn adjust_widths<T: SSS>(
+        &self,
+        widths: &mut [u16],
+        results: &crate::nucleo::WorkerResults<'_, T>,
+    ) {
+        if self.indentation() > 0 {
+            if let Some(first_vis) = widths.iter().position(|&w| w != 0) {
+                widths[first_vis] += self.indentation() as u16;
+            } else if !widths.is_empty() {
+                widths[0] += self.indentation() as u16;
+            }
+        }
+
+        // Ensure visible column is at least wide enough for any group headers in results
+        let max_group_width = results
+            .iter()
+            .filter_map(|(g, _, _)| match g.as_ref() {
+                Some(crate::nucleo::GroupHeader::Named(s)) => {
+                    Some(UnicodeWidthStr::width(&**s) as u16 + 2)
+                }
+                _ => None,
+            })
+            .max()
+            .unwrap_or(0);
+        if max_group_width > 0
+            && let Some(first_vis) = widths.iter().position(|&w| w != 0)
+        {
+            widths[first_vis] = widths[first_vis].max(max_group_width);
+        }
+
+        // When symlink targets are enabled, expand column 0 to use all
+        // remaining horizontal space so the annotation has room to display.
+        if self.config.symlink.active && !widths.is_empty() && widths[0] != 0 {
+            let other_cols: u16 = widths[1..].iter().sum();
+            let col0_max = self
+                .width
+                .saturating_sub(other_cols)
+                .saturating_sub(self.column_spacing_width());
+            widths[0] = widths[0].max(col0_max);
+        }
+    }
+
+    /// The row for a group header or tier separator; `None` for an underline or no separator.
+    fn group_header_row(
+        &self,
+        group: &crate::nucleo::GroupHeader,
+        nav_bar_span: Option<Span<'static>>,
+        active_group_name: &Option<std::sync::Arc<str>>,
+        as_cols: bool,
+        widths: &[u16],
+    ) -> Option<Row<'static>> {
+        match group {
+            crate::nucleo::GroupHeader::Named(group_name) => {
+                let is_active =
+                    active_group_name.as_ref().map(|s| s.as_ref()) == Some(group_name.as_ref());
+                let group_style: Style = if is_active {
+                    self.config.group_header_style.into()
+                } else {
+                    self.config.inactive_group_header_style.into()
+                };
+                let mut line_spans = vec![];
+                if let Some(nav_span) = nav_bar_span {
+                    line_spans.push(nav_span);
+                }
+                line_spans.push(Span::raw(" "));
+                line_spans.push(Span::styled(group_name.to_string(), group_style));
+
+                let line = ratatui::text::Line::from(line_spans);
+                if as_cols {
+                    let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
+                    let mut cells = vec![];
+                    for i in 0..widths.len() {
+                        if i == first_visible {
+                            cells.push(ratatui::widgets::Cell::from(line.clone()));
+                        } else {
+                            cells.push(ratatui::widgets::Cell::from(""));
+                        }
+                    }
+                    Some(Row::new(cells).height(1))
+                } else {
+                    Some(Row::new(vec![line]).height(1))
+                }
+            }
+            crate::nucleo::GroupHeader::TierSeparator => {
+                let tier_sep = self.config.tier.separator;
+                if matches!(
+                    tier_sep,
+                    HorizontalSeparator::None | HorizontalSeparator::Underline
+                ) {
+                    None
+                } else {
+                    let sep_char = tier_sep.as_str();
+                    let tier_style: Style = self.config.tier.style.into();
+                    let total_w = self.width as usize;
+
+                    if as_cols {
+                        let mut cells = vec![];
+                        let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
+                        for (col_i, &w) in widths.iter().enumerate() {
+                            if w == 0 {
+                                cells.push(ratatui::widgets::Cell::from(""));
+                                continue;
+                            }
+                            let mut spans = vec![];
+                            let mut fill_w = w as usize;
+                            if col_i == first_visible
+                                && let Some(nav_span) = nav_bar_span.clone()
+                            {
+                                fill_w = fill_w.saturating_sub(nav_span.width());
+                                spans.push(nav_span);
+                            }
+                            let line_str = sep_char.repeat(fill_w);
+                            spans.push(Span::styled(line_str, tier_style));
+                            cells.push(ratatui::widgets::Cell::from(ratatui::text::Line::from(
+                                spans,
+                            )));
+                        }
+                        Some(Row::new(cells).height(1))
+                    } else {
+                        let mut spans = vec![];
+                        let mut fill_w = total_w;
+                        if let Some(nav_span) = nav_bar_span {
+                            fill_w = fill_w.saturating_sub(nav_span.width());
+                            spans.push(nav_span);
+                        }
+                        let line_str = sep_char.repeat(fill_w);
+                        spans.push(Span::styled(line_str, tier_style));
+                        Some(Row::new(vec![ratatui::text::Line::from(spans)]).height(1))
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn make_table<'a, T: SSS>(
+        &mut self,
+        active_column: usize,
+        worker: &'a mut Worker<T>,
+        selector: &mut Selector<T, impl Selection>,
+        matcher: &mut nucleo::Matcher,
+        click: &mut Click,
+        nav_bar_style: Option<(ratatui::widgets::BorderType, ratatui::style::Style)>,
+        freeze_snapshot: bool,
+    ) -> Table<'a> {
+        self.apply_initial_pos(worker);
 
         let cwd = std::env::current_dir().unwrap_or_default();
         let offset = self.bottom;
@@ -263,41 +403,7 @@ impl ResultsUI {
 
         self.status = status.clone();
         self.medians = medians;
-        if self.indentation() > 0 {
-            if let Some(first_vis) = widths.iter().position(|&w| w != 0) {
-                widths[first_vis] += self.indentation() as u16;
-            } else if !widths.is_empty() {
-                widths[0] += self.indentation() as u16;
-            }
-        }
-
-        // Ensure visible column is at least wide enough for any group headers in results
-        let max_group_width = results
-            .iter()
-            .filter_map(|(g, _, _)| match g.as_ref() {
-                Some(crate::nucleo::GroupHeader::Named(s)) => {
-                    Some(UnicodeWidthStr::width(&**s) as u16 + 2)
-                }
-                _ => None,
-            })
-            .max()
-            .unwrap_or(0);
-        if max_group_width > 0
-            && let Some(first_vis) = widths.iter().position(|&w| w != 0)
-        {
-            widths[first_vis] = widths[first_vis].max(max_group_width);
-        }
-
-        // When symlink targets are enabled, expand column 0 to use all
-        // remaining horizontal space so the annotation has room to display.
-        if self.config.symlink.active && !widths.is_empty() && widths[0] != 0 {
-            let other_cols: u16 = widths[1..].iter().sum();
-            let col0_max = self
-                .width
-                .saturating_sub(other_cols)
-                .saturating_sub(self.column_spacing_width());
-            widths[0] = widths[0].max(col0_max);
-        }
+        self.adjust_widths(&mut widths, &results);
 
         // should generally be true already, but act as a safeguard
         // for x in widths.iter_mut().zip(&self.hidden_columns) {
@@ -945,88 +1051,13 @@ impl ResultsUI {
                 let is_last = remaining_height <= 1;
                 let nav_bar_span = get_nav_bar_span(is_first, is_last, false, false, false);
 
-                let row_opt = match group {
-                    crate::nucleo::GroupHeader::Named(group_name) => {
-                        let is_active = active_group_name.as_ref().map(|s| s.as_ref())
-                            == Some(group_name.as_ref());
-                        let group_style: Style = if is_active {
-                            self.config.group_header_style.into()
-                        } else {
-                            self.config.inactive_group_header_style.into()
-                        };
-                        let mut line_spans = vec![];
-                        if let Some(nav_span) = nav_bar_span {
-                            line_spans.push(nav_span);
-                        }
-                        line_spans.push(Span::raw(" "));
-                        line_spans.push(Span::styled(group_name.to_string(), group_style));
-
-                        let line = ratatui::text::Line::from(line_spans);
-                        if as_cols {
-                            let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
-                            let mut cells = vec![];
-                            for i in 0..widths.len() {
-                                if i == first_visible {
-                                    cells.push(ratatui::widgets::Cell::from(line.clone()));
-                                } else {
-                                    cells.push(ratatui::widgets::Cell::from(""));
-                                }
-                            }
-                            Some(Row::new(cells).height(1))
-                        } else {
-                            Some(Row::new(vec![line]).height(1))
-                        }
-                    }
-                    crate::nucleo::GroupHeader::TierSeparator => {
-                        let tier_sep = self.config.tier.separator;
-                        if matches!(
-                            tier_sep,
-                            HorizontalSeparator::None | HorizontalSeparator::Underline
-                        ) {
-                            None
-                        } else {
-                            let sep_char = tier_sep.as_str();
-                            let tier_style: Style = self.config.tier.style.into();
-                            let total_w = self.width as usize;
-
-                            if as_cols {
-                                let mut cells = vec![];
-                                let first_visible =
-                                    widths.iter().position(|&w| w != 0).unwrap_or(0);
-                                for (col_i, &w) in widths.iter().enumerate() {
-                                    if w == 0 {
-                                        cells.push(ratatui::widgets::Cell::from(""));
-                                        continue;
-                                    }
-                                    let mut spans = vec![];
-                                    let mut fill_w = w as usize;
-                                    if col_i == first_visible
-                                        && let Some(nav_span) = nav_bar_span.clone()
-                                    {
-                                        fill_w = fill_w.saturating_sub(nav_span.width());
-                                        spans.push(nav_span);
-                                    }
-                                    let line_str = sep_char.repeat(fill_w);
-                                    spans.push(Span::styled(line_str, tier_style));
-                                    cells.push(ratatui::widgets::Cell::from(
-                                        ratatui::text::Line::from(spans),
-                                    ));
-                                }
-                                Some(Row::new(cells).height(1))
-                            } else {
-                                let mut spans = vec![];
-                                let mut fill_w = total_w;
-                                if let Some(nav_span) = nav_bar_span {
-                                    fill_w = fill_w.saturating_sub(nav_span.width());
-                                    spans.push(nav_span);
-                                }
-                                let line_str = sep_char.repeat(fill_w);
-                                spans.push(Span::styled(line_str, tier_style));
-                                Some(Row::new(vec![ratatui::text::Line::from(spans)]).height(1))
-                            }
-                        }
-                    }
-                };
+                let row_opt = self.group_header_row(
+                    group,
+                    nav_bar_span,
+                    &active_group_name,
+                    as_cols,
+                    &widths,
+                );
 
                 if let Some(row) = row_opt {
                     rows.push(row);
