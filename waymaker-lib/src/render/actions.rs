@@ -76,138 +76,8 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::ToggleUp
         | Action::CycleAll
         | Action::ClearSelections) => return selection_action(a, results, worker, selections),
-        Action::Accept => {
-            if state.prompt_input_active {
-                state.prompt_input_active = false;
-                *prompt_input_active = false;
-                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                let input_text = std::mem::take(&mut prompt_input.input);
-                prompt_input.cancel();
-
-                state.prompt_input_value = Some(input_text.clone());
-                state.envs.set("WM_INPUT", input_text.clone());
-                state.envs.set("MM_INPUT", input_text);
-
-                if let Some(template) = state.prompt_input_template.take() {
-                    let id = state.prompt_input_stash_id.take().unwrap_or(1);
-                    state.set_interrupt(Interrupt::ExecuteAsync, template);
-                    state.discriminant_payload = Some(2 * id + 1);
-                }
-                tui.redraw();
-                return Flow::Continue;
-            }
-            let ret = if selections.is_empty() {
-                if let Some(item) = get_current(picker_ui) {
-                    vec![item.1]
-                } else if exit_config.allow_empty {
-                    vec![]
-                } else {
-                    return Flow::Continue;
-                }
-            } else {
-                selections.output().collect::<Vec<S>>()
-            };
-            return Flow::Exit(Ok(ret));
-        }
-        Action::Abort(code) => {
-            return Flow::Exit(Err(MatchError::Abort(code)));
-        }
-        Action::Quit(code) => {
-            if state.live_input_active {
-                state.live_input_active = false;
-                *live_input_active = false;
-                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                state.live_input_template = None;
-                state.live_input_key = None;
-                tui.redraw();
-                return Flow::Continue;
-            } else if state.prompt_input_active {
-                state.prompt_input_active = false;
-                *prompt_input_active = false;
-                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                if let Some(id) = state.prompt_input_stash_id.take() {
-                    let _ = state.take_actions(id);
-                }
-                state.prompt_input_template = None;
-                prompt_input.cancel();
-                tui.redraw();
-                return Flow::Continue;
-            } else if picker_ui.action_visible {
-                picker_ui.action_visible = false;
-                picker_ui.action.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-            } else if !picker_ui.selector.is_empty() {
-                // First Esc: clear multi-selections.
-                picker_ui.selector.clear();
-            } else if !picker_ui.results.yank_paths.is_empty() {
-                // Second Esc: clear yanked paths.
-                picker_ui.results.yank_paths.clear();
-            } else if !picker_ui.results.cut_paths.is_empty() {
-                // Third Esc: clear cut paths.
-                picker_ui.results.cut_paths.clear();
-            } else {
-                return Flow::Exit(Err(MatchError::Abort(code)));
-            }
-        }
-        Action::Unwind(code) => {
-            if state.live_input_active {
-                state.live_input_active = false;
-                *live_input_active = false;
-                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                state.live_input_template = None;
-                state.live_input_key = None;
-                tui.redraw();
-                return Flow::Continue;
-            } else if state.prompt_input_active {
-                state.prompt_input_active = false;
-                *prompt_input_active = false;
-                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                if let Some(id) = state.prompt_input_stash_id.take() {
-                    let _ = state.take_actions(id);
-                }
-                state.prompt_input_template = None;
-                prompt_input.cancel();
-                tui.redraw();
-                return Flow::Continue;
-            } else if picker_ui.action_visible {
-                picker_ui.action_visible = false;
-                picker_ui.action.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                tui.redraw();
-                return Flow::Continue;
-            } else if state.sort_menu_active {
-                state.sort_menu_active = false;
-                tui.redraw();
-                return Flow::Continue;
-            } else if overlay_ui.as_ref().is_some_and(|o| o.current().is_some()) {
-                if let Some(o) = overlay_ui.as_mut() {
-                    o.disable();
-                }
-                tui.redraw();
-                return Flow::Continue;
-            } else if state.preview_set_payload.is_some() {
-                state.update_preview_unset();
-                tui.redraw();
-                return Flow::Continue;
-            } else if !picker_ui.selector.is_empty() {
-                picker_ui.selector.clear();
-                tui.redraw();
-                return Flow::Continue;
-            } else if !picker_ui.results.yank_paths.is_empty() {
-                picker_ui.results.yank_paths.clear();
-                tui.redraw();
-                return Flow::Continue;
-            } else if !picker_ui.results.cut_paths.is_empty() {
-                picker_ui.results.cut_paths.clear();
-                tui.redraw();
-                return Flow::Continue;
-            } else if !picker_ui.query.is_empty() {
-                picker_ui.query.cancel();
-                tui.redraw();
-                return Flow::Continue;
-            } else {
-                return Flow::Exit(Err(MatchError::Abort(code)));
-            }
+        a @ (Action::Accept | Action::Abort(..) | Action::Quit(..) | Action::Unwind(..)) => {
+            return exit_action(a, state, picker_ui, tui, overlay_ui, exit_config);
         }
 
         // Results
@@ -230,70 +100,15 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         Action::ToggleHeader => {
             picker_ui.header.show = !picker_ui.header.show;
         }
-        Action::Up(x) | Action::Down(x) => {
-            let next = matches!(action, Action::Down(_)) ^ results.reverse();
-            for _ in 0..x.into() {
-                *did_cursor_wrap = if next {
-                    results.cursor_next()
-                } else {
-                    results.cursor_prev()
-                };
-            }
-        }
-        Action::Pos(pos) => {
-            let (_, status) = crate::nucleo::Worker::new_snapshot(&mut worker.nucleo);
-            results.status = status;
-            let pos = if pos >= 0 {
-                (pos as u32).min(results.end())
-            } else {
-                results.status.matched_count.saturating_sub((-pos) as u32)
-            };
-            results.cursor_jump(pos);
-        }
-        Action::QueryPos(pos) => {
-            let pos = if pos >= 0 {
-                pos as u16
-            } else {
-                (query.len() as u16).saturating_sub((-pos) as u16)
-            };
-            query.set(None, pos);
-        }
-        Action::HScroll(n) | Action::VScroll(n) => {
-            if let Some(p) = preview_ui
-                && !p.config.wrap
-                && false
-            // track mouse location?
-            {
-                p.scroll(true, n);
-            } else if !matches!(action, Action::HScroll(_))
-                || n >= 0
-                || results.hscroll > 0
-                || !query.input.is_empty()
-            {
-                results.current_scroll(n, matches!(action, Action::HScroll(_)));
-            }
-        }
-        Action::HalfPageDown | Action::HalfPageUp => {
-            let x = results.height().div_ceil(2);
-            let next = matches!(action, Action::HalfPageDown) ^ results.reverse();
-            // Stop at the ends rather than wrapping: with fewer items than half
-            // a page, wrapping would circle the list and land anywhere.
-            for _ in 0..x {
-                let visible = results.cursor_offset().is_some();
-                let at_end = if next {
-                    results.index() >= results.end()
-                } else {
-                    results.index() == 0
-                };
-                if visible && at_end {
-                    break;
-                }
-                if next {
-                    results.cursor_next();
-                } else {
-                    results.cursor_prev();
-                }
-            }
+        a @ (Action::Up(..)
+        | Action::Down(..)
+        | Action::Pos(..)
+        | Action::QueryPos(..)
+        | Action::HScroll(..)
+        | Action::VScroll(..)
+        | Action::HalfPageDown
+        | Action::HalfPageUp) => {
+            return cursor_action(a, results, worker, query, preview_ui, did_cursor_wrap);
         }
 
         a @ (Action::PreviewUp(..)
@@ -322,51 +137,16 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::TogglePreviewWrap) => return preview_action(a, state, ui, preview_ui, tui),
 
         // Programmable
-        Action::Execute(payload) => {
-            state.set_interrupt(Interrupt::Execute, payload);
-        }
-        Action::CopyAsync(ref payload) => {
-            state.set_interrupt(Interrupt::ExecuteAsync, payload.clone());
-            state.discriminant_payload = Some(if tui.config.osc52 { 1 } else { 0 });
-        }
-        Action::Copy(ref payload) => {
-            state.set_interrupt(Interrupt::ExecuteSilent, payload.clone());
-            state.discriminant_payload = Some(if tui.config.osc52 { 3 } else { 2 });
-        }
-        Action::ExecuteAsync(ref payload) | Action::ExecuteThen(ref payload) => {
-            let is_async = matches!(action, Action::ExecuteAsync(_));
-            let payload = payload.clone();
-
-            let mut remainder = crate::action::Actions::default();
-            for cmd in events.by_ref() {
-                if let RenderCommand::Action(a) | RenderCommand::KeyAction { action: a, .. } = cmd {
-                    remainder.push(a);
-                }
-            }
-
-            if let Some(id) = state.stash_actions(remainder, bind_tx.clone()) {
-                state.set_interrupt(Interrupt::ExecuteAsync, payload);
-                state.discriminant_payload = Some(2 * id + (if is_async { 1 } else { 0 }));
-            } else {
-                log::error!("No free slots left: remaining actions dropped");
-            }
-        }
-        Action::ExecuteSilent(payload) => {
-            state.set_interrupt(Interrupt::ExecuteSilent, payload);
-        }
-        Action::Store(payload) => {
-            state.envs.set("WM_STORE", payload.clone());
-            state.envs.set("MM_STORE", payload);
-        }
-        Action::Become(payload) => {
-            state.set_interrupt(Interrupt::Become, payload);
-        }
-        Action::BecomeSilent(payload) => {
-            state.set_interrupt(Interrupt::BecomeSilent, payload);
-        }
-        Action::Reload(payload) => {
-            state.set_interrupt(Interrupt::Reload, payload);
-        }
+        a @ (Action::Execute(..)
+        | Action::CopyAsync(..)
+        | Action::Copy(..)
+        | Action::ExecuteAsync(..)
+        | Action::ExecuteThen(..)
+        | Action::ExecuteSilent(..)
+        | Action::Store(..)
+        | Action::Become(..)
+        | Action::BecomeSilent(..)
+        | Action::Reload(..)) => return command_action(a, state, tui, events, bind_tx),
         Action::ChDir(payload) => {
             if ui.config.nav.active {
                 state.focus = Focus::Results;
@@ -381,48 +161,21 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             }
             state.set_interrupt(Interrupt::ChDir, payload);
         }
-        Action::Print(payload) => {
-            state.set_interrupt(Interrupt::Print, payload);
-        }
-        Action::PromptInput(payload) => {
-            let mut remainder = crate::action::Actions::default();
-            for cmd in events.by_ref() {
-                if let RenderCommand::Action(a) | RenderCommand::KeyAction { action: a, .. } = cmd {
-                    remainder.push(a);
-                }
-            }
-
-            state.prompt_input_stash_id = state.stash_actions(remainder, bind_tx.clone());
-            state.prompt_input_template = Some(payload);
-            state.prompt_input_active = true;
-            *prompt_input_active = true;
-            crate::PROMPT_INPUT_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
-            prompt_input.cancel();
-            tui.redraw();
-        }
-        Action::LiveInput(payload) => {
-            state.live_input_active = true;
-            *live_input_active = true;
-            crate::LIVE_INPUT_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
-            let template = if !payload.is_empty() {
-                payload
-            } else {
-                ui.config.nav.live_input.clone().unwrap_or_default()
-            };
-            state.live_input_template = Some(template);
-            tui.redraw();
-        }
-        Action::LiveInputKey(keys) => {
-            if state.live_input_active
-                && let Some(ref template) = state.live_input_template
-            {
-                state.live_input_key = Some(keys.clone());
-                state.envs.set("WM_KEY", keys.clone());
-                state.envs.set("MM_KEY", keys.clone());
-                state.envs.set("WM_KEYS", keys.clone());
-                state.envs.set("MM_KEYS", keys);
-                state.set_interrupt(Interrupt::LiveInputKey, template.clone());
-            }
+        a @ (Action::Print(..)
+        | Action::PromptInput(..)
+        | Action::LiveInput(..)
+        | Action::LiveInputKey(..)) => {
+            return input_action(
+                a,
+                state,
+                ui,
+                tui,
+                events,
+                bind_tx,
+                prompt_input,
+                prompt_input_active,
+                live_input_active,
+            );
         }
 
         a @ (Action::SwitchColumn(..)
@@ -444,115 +197,11 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::DeleteLineEnd) => {
             return query_edit_action(a, state, query, action_input, action_visible, prompt_input);
         }
-        Action::Cancel => {
-            if state.live_input_active {
-                state.live_input_active = false;
-                *live_input_active = false;
-                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                state.live_input_template = None;
-                state.live_input_key = None;
-                tui.redraw();
-                return Flow::Continue;
-            } else if state.prompt_input_active {
-                state.prompt_input_active = false;
-                *prompt_input_active = false;
-                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                if let Some(id) = state.prompt_input_stash_id.take() {
-                    let _ = state.take_actions(id);
-                }
-                state.prompt_input_template = None;
-                prompt_input.cancel();
-                tui.redraw();
-                return Flow::Continue;
-            } else if *action_visible && !action_input.is_empty() {
-                // Like the query: the first Cancel (ctrl-u) clears the typed text, the next
-                // one closes the box.
-                action_input.set(Some(String::new()), 0);
-                tui.redraw();
-            } else if *action_visible {
-                *action_visible = false;
-                action_input.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                tui.redraw();
-            } else {
-                query.cancel()
-            }
-        }
-
-        // Other
-        Action::Redraw => {
-            tui.redraw();
-        }
-        Action::ToggleFocus => {
-            if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
-                *action_visible = false;
-                action_input.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                tui.redraw();
-                return Flow::Continue;
-            }
-            if ui.config.nav.active {
-                state.focus = match state.focus {
-                    Focus::Input => Focus::Results,
-                    Focus::Results => Focus::Input,
-                };
-                state.focus_blink = true;
-                state.focus_tick = 0;
-
-                let prompt = &ui.config.nav.prompt;
-                if !prompt.is_empty() {
-                    let prompt = match state.focus {
-                        Focus::Results => Some(ratatui::text::Line::raw(prompt.clone())),
-                        Focus::Input => None,
-                    };
-                    picker_ui.query.set_prompt(prompt);
-                }
-            }
-        }
-        Action::FocusFilter => {
-            if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
-                *action_visible = false;
-                action_input.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                tui.redraw();
-                return Flow::Continue;
-            }
-            if ui.config.nav.active {
-                state.focus = Focus::Input;
-                state.focus_blink = true;
-                state.focus_tick = 0;
-                let prompt = &ui.config.nav.prompt;
-                if !prompt.is_empty() {
-                    picker_ui.query.set_prompt(None);
-                }
-            }
-        }
-        Action::FocusNav => {
-            if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
-                *action_visible = false;
-                action_input.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-                tui.redraw();
-                return Flow::Continue;
-            }
-            if ui.config.nav.active {
-                state.focus = Focus::Results;
-                state.focus_blink = true;
-                state.focus_tick = 0;
-                let prompt = &ui.config.nav.prompt;
-                if !prompt.is_empty() {
-                    picker_ui
-                        .query
-                        .set_prompt(Some(ratatui::text::Line::raw(prompt.clone())));
-                }
-            }
-        }
+        a @ (Action::Cancel
+        | Action::Redraw
+        | Action::ToggleFocus
+        | Action::FocusFilter
+        | Action::FocusNav) => return focus_action(a, state, ui, picker_ui, tui),
         Action::Overlay(index) => {
             if let Some(x) = overlay_ui.as_mut() {
                 x.enable(index, &ui.area());
@@ -1244,6 +893,493 @@ fn selection_action<T: SSS, S: Selection, A: ActionExt>(
         }
         Action::ClearSelections => {
             selections.clear();
+        }
+        _ => {}
+    }
+    Flow::Proceed
+}
+
+/// /// Cursor and scroll movement in the results and the query: Up/Down, Pos, QueryPos, HScroll/VScroll, half pages.
+fn cursor_action<T: SSS, S: Selection, A: ActionExt>(
+    action: Action<A>,
+    results: &mut ResultsUI,
+    worker: &mut Worker<T>,
+    query: &mut QueryUI,
+    preview_ui: &mut Option<PreviewUI>,
+    did_cursor_wrap: &mut bool,
+) -> Flow<S> {
+    match action {
+        Action::Up(x) | Action::Down(x) => {
+            let next = matches!(action, Action::Down(_)) ^ results.reverse();
+            for _ in 0..x.into() {
+                *did_cursor_wrap = if next {
+                    results.cursor_next()
+                } else {
+                    results.cursor_prev()
+                };
+            }
+        }
+        Action::Pos(pos) => {
+            let (_, status) = crate::nucleo::Worker::new_snapshot(&mut worker.nucleo);
+            results.status = status;
+            let pos = if pos >= 0 {
+                (pos as u32).min(results.end())
+            } else {
+                results.status.matched_count.saturating_sub((-pos) as u32)
+            };
+            results.cursor_jump(pos);
+        }
+        Action::QueryPos(pos) => {
+            let pos = if pos >= 0 {
+                pos as u16
+            } else {
+                (query.len() as u16).saturating_sub((-pos) as u16)
+            };
+            query.set(None, pos);
+        }
+        Action::HScroll(n) | Action::VScroll(n) => {
+            if let Some(p) = preview_ui
+                && !p.config.wrap
+                && false
+            // track mouse location?
+            {
+                p.scroll(true, n);
+            } else if !matches!(action, Action::HScroll(_))
+                || n >= 0
+                || results.hscroll > 0
+                || !query.input.is_empty()
+            {
+                results.current_scroll(n, matches!(action, Action::HScroll(_)));
+            }
+        }
+        Action::HalfPageDown | Action::HalfPageUp => {
+            let x = results.height().div_ceil(2);
+            let next = matches!(action, Action::HalfPageDown) ^ results.reverse();
+            // Stop at the ends rather than wrapping: with fewer items than half
+            // a page, wrapping would circle the list and land anywhere.
+            for _ in 0..x {
+                let visible = results.cursor_offset().is_some();
+                let at_end = if next {
+                    results.index() >= results.end()
+                } else {
+                    results.index() == 0
+                };
+                if visible && at_end {
+                    break;
+                }
+                if next {
+                    results.cursor_next();
+                } else {
+                    results.cursor_prev();
+                }
+            }
+        }
+        _ => {}
+    }
+    Flow::Proceed
+}
+
+/// /// Print, and opening the prompt and live inputs (PromptInput, LiveInput, LiveInputKey).
+fn input_action<W: Write, S: Selection, A: ActionExt>(
+    action: Action<A>,
+    state: &mut State,
+    ui: &mut UI,
+    tui: &mut Tui<W>,
+    events: &mut std::vec::Drain<'_, RenderCommand<A>>,
+    bind_tx: &BindSender<A>,
+    prompt_input: &mut QueryUI,
+    prompt_input_active: &mut bool,
+    live_input_active: &mut bool,
+) -> Flow<S> {
+    match action {
+        Action::Print(payload) => {
+            state.set_interrupt(Interrupt::Print, payload);
+        }
+        Action::PromptInput(payload) => {
+            let mut remainder = crate::action::Actions::default();
+            for cmd in events.by_ref() {
+                if let RenderCommand::Action(a) | RenderCommand::KeyAction { action: a, .. } = cmd {
+                    remainder.push(a);
+                }
+            }
+
+            state.prompt_input_stash_id = state.stash_actions(remainder, bind_tx.clone());
+            state.prompt_input_template = Some(payload);
+            state.prompt_input_active = true;
+            *prompt_input_active = true;
+            crate::PROMPT_INPUT_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+            prompt_input.cancel();
+            tui.redraw();
+        }
+        Action::LiveInput(payload) => {
+            state.live_input_active = true;
+            *live_input_active = true;
+            crate::LIVE_INPUT_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+            let template = if !payload.is_empty() {
+                payload
+            } else {
+                ui.config.nav.live_input.clone().unwrap_or_default()
+            };
+            state.live_input_template = Some(template);
+            tui.redraw();
+        }
+        Action::LiveInputKey(keys) => {
+            if state.live_input_active
+                && let Some(ref template) = state.live_input_template
+            {
+                state.live_input_key = Some(keys.clone());
+                state.envs.set("WM_KEY", keys.clone());
+                state.envs.set("MM_KEY", keys.clone());
+                state.envs.set("WM_KEYS", keys.clone());
+                state.envs.set("MM_KEYS", keys);
+                state.set_interrupt(Interrupt::LiveInputKey, template.clone());
+            }
+        }
+        _ => {}
+    }
+    Flow::Proceed
+}
+
+/// /// Commands for the CLI to run: Execute and its variants, Copy, Store, Become, Reload.
+fn command_action<W: Write, S: Selection, A: ActionExt>(
+    action: Action<A>,
+    state: &mut State,
+    tui: &mut Tui<W>,
+    events: &mut std::vec::Drain<'_, RenderCommand<A>>,
+    bind_tx: &BindSender<A>,
+) -> Flow<S> {
+    match action {
+        Action::Execute(payload) => {
+            state.set_interrupt(Interrupt::Execute, payload);
+        }
+        Action::CopyAsync(ref payload) => {
+            state.set_interrupt(Interrupt::ExecuteAsync, payload.clone());
+            state.discriminant_payload = Some(if tui.config.osc52 { 1 } else { 0 });
+        }
+        Action::Copy(ref payload) => {
+            state.set_interrupt(Interrupt::ExecuteSilent, payload.clone());
+            state.discriminant_payload = Some(if tui.config.osc52 { 3 } else { 2 });
+        }
+        Action::ExecuteAsync(ref payload) | Action::ExecuteThen(ref payload) => {
+            let is_async = matches!(action, Action::ExecuteAsync(_));
+            let payload = payload.clone();
+
+            let mut remainder = crate::action::Actions::default();
+            for cmd in events.by_ref() {
+                if let RenderCommand::Action(a) | RenderCommand::KeyAction { action: a, .. } = cmd {
+                    remainder.push(a);
+                }
+            }
+
+            if let Some(id) = state.stash_actions(remainder, bind_tx.clone()) {
+                state.set_interrupt(Interrupt::ExecuteAsync, payload);
+                state.discriminant_payload = Some(2 * id + (if is_async { 1 } else { 0 }));
+            } else {
+                log::error!("No free slots left: remaining actions dropped");
+            }
+        }
+        Action::ExecuteSilent(payload) => {
+            state.set_interrupt(Interrupt::ExecuteSilent, payload);
+        }
+        Action::Store(payload) => {
+            state.envs.set("WM_STORE", payload.clone());
+            state.envs.set("MM_STORE", payload);
+        }
+        Action::Become(payload) => {
+            state.set_interrupt(Interrupt::Become, payload);
+        }
+        Action::BecomeSilent(payload) => {
+            state.set_interrupt(Interrupt::BecomeSilent, payload);
+        }
+        Action::Reload(payload) => {
+            state.set_interrupt(Interrupt::Reload, payload);
+        }
+        _ => {}
+    }
+    Flow::Proceed
+}
+
+/// /// Cancel, Redraw and the focus actions (ToggleFocus, FocusFilter, FocusNav), which close an open box or input first.
+fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
+    action: Action<A>,
+    state: &mut State,
+    ui: &mut UI,
+    picker_ui: &mut PickerUI<'_, T, S>,
+    tui: &mut Tui<W>,
+) -> Flow<S> {
+    let PickerUI {
+        query,
+        action: action_input,
+        action_visible,
+        prompt_input,
+        prompt_input_active,
+        live_input_active,
+        ..
+    } = &mut *picker_ui;
+    match action {
+        Action::Cancel => {
+            if state.live_input_active {
+                state.live_input_active = false;
+                *live_input_active = false;
+                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.live_input_template = None;
+                state.live_input_key = None;
+                tui.redraw();
+                return Flow::Continue;
+            } else if state.prompt_input_active {
+                state.prompt_input_active = false;
+                *prompt_input_active = false;
+                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                if let Some(id) = state.prompt_input_stash_id.take() {
+                    let _ = state.take_actions(id);
+                }
+                state.prompt_input_template = None;
+                prompt_input.cancel();
+                tui.redraw();
+                return Flow::Continue;
+            } else if *action_visible && !action_input.is_empty() {
+                // Like the query: the first Cancel (ctrl-u) clears the typed text, the next
+                // one closes the box.
+                action_input.set(Some(String::new()), 0);
+                tui.redraw();
+            } else if *action_visible {
+                *action_visible = false;
+                action_input.cancel();
+                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                tui.redraw();
+            } else {
+                query.cancel()
+            }
+        }
+
+        // Other
+        Action::Redraw => {
+            tui.redraw();
+        }
+        Action::ToggleFocus => {
+            if *action_visible
+                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
+            {
+                *action_visible = false;
+                action_input.cancel();
+                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                tui.redraw();
+                return Flow::Continue;
+            }
+            if ui.config.nav.active {
+                state.focus = match state.focus {
+                    Focus::Input => Focus::Results,
+                    Focus::Results => Focus::Input,
+                };
+                state.focus_blink = true;
+                state.focus_tick = 0;
+
+                let prompt = &ui.config.nav.prompt;
+                if !prompt.is_empty() {
+                    let prompt = match state.focus {
+                        Focus::Results => Some(ratatui::text::Line::raw(prompt.clone())),
+                        Focus::Input => None,
+                    };
+                    picker_ui.query.set_prompt(prompt);
+                }
+            }
+        }
+        Action::FocusFilter => {
+            if *action_visible
+                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
+            {
+                *action_visible = false;
+                action_input.cancel();
+                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                tui.redraw();
+                return Flow::Continue;
+            }
+            if ui.config.nav.active {
+                state.focus = Focus::Input;
+                state.focus_blink = true;
+                state.focus_tick = 0;
+                let prompt = &ui.config.nav.prompt;
+                if !prompt.is_empty() {
+                    picker_ui.query.set_prompt(None);
+                }
+            }
+        }
+        Action::FocusNav => {
+            if *action_visible
+                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
+            {
+                *action_visible = false;
+                action_input.cancel();
+                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                tui.redraw();
+                return Flow::Continue;
+            }
+            if ui.config.nav.active {
+                state.focus = Focus::Results;
+                state.focus_blink = true;
+                state.focus_tick = 0;
+                let prompt = &ui.config.nav.prompt;
+                if !prompt.is_empty() {
+                    picker_ui
+                        .query
+                        .set_prompt(Some(ratatui::text::Line::raw(prompt.clone())));
+                }
+            }
+        }
+        _ => {}
+    }
+    Flow::Proceed
+}
+
+/// /// Accept, Abort, Quit and Unwind: confirm or close an open input or box first, then exit (Quit and Unwind unwind one step per press).
+fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
+    action: Action<A>,
+    state: &mut State,
+    picker_ui: &mut PickerUI<'_, T, S>,
+    tui: &mut Tui<W>,
+    overlay_ui: &mut Option<OverlayUI<A>>,
+    exit_config: &ExitConfig,
+) -> Flow<S> {
+    let PickerUI {
+        prompt_input,
+        prompt_input_active,
+        live_input_active,
+        selector: selections,
+        ..
+    } = &mut *picker_ui;
+    match action {
+        Action::Accept => {
+            if state.prompt_input_active {
+                state.prompt_input_active = false;
+                *prompt_input_active = false;
+                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                let input_text = std::mem::take(&mut prompt_input.input);
+                prompt_input.cancel();
+
+                state.prompt_input_value = Some(input_text.clone());
+                state.envs.set("WM_INPUT", input_text.clone());
+                state.envs.set("MM_INPUT", input_text);
+
+                if let Some(template) = state.prompt_input_template.take() {
+                    let id = state.prompt_input_stash_id.take().unwrap_or(1);
+                    state.set_interrupt(Interrupt::ExecuteAsync, template);
+                    state.discriminant_payload = Some(2 * id + 1);
+                }
+                tui.redraw();
+                return Flow::Continue;
+            }
+            let ret = if selections.is_empty() {
+                if let Some(item) = get_current(picker_ui) {
+                    vec![item.1]
+                } else if exit_config.allow_empty {
+                    vec![]
+                } else {
+                    return Flow::Continue;
+                }
+            } else {
+                selections.output().collect::<Vec<S>>()
+            };
+            return Flow::Exit(Ok(ret));
+        }
+        Action::Abort(code) => {
+            return Flow::Exit(Err(MatchError::Abort(code)));
+        }
+        Action::Quit(code) => {
+            if state.live_input_active {
+                state.live_input_active = false;
+                *live_input_active = false;
+                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.live_input_template = None;
+                state.live_input_key = None;
+                tui.redraw();
+                return Flow::Continue;
+            } else if state.prompt_input_active {
+                state.prompt_input_active = false;
+                *prompt_input_active = false;
+                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                if let Some(id) = state.prompt_input_stash_id.take() {
+                    let _ = state.take_actions(id);
+                }
+                state.prompt_input_template = None;
+                prompt_input.cancel();
+                tui.redraw();
+                return Flow::Continue;
+            } else if picker_ui.action_visible {
+                picker_ui.action_visible = false;
+                picker_ui.action.cancel();
+                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+            } else if !picker_ui.selector.is_empty() {
+                // First Esc: clear multi-selections.
+                picker_ui.selector.clear();
+            } else if !picker_ui.results.yank_paths.is_empty() {
+                // Second Esc: clear yanked paths.
+                picker_ui.results.yank_paths.clear();
+            } else if !picker_ui.results.cut_paths.is_empty() {
+                // Third Esc: clear cut paths.
+                picker_ui.results.cut_paths.clear();
+            } else {
+                return Flow::Exit(Err(MatchError::Abort(code)));
+            }
+        }
+        Action::Unwind(code) => {
+            if state.live_input_active {
+                state.live_input_active = false;
+                *live_input_active = false;
+                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.live_input_template = None;
+                state.live_input_key = None;
+                tui.redraw();
+                return Flow::Continue;
+            } else if state.prompt_input_active {
+                state.prompt_input_active = false;
+                *prompt_input_active = false;
+                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                if let Some(id) = state.prompt_input_stash_id.take() {
+                    let _ = state.take_actions(id);
+                }
+                state.prompt_input_template = None;
+                prompt_input.cancel();
+                tui.redraw();
+                return Flow::Continue;
+            } else if picker_ui.action_visible {
+                picker_ui.action_visible = false;
+                picker_ui.action.cancel();
+                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                tui.redraw();
+                return Flow::Continue;
+            } else if state.sort_menu_active {
+                state.sort_menu_active = false;
+                tui.redraw();
+                return Flow::Continue;
+            } else if overlay_ui.as_ref().is_some_and(|o| o.current().is_some()) {
+                if let Some(o) = overlay_ui.as_mut() {
+                    o.disable();
+                }
+                tui.redraw();
+                return Flow::Continue;
+            } else if state.preview_set_payload.is_some() {
+                state.update_preview_unset();
+                tui.redraw();
+                return Flow::Continue;
+            } else if !picker_ui.selector.is_empty() {
+                picker_ui.selector.clear();
+                tui.redraw();
+                return Flow::Continue;
+            } else if !picker_ui.results.yank_paths.is_empty() {
+                picker_ui.results.yank_paths.clear();
+                tui.redraw();
+                return Flow::Continue;
+            } else if !picker_ui.results.cut_paths.is_empty() {
+                picker_ui.results.cut_paths.clear();
+                tui.redraw();
+                return Flow::Continue;
+            } else if !picker_ui.query.is_empty() {
+                picker_ui.query.cancel();
+                tui.redraw();
+                return Flow::Continue;
+            } else {
+                return Flow::Exit(Err(MatchError::Abort(code)));
+            }
         }
         _ => {}
     }
