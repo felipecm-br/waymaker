@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+### 🐛 Bug Fixes
+
+- A `[binds]` key bound to a built-in file-manager alias (`@create`, `@rename`, `@delete`, `@zip`, `@unzip`, `@yank`, `@cut`, `@undo`, `@redo`, ...) did nothing: the bind was dropped at startup. The default `F2` (`@rename`) now renames
+- The `jump` preset showed `a Add`, `r Rename`, `d Trash` and `z/Z Zip` hints but bound none of them; the keys now do what the hints say
+- In `jump` the file-manager box (create, rename, trash confirmation, zip) was never drawn, so the prompt and the typed name were invisible
+- Rename and zip put the caret before the prefilled name, so typing could only add a prefix; the caret now starts at the end. `ctrl-u` in the box clears the text, and a second press closes it
+- `ctrl-r` (redo) in `jump` reloaded the list instead of redoing while the "Undone ..." message was up, which is always right after an undo
+- `PreviewHScroll` never scrolled a text preview; it now scrolls unwrapped text
+
+### 🧪 Testing
+
+- Golden frames now count toward coverage (each `wm` exits normally), plus new frames for clipped and stacked rows, tiers, symlinks, mouse input, every preview action and many picker actions; pty tests for the file manager on real files. Line coverage 71% -> 76%; the CI floor is 72%
+
 ## [0.8.0] - 2026-11-05
 
 ### ✨ Added
