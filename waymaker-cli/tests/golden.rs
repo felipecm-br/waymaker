@@ -1314,3 +1314,84 @@ fn golden_cli_cycle_sort() {
     wm.send(F1);
     insta::assert_snapshot!(wm.styled_screen());
 }
+
+// ---- Command previews (preview/previewer.rs run_command_preview) ----
+
+fn cmd_preview(args: &'static [&'static str], ready: &'static str) -> Session {
+    Launch::new("alpha\nbeta\ngamma\n")
+        .args(args)
+        .size(16, 80)
+        .ready(ready)
+        .start()
+}
+
+#[test]
+fn golden_preview_cmd_last_line_without_newline() {
+    let wm = cmd_preview(
+        &["p.l", "x=printf 'first\\nlast line, no newline'"],
+        "no newline",
+    );
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+/// BUG: with `previewer.try_lossy` a line with invalid UTF-8 should show with U+FFFD; it shows
+/// as an empty line (the bytes wait in the decoder's leftover until EOF, where the ANSI parser
+/// turns them into nothing instead of failing, so the lossy path never runs).
+#[test]
+#[ignore = "known bug: try_lossy never applies to invalid UTF-8 in a command preview"]
+fn preview_cmd_invalid_utf8_lossy_shows_replacement_char() {
+    let wm = cmd_preview(
+        &[
+            "p.l",
+            "x=printf 'good line\\nbad \\377 byte\\nafter\\n'",
+            "previewer.try_lossy=true",
+        ],
+        "after",
+    );
+    wm.wait_for_screen(|s| s.contains("bad \u{fffd} byte"));
+}
+
+/// BUG: one invalid byte stalls a streaming preview: each read cuts the valid text at the bad
+/// byte, so nothing after it is shown until the command exits.
+#[test]
+#[ignore = "known bug: an invalid UTF-8 byte stalls a streaming preview until EOF"]
+fn preview_cmd_invalid_utf8_does_not_stall_streaming() {
+    let wm = cmd_preview(
+        &[
+            "p.l",
+            "x=sh -c \"printf 'bad \\377 byte\\n'; echo streamed after; sleep 30\"",
+        ],
+        "3/3",
+    );
+    wm.wait_for_screen(|s| s.contains("streamed after"));
+}
+
+#[test]
+fn preview_cmd_long_output_with_and_without_delay_clear() {
+    // delay_clear (the default) stages the first 500 lines before swapping them in; both ways
+    // the whole output arrives and PreviewJump reaches its end.
+    for delay in ["previewer.delay_clear=true", "previewer.delay_clear=false"] {
+        let args: &'static [&'static str] =
+            Box::leak(vec!["p.l", "x=seq 3000", delay, "b.f1", "PreviewJump"].into_boxed_slice());
+        let wm = cmd_preview(args, "1");
+        wm.send(F1);
+        wm.wait_for_screen(|s| s.contains("3000"));
+    }
+}
+
+#[test]
+fn preview_cmd_shows_the_current_item_after_fast_moves() {
+    // Earlier previews still running when the cursor moves on are dropped: the pane ends up
+    // with the current item's output only.
+    let wm = cmd_preview(&["p.l", "x=sh -c 'sleep 0.2; echo preview of {}'"], "alpha");
+    wm.send_raw(DOWN);
+    wm.send_raw(DOWN);
+    wm.wait_for_screen(|s| s.contains("preview of gamma"));
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    let screen = wm.current_screen();
+    assert!(screen.contains("preview of gamma"), "{screen}");
+    assert!(
+        !screen.contains("preview of alpha") && !screen.contains("preview of beta"),
+        "{screen}"
+    );
+}

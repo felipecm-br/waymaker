@@ -759,6 +759,12 @@ impl PreviewUI {
             .changed
             .store(true, std::sync::atomic::Ordering::Release);
     }
+    /// 1 when make_preview puts the title on the first line (no border to hold it), which
+    /// leaves one line less for the content: the end of the output must account for it.
+    fn inline_title_rows(&self) -> usize {
+        (self.active_border().is_none() && self.title_text().is_some()) as usize
+    }
+
     pub fn scroll_end(&mut self) {
         if !self.is_diagram_mode() {
             let rl = self.view.len();
@@ -766,7 +772,9 @@ impl PreviewUI {
 
             let header_count = self.initial().header_lines.min(height);
             let remaining_lines = rl.saturating_sub(header_count);
-            let remaining_space = height.saturating_sub(header_count);
+            let remaining_space = height
+                .saturating_sub(header_count)
+                .saturating_sub(self.inline_title_rows());
 
             self.offset = remaining_lines.saturating_sub(remaining_space);
             self.attained_target = true;
@@ -1396,7 +1404,9 @@ impl PreviewUI {
 
         let header_count = self.initial().header_lines.min(height);
         let remaining_lines = rl.saturating_sub(header_count);
-        let remaining_space = height.saturating_sub(header_count);
+        let remaining_space = height
+            .saturating_sub(header_count)
+            .saturating_sub(self.inline_title_rows());
         let tail_offset = remaining_lines.saturating_sub(remaining_space);
 
         // this only triggers on preview change but not guaranteed on every preview change -- attaching it to the event handler is worse
