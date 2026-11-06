@@ -721,3 +721,234 @@ fn golden_mouse_click_status_and_footer() {
     wm.send(&release(6, 9));
     insta::assert_snapshot!(wm.styled_screen());
 }
+
+// ---- Preview actions (render/actions.rs preview_action), each bound to F1/F2 ----
+
+const F1: &str = "\x1bOP";
+const F2: &str = "\x1bOQ";
+
+/// 60 numbered lines, every fifth one wide enough to scroll horizontally.
+fn preview_text() -> String {
+    (1..=60)
+        .map(|i| {
+            if i % 5 == 0 {
+                format!("line {i:02} {}\n", "wide ".repeat(30))
+            } else {
+                format!("line {i:02}\n")
+            }
+        })
+        .collect()
+}
+
+fn preview_session(args: &'static [&'static str]) -> Session {
+    let text: &'static str = Box::leak(preview_text().into_boxed_str());
+    let files: &'static [(&'static str, &'static str)] =
+        Box::leak(vec![("doc.txt", text), ("other.txt", "other\n")].into_boxed_slice());
+    Launch::new("doc.txt\nother.txt\n")
+        .files(files)
+        .args(args)
+        .size(24, 100)
+        .ready("line 01")
+        .start()
+}
+
+#[test]
+fn golden_preview_down() {
+    let wm = preview_session(&["b.f1", "PreviewDown(5)"]);
+    wm.send(F1);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_down_then_up() {
+    let wm = preview_session(&["b.f1", "PreviewDown(9)", "b.f2", "PreviewUp(4)"]);
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_up_zero_resets() {
+    let wm = preview_session(&["b.f1", "PreviewDown(9)", "b.f2", "PreviewUp(0)"]);
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_half_page_down() {
+    let wm = preview_session(&["b.f1", "PreviewHalfPageDown"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_half_page_up() {
+    let wm = preview_session(&["b.f1", "PreviewHalfPageDown", "b.f2", "PreviewHalfPageUp"]);
+    wm.send(F1);
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_unwrapped_scroll_down() {
+    let wm = preview_session(&["b.f1", "PreviewDown(5)", "b.f2", "TogglePreviewWrap"]);
+    wm.send(F2);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+/// BUG: `PreviewHScroll` moves no text. `PreviewUI` passes its scroll offset to the text
+/// `Paragraph` only when wrapping (ui/preview.rs), and a wrapped paragraph ignores the
+/// horizontal offset, so text previews never scroll sideways in either mode.
+#[test]
+#[ignore = "known bug: PreviewHScroll does not scroll text previews"]
+fn preview_hscroll_shifts_unwrapped_text() {
+    let wm = preview_session(&["b.f1", "PreviewHScroll(5)", "b.f2", "TogglePreviewWrap"]);
+    wm.send(F2);
+    wm.send(F1);
+    // Scrolled 5 columns, "line 05 wide wide ..." no longer shows its "line " prefix.
+    let screen = wm.screen_text();
+    assert!(!screen.contains("line 05 wide"), "{screen}");
+}
+
+#[test]
+fn golden_preview_scroll() {
+    let wm = preview_session(&["b.f1", "PreviewScroll(7)"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_jump() {
+    let wm = preview_session(&["b.f1", "PreviewDown(20)", "b.f2", "PreviewJump"]);
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_expand() {
+    let wm = preview_session(&["b.f1", "ExpandPreview(15)"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_shrink() {
+    let wm = preview_session(&["b.f1", "ShrinkPreview(15)"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_toggle_wrap() {
+    let wm = preview_session(&["b.f1", "TogglePreviewWrap"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_command() {
+    let wm = preview_session(&["b.f1", "Preview(echo from-a-command {})"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_help() {
+    let wm = preview_session(&["b.f1", "Help"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_switch_layout() {
+    let wm = preview_session(&[
+        "p.l",
+        "gap=1",
+        "p.l",
+        "x=echo second layout",
+        "b.f1",
+        "SwitchPreview(1)",
+    ]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_set_layout() {
+    let wm = preview_session(&[
+        "p.l",
+        "gap=1",
+        "p.l",
+        "x=echo second layout",
+        "b.f1",
+        "SetPreview(1)",
+    ]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_cycle_layout() {
+    let wm = preview_session(&[
+        "p.l",
+        "gap=1",
+        "p.l",
+        "x=echo second layout",
+        "b.f1",
+        "CyclePreview",
+    ]);
+    wm.send(F1);
+    wm.send(F1);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_zoom_in() {
+    let wm = preview_session(&["b.f1", "PreviewZoomIn"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_preview_zoom_out_reset() {
+    let wm = preview_session(&["b.f1", "PreviewZoomOut", "b.f2", "PreviewResetZoom"]);
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+const DIAGRAMS_MD: &str = "# Diagrams\n\nFirst:\n\n```mermaid\ngraph TD\n  A --> B\n```\n\nSecond:\n\n```mermaid\ngraph LR\n  C --> D\n```\n";
+
+fn diagram_session(args: &'static [&'static str]) -> Session {
+    Launch::new("diagrams.md\n")
+        .files(&[("diagrams.md", DIAGRAMS_MD)])
+        .args(args)
+        .size(30, 100)
+        .ready("Diagrams")
+        .start()
+}
+
+#[test]
+fn golden_preview_next_diagram() {
+    let wm = diagram_session(&["b.f1", "NextDiagram", "b.f2", "PrevDiagram"]);
+    wm.send(F1);
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn preview_toggle_diagram_and_zoom() {
+    // The image itself is drawn with terminal graphics placeholders that vary by host, so
+    // only the diagram indicator is checked.
+    let wm = diagram_session(&["b.f1", "ToggleDiagram", "b.f2", "DiagramZoomIn"]);
+    wm.send(F1);
+    wm.send(F2);
+    wm.wait_for_screen(|s| s.contains("[1/2 · 125%]"));
+}

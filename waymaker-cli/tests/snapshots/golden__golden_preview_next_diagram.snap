@@ -1,0 +1,52 @@
+---
+source: waymaker-cli/tests/golden.rs
+assertion_line: 942
+expression: wm.styled_screen()
+---
+ 0|
+ 1| >                                                         diagrams.md
+ 2|   1/1                                                     ╭─ [Mermaid Diagram (Press 's' to view
+ 3|   diagrams.md                                             image)] ╮
+ 4|                                                           │   ┌───┐                              │
+ 5|                                                           │   │ A │                              │
+ 6|                                                           │   └───┘                              │
+ 7|                                                           │     │                                │
+ 8|                                                           │     │                                │
+ 9|                                                           │     │                                │
+10|                                                           │     │                                │
+11|                                                           │     │                                │
+12|                                                           │   ┌─▾─┐                              │
+13|                                                           │   │ B │                              │
+14|                                                           │   └───┘                              │
+15|                                                           ╰──────────────────────────────────────╯
+16|    enter accept │ tab mark │ ctrl-p preview
+17|
+18|
+19|
+20|
+21|
+22|
+23|
+24|
+25|
+26|
+27|
+28|
+29|
+-- styles --
+ 1: 1-2 fg=7
+ 2: 1-5 fg=2 italic | 59-96 fg=4 bold
+ 3: 3-58 bold | 59-67 fg=4 bold
+ 4: 59-60 fg=4 | 61-62 fg=15 bold | 63-67 fg=6 | 97-98 fg=4
+ 5: 59-60 fg=4 | 61-62 fg=15 bold | 63 fg=6 | 64-66 fg=15 bold | 67 fg=6 | 97-98 fg=4
+ 6: 59-60 fg=4 | 61-62 fg=15 bold | 63-67 fg=6 | 97-98 fg=4
+ 7: 59-60 fg=4 | 61-64 fg=15 bold | 65 fg=6 | 97-98 fg=4
+ 8: 59-60 fg=4 | 61-64 fg=15 bold | 65 fg=6 | 97-98 fg=4
+ 9: 59-60 fg=4 | 61-64 fg=15 bold | 65 fg=6 | 97-98 fg=4
+10: 59-60 fg=4 | 61-64 fg=15 bold | 65 fg=6 | 97-98 fg=4
+11: 59-60 fg=4 | 61-64 fg=15 bold | 65 fg=6 | 97-98 fg=4
+12: 59-60 fg=4 | 61-62 fg=15 bold | 63-67 fg=6 | 97-98 fg=4
+13: 59-60 fg=4 | 61-62 fg=15 bold | 63 fg=6 | 64-66 fg=15 bold | 67 fg=6 | 97-98 fg=4
+14: 59-60 fg=4 | 61-62 fg=15 bold | 63-67 fg=6 | 97-98 fg=4
+15: 59-98 fg=4
+16: 1-3 fg=6 | 4-8 fg=6 bold | 9 fg=6 | 10-15 fg=8 | 16 fg=6 | 17 fg=8 | 18 fg=6 | 19-21 fg=6 bold | 22 fg=6 | 23-26 fg=8 | 27 fg=6 | 28 fg=8 | 29 fg=6 | 30-35 fg=6 bold | 36 fg=6 | 37-43 fg=8 | 44-58 fg=6
