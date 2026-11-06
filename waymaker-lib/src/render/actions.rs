@@ -594,248 +594,17 @@ fn preview_action<W: Write, S: Selection, A: ActionExt>(
             }
         }
 
-        Action::NextDiagram | Action::PrevDiagram => {
-            if let Some(p) = preview_ui.as_mut() {
-                let offsets = p
-                    .view
-                    .diagram_offsets
-                    .lock()
-                    .ok()
-                    .map(|g| g.clone())
-                    .unwrap_or_default();
-                if !offsets.is_empty() {
-                    let current = p.current_offset();
-                    let (target, next_idx) = if matches!(action, Action::NextDiagram) {
-                        // Find first offset strictly greater than current scroll
-                        let found = offsets
-                            .iter()
-                            .copied()
-                            .enumerate()
-                            .find(|(_, o)| *o > current);
-                        if let Some((idx, o)) = found {
-                            (o, idx)
-                        } else {
-                            (*offsets.first().unwrap(), 0)
-                        }
-                    } else {
-                        // Find last offset strictly less than current scroll
-                        let found = offsets
-                            .iter()
-                            .copied()
-                            .enumerate()
-                            .rfind(|(_, o)| *o < current);
-                        if let Some((idx, o)) = found {
-                            (o, idx)
-                        } else {
-                            (*offsets.last().unwrap(), offsets.len() - 1)
-                        }
-                    };
-                    p.scroll_to(target);
-
-                    // Update active diagram image from sources if available
-                    let src_opt = p
-                        .view
-                        .diagram_sources
-                        .lock()
-                        .ok()
-                        .and_then(|sources| sources.get(next_idx).cloned());
-                    if let Some(src) = src_opt {
-                        p.view
-                            .current_diagram_idx
-                            .store(next_idx, std::sync::atomic::Ordering::Release);
-                        if let Some(img) =
-                            crate::utils::mermaid::render_mermaid_to_image_with_options(
-                                &src,
-                                2.0,
-                                p.config.diagrams.theme,
-                                p.config.diagrams.background,
-                            )
-                        {
-                            if let Ok(mut guard) = p.view.image.lock() {
-                                *guard = Some(img);
-                            }
-                            p.reset_diagram_pan();
-                            p.view
-                                .image_id
-                                .fetch_add(1, std::sync::atomic::Ordering::Release);
-                            p.view
-                                .changed
-                                .store(true, std::sync::atomic::Ordering::Release);
-                        }
-                    }
-                } else {
-                    let src_opt = p.view.diagram_sources.lock().ok().and_then(|sources| {
-                        if sources.is_empty() {
-                            return None;
-                        }
-                        let total = sources.len();
-                        let cur = p
-                            .view
-                            .current_diagram_idx
-                            .load(std::sync::atomic::Ordering::Relaxed);
-                        let next_idx = if matches!(action, Action::NextDiagram) {
-                            (cur + 1) % total
-                        } else {
-                            (cur + total.saturating_sub(1)) % total
-                        };
-                        p.view
-                            .current_diagram_idx
-                            .store(next_idx, std::sync::atomic::Ordering::Release);
-                        sources.get(next_idx).cloned()
-                    });
-                    if let Some(src) = src_opt
-                        && let Some(img) =
-                            crate::utils::mermaid::render_mermaid_to_image_with_options(
-                                &src,
-                                2.0,
-                                p.config.diagrams.theme,
-                                p.config.diagrams.background,
-                            )
-                    {
-                        if let Ok(mut guard) = p.view.image.lock() {
-                            *guard = Some(img);
-                        }
-                        p.reset_diagram_pan();
-                        p.view
-                            .image_id
-                            .fetch_add(1, std::sync::atomic::Ordering::Release);
-                        p.view
-                            .changed
-                            .store(true, std::sync::atomic::Ordering::Release);
-                    }
-                }
-            }
+        a @ (Action::NextDiagram | Action::PrevDiagram) => {
+            return diagram_step_action(a, preview_ui);
         }
 
         // Preview
-        Action::CyclePreview => {
-            if let Some(p) = preview_ui.as_mut() {
-                p.cycle_layout();
-                p.current_dimension = None;
-                p.view
-                    .image_id
-                    .fetch_add(1, std::sync::atomic::Ordering::Release);
-                p.view
-                    .changed
-                    .store(true, std::sync::atomic::Ordering::Release);
-                state.insert(crate::message::Event::PreviewChange);
-                if !p.command().is_empty() {
-                    state.update_preview_payload(p.command());
-                }
-                if p.is_fullscreen() {
-                    state.focus = Focus::Results;
-                    state.preview_fullscreen = true;
-                } else {
-                    state.focus = if ui.config.nav.active {
-                        Focus::Results
-                    } else {
-                        Focus::Input
-                    };
-                    state.preview_fullscreen = false;
-                }
-                tui.redraw();
-            }
-        }
-
-        Action::Preview(context) => {
-            if let Some(p) = preview_ui.as_mut() {
-                if !state.update_preview_payload(context.as_str()) {
-                    p.toggle_show()
-                } else {
-                    p.show(true);
-                }
-            };
-        }
-        Action::Help(context) => {
-            if let Some(p) = preview_ui.as_mut() {
-                // empty payload signifies help
-                if !state.update_preview_set(Err(context.into())) {
-                    state.update_preview_unset()
-                } else {
-                    p.show(true);
-                }
-            };
-        }
-        Action::SetPreview(idx) => {
-            if let Some(p) = preview_ui.as_mut() {
-                if let Some(idx) = idx {
-                    p.show(true);
-                    p.set_layout(idx);
-                    p.current_dimension = None;
-                    p.view
-                        .image_id
-                        .fetch_add(1, std::sync::atomic::Ordering::Release);
-                    p.view
-                        .changed
-                        .store(true, std::sync::atomic::Ordering::Release);
-                    state.insert(crate::message::Event::PreviewChange);
-                    if !p.command().is_empty() {
-                        state.update_preview_payload(p.command());
-                    }
-                    if p.is_fullscreen() {
-                        state.focus = Focus::Results;
-                        state.preview_fullscreen = true;
-                    } else {
-                        state.focus = if ui.config.nav.active {
-                            Focus::Results
-                        } else {
-                            Focus::Input
-                        };
-                        state.preview_fullscreen = false;
-                    }
-                    tui.redraw();
-                } else {
-                    state.update_preview_payload(p.command());
-                }
-            }
-        }
-        Action::SwitchPreview(idx) => {
-            if let Some(p) = preview_ui.as_mut() {
-                if let Some(idx) = idx {
-                    let target_idx = idx as usize;
-                    let new_idx = if p.layout_idx() == target_idx {
-                        if target_idx != 0 {
-                            Some(0)
-                        } else {
-                            p.toggle_show();
-                            tui.redraw();
-                            None
-                        }
-                    } else {
-                        Some(target_idx as u8)
-                    };
-                    if let Some(new_idx) = new_idx {
-                        p.show(true);
-                        p.set_layout(new_idx);
-                        p.current_dimension = None;
-                        p.view
-                            .image_id
-                            .fetch_add(1, std::sync::atomic::Ordering::Release);
-                        p.view
-                            .changed
-                            .store(true, std::sync::atomic::Ordering::Release);
-                        state.insert(crate::message::Event::PreviewChange);
-                        if !p.command().is_empty() {
-                            state.update_preview_payload(p.command());
-                        }
-                        if p.is_fullscreen() {
-                            state.focus = Focus::Results;
-                            state.preview_fullscreen = true;
-                        } else {
-                            state.focus = if ui.config.nav.active {
-                                Focus::Results
-                            } else {
-                                Focus::Input
-                            };
-                            state.preview_fullscreen = false;
-                        }
-                        tui.redraw();
-                    }
-                } else {
-                    p.toggle_show();
-                    tui.redraw();
-                }
-            }
+        a @ (Action::CyclePreview
+        | Action::Preview(..)
+        | Action::Help(..)
+        | Action::SetPreview(..)
+        | Action::SwitchPreview(..)) => {
+            return preview_layout_action(a, state, ui, preview_ui, tui);
         }
         Action::TogglePreviewWrap => {
             if let Some(p) = preview_ui.as_mut() {
@@ -1379,6 +1148,272 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                 return Flow::Continue;
             } else {
                 return Flow::Exit(Err(MatchError::Abort(code)));
+            }
+        }
+        _ => {}
+    }
+    Flow::Proceed
+}
+
+/// /// Preview layouts and content: CyclePreview, Preview, Help, SetPreview, SwitchPreview.
+fn preview_layout_action<W: Write, S: Selection, A: ActionExt>(
+    action: Action<A>,
+    state: &mut State,
+    ui: &mut UI,
+    preview_ui: &mut Option<PreviewUI>,
+    tui: &mut Tui<W>,
+) -> Flow<S> {
+    match action {
+        Action::CyclePreview => {
+            if let Some(p) = preview_ui.as_mut() {
+                p.cycle_layout();
+                p.current_dimension = None;
+                p.view
+                    .image_id
+                    .fetch_add(1, std::sync::atomic::Ordering::Release);
+                p.view
+                    .changed
+                    .store(true, std::sync::atomic::Ordering::Release);
+                state.insert(crate::message::Event::PreviewChange);
+                if !p.command().is_empty() {
+                    state.update_preview_payload(p.command());
+                }
+                if p.is_fullscreen() {
+                    state.focus = Focus::Results;
+                    state.preview_fullscreen = true;
+                } else {
+                    state.focus = if ui.config.nav.active {
+                        Focus::Results
+                    } else {
+                        Focus::Input
+                    };
+                    state.preview_fullscreen = false;
+                }
+                tui.redraw();
+            }
+        }
+
+        Action::Preview(context) => {
+            if let Some(p) = preview_ui.as_mut() {
+                if !state.update_preview_payload(context.as_str()) {
+                    p.toggle_show()
+                } else {
+                    p.show(true);
+                }
+            };
+        }
+        Action::Help(context) => {
+            if let Some(p) = preview_ui.as_mut() {
+                // empty payload signifies help
+                if !state.update_preview_set(Err(context.into())) {
+                    state.update_preview_unset()
+                } else {
+                    p.show(true);
+                }
+            };
+        }
+        Action::SetPreview(idx) => {
+            if let Some(p) = preview_ui.as_mut() {
+                if let Some(idx) = idx {
+                    p.show(true);
+                    p.set_layout(idx);
+                    p.current_dimension = None;
+                    p.view
+                        .image_id
+                        .fetch_add(1, std::sync::atomic::Ordering::Release);
+                    p.view
+                        .changed
+                        .store(true, std::sync::atomic::Ordering::Release);
+                    state.insert(crate::message::Event::PreviewChange);
+                    if !p.command().is_empty() {
+                        state.update_preview_payload(p.command());
+                    }
+                    if p.is_fullscreen() {
+                        state.focus = Focus::Results;
+                        state.preview_fullscreen = true;
+                    } else {
+                        state.focus = if ui.config.nav.active {
+                            Focus::Results
+                        } else {
+                            Focus::Input
+                        };
+                        state.preview_fullscreen = false;
+                    }
+                    tui.redraw();
+                } else {
+                    state.update_preview_payload(p.command());
+                }
+            }
+        }
+        Action::SwitchPreview(idx) => {
+            if let Some(p) = preview_ui.as_mut() {
+                if let Some(idx) = idx {
+                    let target_idx = idx as usize;
+                    let new_idx = if p.layout_idx() == target_idx {
+                        if target_idx != 0 {
+                            Some(0)
+                        } else {
+                            p.toggle_show();
+                            tui.redraw();
+                            None
+                        }
+                    } else {
+                        Some(target_idx as u8)
+                    };
+                    if let Some(new_idx) = new_idx {
+                        p.show(true);
+                        p.set_layout(new_idx);
+                        p.current_dimension = None;
+                        p.view
+                            .image_id
+                            .fetch_add(1, std::sync::atomic::Ordering::Release);
+                        p.view
+                            .changed
+                            .store(true, std::sync::atomic::Ordering::Release);
+                        state.insert(crate::message::Event::PreviewChange);
+                        if !p.command().is_empty() {
+                            state.update_preview_payload(p.command());
+                        }
+                        if p.is_fullscreen() {
+                            state.focus = Focus::Results;
+                            state.preview_fullscreen = true;
+                        } else {
+                            state.focus = if ui.config.nav.active {
+                                Focus::Results
+                            } else {
+                                Focus::Input
+                            };
+                            state.preview_fullscreen = false;
+                        }
+                        tui.redraw();
+                    }
+                } else {
+                    p.toggle_show();
+                    tui.redraw();
+                }
+            }
+        }
+        _ => {}
+    }
+    Flow::Proceed
+}
+
+/// /// NextDiagram / PrevDiagram: steps through the diagrams of a Markdown preview.
+fn diagram_step_action<S: Selection, A: ActionExt>(
+    action: Action<A>,
+    preview_ui: &mut Option<PreviewUI>,
+) -> Flow<S> {
+    match action {
+        Action::NextDiagram | Action::PrevDiagram => {
+            if let Some(p) = preview_ui.as_mut() {
+                let offsets = p
+                    .view
+                    .diagram_offsets
+                    .lock()
+                    .ok()
+                    .map(|g| g.clone())
+                    .unwrap_or_default();
+                if !offsets.is_empty() {
+                    let current = p.current_offset();
+                    let (target, next_idx) = if matches!(action, Action::NextDiagram) {
+                        // Find first offset strictly greater than current scroll
+                        let found = offsets
+                            .iter()
+                            .copied()
+                            .enumerate()
+                            .find(|(_, o)| *o > current);
+                        if let Some((idx, o)) = found {
+                            (o, idx)
+                        } else {
+                            (*offsets.first().unwrap(), 0)
+                        }
+                    } else {
+                        // Find last offset strictly less than current scroll
+                        let found = offsets
+                            .iter()
+                            .copied()
+                            .enumerate()
+                            .rfind(|(_, o)| *o < current);
+                        if let Some((idx, o)) = found {
+                            (o, idx)
+                        } else {
+                            (*offsets.last().unwrap(), offsets.len() - 1)
+                        }
+                    };
+                    p.scroll_to(target);
+
+                    // Update active diagram image from sources if available
+                    let src_opt = p
+                        .view
+                        .diagram_sources
+                        .lock()
+                        .ok()
+                        .and_then(|sources| sources.get(next_idx).cloned());
+                    if let Some(src) = src_opt {
+                        p.view
+                            .current_diagram_idx
+                            .store(next_idx, std::sync::atomic::Ordering::Release);
+                        if let Some(img) =
+                            crate::utils::mermaid::render_mermaid_to_image_with_options(
+                                &src,
+                                2.0,
+                                p.config.diagrams.theme,
+                                p.config.diagrams.background,
+                            )
+                        {
+                            if let Ok(mut guard) = p.view.image.lock() {
+                                *guard = Some(img);
+                            }
+                            p.reset_diagram_pan();
+                            p.view
+                                .image_id
+                                .fetch_add(1, std::sync::atomic::Ordering::Release);
+                            p.view
+                                .changed
+                                .store(true, std::sync::atomic::Ordering::Release);
+                        }
+                    }
+                } else {
+                    let src_opt = p.view.diagram_sources.lock().ok().and_then(|sources| {
+                        if sources.is_empty() {
+                            return None;
+                        }
+                        let total = sources.len();
+                        let cur = p
+                            .view
+                            .current_diagram_idx
+                            .load(std::sync::atomic::Ordering::Relaxed);
+                        let next_idx = if matches!(action, Action::NextDiagram) {
+                            (cur + 1) % total
+                        } else {
+                            (cur + total.saturating_sub(1)) % total
+                        };
+                        p.view
+                            .current_diagram_idx
+                            .store(next_idx, std::sync::atomic::Ordering::Release);
+                        sources.get(next_idx).cloned()
+                    });
+                    if let Some(src) = src_opt
+                        && let Some(img) =
+                            crate::utils::mermaid::render_mermaid_to_image_with_options(
+                                &src,
+                                2.0,
+                                p.config.diagrams.theme,
+                                p.config.diagrams.background,
+                            )
+                    {
+                        if let Ok(mut guard) = p.view.image.lock() {
+                            *guard = Some(img);
+                        }
+                        p.reset_diagram_pan();
+                        p.view
+                            .image_id
+                            .fetch_add(1, std::sync::atomic::Ordering::Release);
+                        p.view
+                            .changed
+                            .store(true, std::sync::atomic::Ordering::Release);
+                    }
+                }
             }
         }
         _ => {}
