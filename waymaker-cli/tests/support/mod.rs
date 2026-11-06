@@ -28,7 +28,29 @@ pub struct Session {
     size: (u16, u16),
 }
 
-/// How to start a [`Session`]: `Launch::new(items).args(..).size(rows, cols).start()`.
+/// A session the test did not `finish` (every golden frame) is stopped with ctrl-c (`Abort`)
+/// so `wm` exits normally: a process killed with the pty never writes its `cargo llvm-cov`
+/// profile, so those tests would add no coverage.
+impl Drop for Session {
+    fn drop(&mut self) {
+        if matches!(self.child.try_wait(), Ok(Some(_))) {
+            return;
+        }
+        if let Ok(mut writer) = self.writer.lock() {
+            let _ = writer.write_all(b"\x03");
+        }
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if matches!(self.child.try_wait(), Ok(Some(_))) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        let _ = self.child.kill();
+    }
+}
+
+/// How to start a [`Session`]:`Launch::new(items).args(..).size(rows, cols).start()`.
 pub struct Launch<'a> {
     items: &'a str,
     args: &'a [&'a str],

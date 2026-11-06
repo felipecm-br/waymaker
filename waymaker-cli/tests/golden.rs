@@ -267,3 +267,134 @@ fn golden_split_columns_icons_scrolled() {
     }
     insta::assert_snapshot!(wm.styled_screen());
 }
+
+const UP: &str = "\x1b[A";
+
+#[test]
+fn golden_initial_pos_from_end() {
+    // `results.pos` negative: the cursor starts third from the end (make_table's initial_pos).
+    let items = items();
+    let wm = Launch::new(&items)
+        .args(&["results.pos=-3"])
+        .size(16, 60)
+        .ready("30/30")
+        .start();
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+/// Rows of uneven height (1 or 3 lines at 60 columns), so scrolling cuts the top row mid-item.
+fn mixed_items() -> String {
+    (0..20)
+        .map(|i| {
+            if i % 3 == 0 {
+                format!("entry_{i:02} lorem ipsum dolor sit amet consectetur adipiscing elit\n")
+            } else {
+                format!("entry_{i:02}\n")
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn golden_wrapped_rows_scrolled_back() {
+    // Scrolled down until the top row is clipped, then back up while the clip is kept: the
+    // bottom_clip path, which redraws the partly visible top row from the previous frame.
+    let items = mixed_items();
+    let wm = Launch::new(&items)
+        .args(&["results.wrap=true"])
+        .size(24, 60)
+        .ready("entry_00")
+        .start();
+    for _ in 0..4 {
+        wm.send(DOWN);
+    }
+    wm.send(UP);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+/// Rows of three columns whose first column wraps, for the stacked layout.
+fn stacked_items() -> String {
+    (0..20)
+        .map(|i| {
+            format!(
+                "item_{i:02}{}  {}K  2026-01-{:02}\n",
+                if i % 3 == 0 {
+                    "_with_a_rather_long_name_that_wraps_in_the_list"
+                } else {
+                    ""
+                },
+                i + 1,
+                i + 1
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn golden_stacked_columns_scrolled() {
+    // Stacked columns scrolled so the top item is cut: the stacked branch of the clipped row.
+    let items = stacked_items();
+    let wm = Launch::new(&items)
+        .args(&[
+            "columns.split=\\s\\s+",
+            "results.stacked_columns=true",
+            "results.wrap=true",
+        ])
+        .size(30, 80)
+        .ready("20/20")
+        .start();
+    for _ in 0..3 {
+        wm.send(DOWN);
+    }
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_stacked_columns_scrolled_back() {
+    let items = stacked_items();
+    let wm = Launch::new(&items)
+        .args(&[
+            "columns.split=\\s\\s+",
+            "results.stacked_columns=true",
+            "results.wrap=true",
+        ])
+        .size(30, 80)
+        .ready("20/20")
+        .start();
+    for _ in 0..3 {
+        wm.send(DOWN);
+    }
+    wm.send(UP);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_stacked_columns_icons() {
+    let wm = Launch::new(
+        "src/main.rs  4K  2026-01-02\nREADME.md  1K  2026-01-03\nCargo.toml  2K  2026-01-04\n",
+    )
+    .args(&[
+        "--icons",
+        "columns.split=\\s\\s+",
+        "results.stacked_columns=true",
+    ])
+    .size(14, 60)
+    .ready("3/3")
+    .start();
+    wm.send(DOWN);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_reverse_wrapped_scrolled() {
+    let items = mixed_items();
+    let wm = Launch::new(&items)
+        .args(&["results.wrap=true", "results.reverse=true"])
+        .size(24, 60)
+        .ready("entry_00")
+        .start();
+    for _ in 0..4 {
+        wm.send(UP); // reverse: up moves away from the first item
+    }
+    insta::assert_snapshot!(wm.styled_screen());
+}
