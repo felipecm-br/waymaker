@@ -1129,3 +1129,188 @@ fn action_become_replaces_wm() {
     let (code, out) = wm.finish();
     assert_eq!((code, out.as_str()), (0, "became banana/01\n"));
 }
+
+// ---- CLI actions (waymaker-cli action_handler), bound to F1/F2 ----
+
+fn accept_output(wm: Session) -> String {
+    wm.send(ENTER);
+    let (code, out) = wm.finish();
+    assert_eq!(code, 0);
+    out
+}
+
+#[test]
+fn golden_cli_set_header_and_footer() {
+    let wm = bound(
+        &items(),
+        &[
+            "b.f1",
+            "SetHeader(a header line)",
+            "b.f2",
+            "SetFooter(a footer line)",
+        ],
+    );
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+/// Only PushHeader: a pushed footer text is never drawn (the footer draws its first text
+/// only), and with a pushed header the footer hints are fitted to the wrong width.
+#[test]
+fn golden_cli_push_header() {
+    let wm = bound(&items(), &["b.f1", "PushHeader(pushed header)"]);
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_cli_set_prompt_and_status() {
+    let wm = bound(
+        &items(),
+        &[
+            "b.f1",
+            "SetPrompt(pick: )",
+            "b.f2",
+            "SetStatus(custom status)",
+        ],
+    );
+    wm.send(F1);
+    wm.send(F2);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_cli_set_styled_prompt_footer_status() {
+    let wm = bound(
+        &items(),
+        &[
+            "b.f1",
+            "SetStyledPrompt({cyan:P} )|||SetStyledFooter({red:F})|||SetStyledStatus({green:S})",
+        ],
+    );
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn cli_transform_runs_the_printed_actions() {
+    let wm = bound(&items(), &["b.f1", "Transform(printf 'Down\\nDown\\n')"]);
+    wm.send(F1);
+    wm.wait_for_screen(|s| {
+        s.contains("> ") && s.lines().nth(1).is_some_and(|l| l.contains("cherry/02"))
+    });
+    assert_eq!(accept_output(wm), "cherry/02\n");
+}
+
+#[test]
+fn golden_cli_transform_config() {
+    let wm = bound(
+        &items(),
+        &["b.f1", "TransformConfig(echo results.reverse=true)"],
+    );
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn cli_confirm_runs_the_command_on_enter() {
+    let wm = bound(&items(), &["b.f1", "Confirm(Really? ::: touch confirmed)"]);
+    wm.send(F1);
+    wm.wait_for_screen(|s| s.contains("Really?"));
+    wm.send(ENTER);
+    wait_for_file(&wm, "confirmed");
+}
+
+#[test]
+fn cli_confirm_esc_skips_the_command() {
+    let wm = bound(&items(), &["b.f1", "Confirm(Really? ::: touch confirmed)"]);
+    let path = wm.dir.path().join("work/confirmed");
+    wm.send(F1);
+    wm.wait_for_screen(|s| s.contains("Really?"));
+    wm.send(ESC);
+    wm.wait_for_screen(|s| !s.contains("Really?"));
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    assert!(!path.exists());
+}
+
+#[test]
+fn cli_prompt_passes_the_typed_text() {
+    let wm = bound(
+        &items(),
+        &["b.f1", "Prompt(Name: | echo {input} > out | prefilled_)"],
+    );
+    wm.send(F1);
+    wm.wait_for_screen(|s| s.contains("Name:") && s.contains("prefilled_"));
+    wm.send(" x;y"); // shell-quoted: the space and ';' reach echo as text
+    wm.send(ENTER);
+    let out = wait_for_file(&wm, "out");
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    assert_eq!(std::fs::read_to_string(out).unwrap(), "prefilled_ x;y\n");
+}
+
+#[test]
+fn cli_bind_rebinds_a_key() {
+    let wm = bound(&items(), &["b.f1", "Bind(f3=Down)"]);
+    wm.send(F1);
+    wm.send("\x1bOR"); // F3
+    wm.send("\x1bOR");
+    assert_eq!(accept_output(wm), "cherry/02\n");
+}
+
+#[test]
+fn cli_unbind_removes_a_key() {
+    let wm = bound(&items(), &["b.f3", "Down", "b.f1", "Unbind(f3)"]);
+    wm.send(F1);
+    wm.send("\x1bOR"); // F3: unbound now
+    assert_eq!(accept_output(wm), "apple/00\n");
+}
+
+#[test]
+fn cli_push_bind_then_pop_bind() {
+    let wm = bound(
+        &items(),
+        &[
+            "b.f3",
+            "Down",
+            "b.f1",
+            "PushBind(f3=Pos(-1))",
+            "b.f2",
+            "PopBind(f3)",
+        ],
+    );
+    wm.send(F1);
+    wm.send("\x1bOR"); // F3 = Pos(-1): last item
+    wm.send(F2);
+    wm.send(UP);
+    wm.send("\x1bOR"); // F3 = Down again
+    assert_eq!(accept_output(wm), "lime/29\n");
+}
+
+#[test]
+fn golden_cli_run_preview() {
+    let wm = bound(
+        &items(),
+        &["b.f1", "RunPreview(echo preview from RunPreview)"],
+    );
+    wm.send(F1);
+    wm.wait_for_screen(|s| s.contains("preview from RunPreview"));
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_cli_filtering_off_keeps_all_items() {
+    // Filtering(false): typing edits the query but no longer narrows the list.
+    let wm = bound(&items(), &["b.f1", "Filtering(false)"]);
+    wm.send(F1);
+    wm.send("zzz");
+    insta::assert_snapshot!(wm.styled_screen());
+}
+
+#[test]
+fn golden_cli_cycle_sort() {
+    let wm = bound(&items(), &["b.f1", "CycleSort"]);
+    wm.send("an");
+    wm.send(F1);
+    insta::assert_snapshot!(wm.styled_screen());
+}

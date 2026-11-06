@@ -461,7 +461,7 @@ pub fn action_handler(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Action
             };
 
             let formatted_prompt = format_cli(state, prompt_tmpl, None);
-            let formatted_cmd = format_cli(state, cmd_tmpl, None);
+            let formatted_cmd = format_keeping_input(state, cmd_tmpl);
 
             *fm_action = Some(FmActionMode::Custom {
                 command: formatted_cmd,
@@ -478,7 +478,7 @@ pub fn action_handler(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Action
             };
 
             let formatted_prompt = crate::formatter::format_cli(state, prompt_tmpl, None);
-            let formatted_cmd = crate::formatter::format_cli(state, cmd_tmpl, None);
+            let formatted_cmd = format_keeping_input(state, cmd_tmpl);
             let formatted_initial = if !initial_tmpl.is_empty() {
                 crate::formatter::format_cli(state, initial_tmpl, None)
             } else {
@@ -491,6 +491,13 @@ pub fn action_handler(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Action
             show_styled_action_box(state, &formatted_prompt, &formatted_initial);
         }
     }
+}
+
+/// Formats a Prompt/Confirm command template now, but leaves `{input}` for the text the user
+/// types into the box: format_cli would expand it at once, to the (empty) input of the moment.
+fn format_keeping_input(state: &mut MMState<'_, '_>, template: &str) -> String {
+    const MARK: &str = "\u{1}wm-prompt-input\u{1}";
+    format_cli(state, &template.replace("{input}", MARK), None).replace(MARK, "{input}")
 }
 
 impl MMAction {

@@ -89,8 +89,19 @@ impl DisplayUI {
     /// Set text (single column) and show. The base style is applied "under" the text's styling.
     pub fn set(&mut self, text: impl Into<Text<'static>>) {
         self.text = vec![text.into()];
+        self.height = self.text_height();
 
         self.show = true;
+    }
+
+    /// Rows the texts need before wrapping. Drawing refines it, but the layout of the frame
+    /// right after a set/push uses it: without it a new header showed one event late.
+    fn text_height(&self) -> u16 {
+        self.text
+            .iter()
+            .map(|t| t.height())
+            .max()
+            .unwrap_or_default() as u16
     }
 
     /// Set text from a style template (`{cyan,bold:Key} {darkgray:Label}`, one line per
@@ -102,6 +113,7 @@ impl DisplayUI {
     /// Add a column and show.
     pub fn push(&mut self, text: impl Into<Text<'static>>) {
         self.text.push(text.into());
+        self.height = self.height.max(self.text_height());
 
         self.show = true;
     }

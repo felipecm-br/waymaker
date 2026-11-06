@@ -438,7 +438,9 @@ pub(super) fn commit_fm_action(
         }
         FmActionMode::Custom { command } => {
             if !command.is_empty() {
-                let final_cmd = command.replace("{input}", &input);
+                // Shell-quoted, like every other placeholder.
+                let final_cmd =
+                    command.replace("{input}", &waymaker::render::quote_live_token(&input));
                 let vars = state.make_env_vars();
                 if let Some(mut child) = Command::from_script(&final_cmd)
                     .envs(vars)

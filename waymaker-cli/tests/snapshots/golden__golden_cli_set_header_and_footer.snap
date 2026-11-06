@@ -1,0 +1,27 @@
+---
+source: waymaker-cli/tests/golden.rs
+assertion_line: 1155
+expression: wm.styled_screen()
+---
+ 0|
+ 1| >                           apple/00
+ 2|   30/30
+ 3|   a header line
+ 4|   apple/00
+ 5|   banana/01
+ 6|   cherry/02
+ 7|   mango/03
+ 8|   a footer line
+ 9|
+10|
+11|
+12|
+13|
+14|
+15|
+-- styles --
+ 1: 1-2 fg=7
+ 2: 1-7 fg=2 italic
+ 3: 1-28 fg=6
+ 4: 3-28 bold
+ 8: 1-28 fg=6
