@@ -110,48 +110,9 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     //   - suppress yank    if yank_count == cut_count  (fully covered by cut)
     //   - if only one group: horizontal, width = " N " of that group
     //   - if multiple groups: vertical (one row each), width = widest " N "
-    let _counter_gap_width: u16 = {
-        let sel_raw = picker_ui.selector.len();
-        let yank_raw = picker_ui.results.yank_paths.len();
-        let cut_raw = picker_ui.results.cut_paths.len();
+    let counter_gap_width = counter_gap_width(picker_ui);
 
-        let show_cut = cut_raw > 0;
-        let show_yank = yank_raw > 0 && yank_raw != cut_raw;
-        let show_sel = sel_raw > 0 && sel_raw != yank_raw && sel_raw != cut_raw;
-
-        let widths: Vec<usize> = [
-            show_cut.then(|| cut_raw.to_string().len() + 2),
-            show_yank.then(|| yank_raw.to_string().len() + 2),
-            show_sel.then(|| sel_raw.to_string().len() + 2),
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
-
-        widths.iter().copied().max().unwrap_or(0) as u16
-    };
-
-    let mut parent_peek_rect = Rect::default();
-    if ui.config.parent_peek.enabled && _area.width >= 50 {
-        let top_offset = if !picker_ui.reverse() && picker_ui.query.config.show {
-            1 + picker_ui.query.config.border.height()
-        } else {
-            0
-        };
-        let pw = ui
-            .config
-            .parent_peek
-            .pct
-            .compute_clamped(_area.width, 10, 30);
-        parent_peek_rect = Rect {
-            x: _area.x,
-            y: _area.y + top_offset,
-            width: pw,
-            height: _area.height.saturating_sub(top_offset),
-        };
-        _area.x += pw;
-        _area.width -= pw;
-    }
+    let mut parent_peek_rect = take_parent_peek(ui, picker_ui, &mut _area);
 
     let [preview, picker_area, footer, gap_area] = if let Some(preview_ui) = preview_ui.as_mut()
         && preview_ui.visible()
@@ -168,8 +129,8 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
         } else {
             // Temporarily widen the gap so the counter fits horizontally.
             let original_gap = preview_ui.setting().map(|s| s.layout.gap).unwrap_or(0);
-            let effective_gap = original_gap.max(if _counter_gap_width > 0 {
-                _counter_gap_width + 2
+            let effective_gap = original_gap.max(if counter_gap_width > 0 {
+                counter_gap_width + 2
             } else {
                 0
             });
@@ -920,4 +881,57 @@ fn breadcrumb_layout<T: SSS, S: Selection>(
         global_breadcrumb_rect,
         _area,
     )
+}
+
+/// How wide the gap beside the preview must be to show the cut / yank / selected counters:
+/// the widest " N ", skipping a count another one already covers.
+fn counter_gap_width<T: SSS, S: Selection>(picker_ui: &PickerUI<'_, T, S>) -> u16 {
+    let sel_raw = picker_ui.selector.len();
+    let yank_raw = picker_ui.results.yank_paths.len();
+    let cut_raw = picker_ui.results.cut_paths.len();
+
+    let show_cut = cut_raw > 0;
+    let show_yank = yank_raw > 0 && yank_raw != cut_raw;
+    let show_sel = sel_raw > 0 && sel_raw != yank_raw && sel_raw != cut_raw;
+
+    let widths: Vec<usize> = [
+        show_cut.then(|| cut_raw.to_string().len() + 2),
+        show_yank.then(|| yank_raw.to_string().len() + 2),
+        show_sel.then(|| sel_raw.to_string().len() + 2),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    widths.iter().copied().max().unwrap_or(0) as u16
+}
+
+/// Takes the parent-peek column off the left of `_area` when it is enabled and wide enough.
+fn take_parent_peek<T: SSS, S: Selection>(
+    ui: &UI,
+    picker_ui: &PickerUI<'_, T, S>,
+    _area: &mut Rect,
+) -> Rect {
+    let mut parent_peek_rect = Rect::default();
+    if ui.config.parent_peek.enabled && _area.width >= 50 {
+        let top_offset = if !picker_ui.reverse() && picker_ui.query.config.show {
+            1 + picker_ui.query.config.border.height()
+        } else {
+            0
+        };
+        let pw = ui
+            .config
+            .parent_peek
+            .pct
+            .compute_clamped(_area.width, 10, 30);
+        parent_peek_rect = Rect {
+            x: _area.x,
+            y: _area.y + top_offset,
+            width: pw,
+            height: _area.height.saturating_sub(top_offset),
+        };
+        _area.x += pw;
+        _area.width -= pw;
+    }
+    parent_peek_rect
 }
