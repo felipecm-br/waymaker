@@ -186,6 +186,92 @@ impl ResultsUI {
         }
     }
 
+    /// The prefix column of a row (spinner frame, multi-select marker or the default prefix),
+    /// plus what it found: the item's name, spinner state and yank/cut marks. Animates or strips
+    /// a spinner marker in `row` on the way.
+    #[allow(clippy::too_many_arguments)]
+    fn row_prefix<T: SSS>(
+        &self,
+        row: &mut [ratatui::text::Text<'_>],
+        is_selected: bool,
+        idx: usize,
+        item: &T,
+        columns: &[crate::nucleo::Column<T>],
+        is_first: bool,
+        is_last: bool,
+        cwd: &std::path::Path,
+        get_dynamic_multi_prefix: &impl Fn(bool, bool) -> String,
+    ) -> (String, String, bool, usize, bool, bool) {
+        let mut icon_name = String::new();
+        let mut is_spinner = false;
+        let mut spinner_col_idx = 0;
+        // The marker found in the row and the spinner it animates.
+        let mut spinner_marker: &str = &self.config.spinner_prefix;
+        let mut spinner_name: &str = &self.config.spinner;
+
+        if !row.is_empty() {
+            let markers = [
+                (&self.config.spinner_prefix, &self.config.spinner),
+                (&self.config.slow_spinner_prefix, &self.config.slow_spinner),
+            ];
+            'find: for (i, col_text) in row.iter().enumerate() {
+                let text_content = extract_col0_name(col_text);
+                for (marker, name) in markers {
+                    if !marker.is_empty() && text_content.contains(marker.as_str()) {
+                        is_spinner = true;
+                        spinner_col_idx = i;
+                        spinner_marker = marker;
+                        spinner_name = name;
+                        break 'find;
+                    }
+                }
+            }
+        }
+
+        if !row.is_empty() {
+            icon_name = columns[0].raw(item).into_owned();
+            if is_spinner && spinner_col_idx == 0 {
+                icon_name = icon_name.replace(spinner_marker, "");
+            }
+        }
+
+        if is_spinner {
+            if self.config.spinner_inline {
+                let frame = crate::spinner::Spinner::from_name(spinner_name).current_frame();
+                crate::utils::text::replace_string_in_text(
+                    &mut row[spinner_col_idx],
+                    spinner_marker,
+                    frame,
+                );
+            } else {
+                crate::utils::text::strip_string_from_text(
+                    &mut row[spinner_col_idx],
+                    spinner_marker,
+                );
+            }
+        }
+        let is_yanked = Self::is_path_in_set(&self.yank_paths, &icon_name, cwd);
+        let is_cut = Self::is_path_in_set(&self.cut_paths, &icon_name, cwd);
+
+        let prefix = if is_spinner && !self.config.spinner_inline {
+            let frame = crate::spinner::Spinner::from_name(spinner_name).current_frame();
+            let f = format!("{frame} ");
+            crate::utils::string::fit_width(&f, self.config.multi_prefix.width())
+        } else if is_selected || is_yanked || is_cut {
+            get_dynamic_multi_prefix(is_first, is_last)
+        } else {
+            self.default_prefix(idx)
+        };
+        (
+            prefix,
+            icon_name,
+            is_spinner,
+            spinner_col_idx,
+            is_yanked,
+            is_cut,
+        )
+    }
+
     pub fn make_table<'a, T: SSS>(
         &mut self,
         active_column: usize,
@@ -275,80 +361,6 @@ impl ResultsUI {
                 multi_prefix.clone()
             }
         };
-
-        macro_rules! get_prefix {
-            ($row:expr, $is_selected:expr, $idx:expr, $item:expr, $columns:expr, $is_first:expr, $is_last:expr) => {{
-                let mut icon_name = String::new();
-                let mut is_spinner = false;
-                let mut spinner_col_idx = 0;
-                // The marker found in the row and the spinner it animates.
-                let mut spinner_marker: &str = &self.config.spinner_prefix;
-                let mut spinner_name: &str = &self.config.spinner;
-
-                if !$row.is_empty() {
-                    let markers = [
-                        (&self.config.spinner_prefix, &self.config.spinner),
-                        (&self.config.slow_spinner_prefix, &self.config.slow_spinner),
-                    ];
-                    'find: for (i, col_text) in $row.iter().enumerate() {
-                        let text_content = extract_col0_name(col_text);
-                        for (marker, name) in markers {
-                            if !marker.is_empty() && text_content.contains(marker.as_str()) {
-                                is_spinner = true;
-                                spinner_col_idx = i;
-                                spinner_marker = marker;
-                                spinner_name = name;
-                                break 'find;
-                            }
-                        }
-                    }
-                }
-
-                if !$row.is_empty() {
-                    icon_name = $columns[0].raw($item).into_owned();
-                    if is_spinner && spinner_col_idx == 0 {
-                        icon_name = icon_name.replace(spinner_marker, "");
-                    }
-                }
-
-                if is_spinner {
-                    if self.config.spinner_inline {
-                        let frame =
-                            crate::spinner::Spinner::from_name(spinner_name).current_frame();
-                        crate::utils::text::replace_string_in_text(
-                            &mut $row[spinner_col_idx],
-                            spinner_marker,
-                            &format!("{frame}"),
-                        );
-                    } else {
-                        crate::utils::text::strip_string_from_text(
-                            &mut $row[spinner_col_idx],
-                            spinner_marker,
-                        );
-                    }
-                }
-                let is_yanked = Self::is_path_in_set(&self.yank_paths, &icon_name, &cwd);
-                let is_cut = Self::is_path_in_set(&self.cut_paths, &icon_name, &cwd);
-
-                let prefix = if is_spinner && !self.config.spinner_inline {
-                    let frame = crate::spinner::Spinner::from_name(spinner_name).current_frame();
-                    let f = format!("{frame} ");
-                    crate::utils::string::fit_width(&f, self.config.multi_prefix.width())
-                } else if $is_selected || is_yanked || is_cut {
-                    get_dynamic_multi_prefix($is_first, $is_last)
-                } else {
-                    self.default_prefix($idx)
-                };
-                (
-                    prefix,
-                    icon_name,
-                    is_spinner,
-                    spinner_col_idx,
-                    is_yanked,
-                    is_cut,
-                )
-            }};
-        }
 
         let width_limits = if as_cols {
             self.max_widths()
@@ -567,8 +579,18 @@ impl ResultsUI {
                     let is_first = rows.is_empty();
                     let is_last = (self.height <= total_height + remaining_height)
                         || (start_index as usize >= results_len);
-                    let (prefix, icon_name, is_spinner, spinner_col_idx, is_yanked, is_cut) =
-                        get_prefix!(row, is_selected, 0, item, columns, is_first, is_last);
+                    let (prefix, icon_name, is_spinner, spinner_col_idx, is_yanked, is_cut) = self
+                        .row_prefix(
+                            row,
+                            is_selected,
+                            0,
+                            *item,
+                            &columns,
+                            is_first,
+                            is_last,
+                            &cwd,
+                            &get_dynamic_multi_prefix,
+                        );
                     let nav_bar_span =
                         get_nav_bar_span(is_first, is_last, is_current_row, is_yanked, is_cut);
                     let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name, &cwd);
@@ -789,8 +811,18 @@ impl ResultsUI {
             let is_first = rows.is_empty();
             let is_last = (self.height <= total_height + remaining_height)
                 || (start_index as usize >= results_len);
-            let (prefix, icon_name, is_spinner, spinner_col_idx, is_yanked, is_cut) =
-                get_prefix!(row, is_selected, 0, item, columns, is_first, is_last);
+            let (prefix, icon_name, is_spinner, spinner_col_idx, is_yanked, is_cut) = self
+                .row_prefix(
+                    row,
+                    is_selected,
+                    0,
+                    *item,
+                    &columns,
+                    is_first,
+                    is_last,
+                    &cwd,
+                    &get_dynamic_multi_prefix,
+                );
             let nav_bar_span =
                 get_nav_bar_span(is_first, is_last, is_current_row, is_yanked, is_cut);
             let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name, &cwd);
@@ -1097,8 +1129,18 @@ impl ResultsUI {
             };
             let is_last = is_last_in_results || (remaining_height <= h);
             let is_current_row = self.is_current(i);
-            let (prefix, icon_name_hz, is_spinner, spinner_col_idx, is_yanked, is_cut) =
-                get_prefix!(row, is_selected, i, item, columns, is_first, is_last);
+            let (prefix, icon_name_hz, is_spinner, spinner_col_idx, is_yanked, is_cut) = self
+                .row_prefix(
+                    &mut row,
+                    is_selected,
+                    i,
+                    item,
+                    &columns,
+                    is_first,
+                    is_last,
+                    &cwd,
+                    &get_dynamic_multi_prefix,
+                );
             let nav_bar_span =
                 get_nav_bar_span(is_first, is_last, is_current_row, is_yanked, is_cut);
             let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name_hz, &cwd);
