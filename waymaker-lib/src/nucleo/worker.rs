@@ -1246,6 +1246,264 @@ pub enum GroupHeader {
 pub type WorkerResults<'a, T> = Vec<(Option<GroupHeader>, Vec<Text<'a>>, &'a T)>;
 
 impl<T: SSS> Worker<T> {
+    /// The `start..end` window of the matches when they are re-sorted (sort order, frecency,
+    /// depth penalty or dirs first): sorts up to `sort_cap` matches, then returns the window
+    /// with each item's tier, and the tier of the item just before it.
+    #[allow(clippy::too_many_arguments)]
+    fn sorted_window<'s>(
+        &self,
+        snapshot: &'s nucleo::Snapshot<T>,
+        status: &Status,
+        start: u32,
+        end: u32,
+        effective_sort_order: Option<crate::action::SortOrder>,
+        effective_dir_first: bool,
+        is_query_empty: bool,
+        query_len: usize,
+    ) -> (Vec<(nucleo::Item<'s, T>, u8)>, Option<u8>) {
+        let total = status.matched_count;
+        let total_sort = if effective_sort_order.is_some() {
+            total
+        } else if self.sort_cap > 0 {
+            total.min(self.sort_cap as u32)
+        } else {
+            total
+        };
+        let mut items: Vec<_> = snapshot.matched_items(0..total_sort).enumerate().collect();
+        let penalty = if is_query_empty || self.mode_index != 0 {
+            0
+        } else {
+            self.depth_penalty
+        };
+        let frec_weight = self.frecency_weight;
+        let snapshot_ref = if self.frecency {
+            self.frecency_snapshot.as_ref()
+        } else {
+            None
+        };
+        let col0 = &self.columns[0];
+        let scan_end = total.min(total_sort + 5000);
+        if scan_end > total_sort {
+            for (idx, item) in snapshot.matched_items(total_sort..scan_end).enumerate() {
+                let raw_path = col0.raw(item.data);
+                let has_frecency =
+                    snapshot_ref.is_some_and(|snap| snap.has_bonus_fast(raw_path.as_ref()));
+                let is_direct = if effective_dir_first {
+                    let (tier, _) = get_item_tier_and_clean_path(raw_path.as_ref(), true);
+                    tier < 2
+                } else {
+                    false
+                };
+                if has_frecency || is_direct {
+                    items.push((total_sort as usize + idx, item));
+                }
+            }
+        }
+
+        let mut decorated: Vec<DecoratedItem<'_, T>> = items
+            .into_iter()
+            .map(|(idx, item)| {
+                let raw_path = col0.raw(item.data);
+                let score = compute_item_score(
+                    total,
+                    idx,
+                    raw_path.as_ref(),
+                    is_query_empty,
+                    query_len,
+                    snapshot_ref,
+                    frec_weight,
+                    self.location_bias,
+                    penalty,
+                );
+                let (tier, clean) =
+                    get_item_tier_and_clean_path(raw_path.as_ref(), effective_dir_first);
+                let clean_start = clean.as_ptr() as usize - raw_path.as_ref().as_ptr() as usize;
+                let clean_range = (clean_start, clean_start + clean.len());
+                let (mtime, btime, size, ext_range) = match effective_sort_order {
+                    Some(
+                        crate::action::SortOrder::Modified
+                        | crate::action::SortOrder::ModifiedReverse,
+                    ) => {
+                        let m = std::fs::metadata(clean)
+                            .or_else(|_| std::fs::symlink_metadata(clean))
+                            .and_then(|meta| meta.modified())
+                            .ok();
+                        (m, None, None, None)
+                    }
+                    Some(
+                        crate::action::SortOrder::Created
+                        | crate::action::SortOrder::CreatedReverse,
+                    ) => {
+                        let meta = std::fs::metadata(clean)
+                            .or_else(|_| std::fs::symlink_metadata(clean))
+                            .ok();
+                        let b = meta
+                            .as_ref()
+                            .and_then(|m| m.created().ok())
+                            .or_else(|| meta.as_ref().and_then(|m| m.modified().ok()));
+                        (None, b, None, None)
+                    }
+                    Some(
+                        crate::action::SortOrder::Size | crate::action::SortOrder::SizeReverse,
+                    ) => {
+                        let s = std::fs::metadata(clean)
+                            .or_else(|_| std::fs::symlink_metadata(clean))
+                            .map(|meta| meta.len())
+                            .ok();
+                        (None, None, s, None)
+                    }
+                    Some(
+                        crate::action::SortOrder::Extension
+                        | crate::action::SortOrder::ExtensionReverse,
+                    ) => {
+                        let ext = std::path::Path::new(clean)
+                            .extension()
+                            .and_then(|e| e.to_str());
+                        let range = ext.map(|e| {
+                            let start = e.as_ptr() as usize - raw_path.as_ref().as_ptr() as usize;
+                            (start, start + e.len())
+                        });
+                        (None, None, None, range)
+                    }
+                    _ => (None, None, None, None),
+                };
+                DecoratedItem {
+                    item,
+                    tier,
+                    raw_path,
+                    clean_range,
+                    score,
+                    mtime,
+                    btime,
+                    size,
+                    ext_range,
+                }
+            })
+            .collect();
+
+        decorated.sort_unstable_by(|a, b| {
+            if let Some(sort_order) = effective_sort_order {
+                use crate::action::SortOrder;
+                if effective_dir_first && a.tier != b.tier {
+                    return a.tier.cmp(&b.tier);
+                }
+
+                let ord = match sort_order {
+                    SortOrder::Alphabetical => cmp_ascii_case_insensitive(a.clean(), b.clean())
+                        .then_with(|| a.clean().cmp(b.clean())),
+                    SortOrder::AlphabeticalReverse => {
+                        cmp_ascii_case_insensitive(b.clean(), a.clean())
+                            .then_with(|| b.clean().cmp(a.clean()))
+                    }
+                    SortOrder::Natural => crate::utils::string::natural_cmp(a.clean(), b.clean())
+                        .then_with(|| a.clean().cmp(b.clean())),
+                    SortOrder::NaturalReverse => {
+                        crate::utils::string::natural_cmp(b.clean(), a.clean())
+                            .then_with(|| b.clean().cmp(a.clean()))
+                    }
+                    SortOrder::Modified => {
+                        let a_time = a.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        let b_time = b.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        a_time
+                            .cmp(&b_time)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
+                    }
+                    SortOrder::ModifiedReverse => {
+                        let a_time = a.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        let b_time = b.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        b_time
+                            .cmp(&a_time)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
+                    }
+                    SortOrder::Created => {
+                        let a_time = a.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        let b_time = b.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        a_time
+                            .cmp(&b_time)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
+                    }
+                    SortOrder::CreatedReverse => {
+                        let a_time = a.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        let b_time = b.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        b_time
+                            .cmp(&a_time)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
+                    }
+                    SortOrder::Size => {
+                        let a_size = a.size.unwrap_or(0);
+                        let b_size = b.size.unwrap_or(0);
+                        a_size
+                            .cmp(&b_size)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
+                    }
+                    SortOrder::SizeReverse => {
+                        let a_size = a.size.unwrap_or(0);
+                        let b_size = b.size.unwrap_or(0);
+                        b_size
+                            .cmp(&a_size)
+                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean()))
+                    }
+                    SortOrder::Extension => cmp_ascii_case_insensitive(a.ext(), b.ext())
+                        .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean())),
+                    SortOrder::ExtensionReverse => cmp_ascii_case_insensitive(b.ext(), a.ext())
+                        .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean())),
+                };
+
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+                return b.score.cmp(&a.score);
+            }
+
+            if a.tier != b.tier {
+                return a.tier.cmp(&b.tier);
+            }
+
+            if is_query_empty && a.tier < 2 {
+                let cmp = cmp_ascii_case_insensitive(a.clean(), b.clean());
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
+                }
+            }
+
+            b.score
+                .cmp(&a.score)
+                .then_with(|| cmp_ascii_case_insensitive(a.clean(), b.clean()))
+        });
+
+        let range_start = start.min(total) as usize;
+        let range_end = end.min(total) as usize;
+        let prev_tier = if range_start > 0 && range_start <= decorated.len() {
+            decorated.get(range_start - 1).map(|d| d.tier)
+        } else {
+            None
+        };
+        let items: Vec<_> = if range_start < decorated.len() {
+            let take_count = range_end.saturating_sub(range_start);
+            decorated
+                .into_iter()
+                .skip(range_start)
+                .take(take_count)
+                .map(|d| (d.item, d.tier))
+                .collect()
+        } else {
+            snapshot
+                .matched_items(start.min(status.matched_count)..end.min(status.matched_count))
+                .map(|item| {
+                    let tier = if effective_dir_first {
+                        let raw_path = col0.raw(item.data);
+                        let (tier, _) = get_item_tier_and_clean_path(raw_path.as_ref(), true);
+                        tier
+                    } else {
+                        2
+                    };
+                    (item, tier)
+                })
+                .collect()
+        };
+        (items, prev_tier)
+    }
+
     /// Returns:
     /// 1. Table of (Row, item, height)
     /// 2. Final column widths
@@ -1350,250 +1608,16 @@ impl<T: SSS> Worker<T> {
                 .collect();
             (items, prev_tier)
         } else if should_sort {
-            let total = status.matched_count;
-            let total_sort = if effective_sort_order.is_some() {
-                total
-            } else if self.sort_cap > 0 {
-                total.min(self.sort_cap as u32)
-            } else {
-                total
-            };
-            let mut items: Vec<_> = snapshot.matched_items(0..total_sort).enumerate().collect();
-            let penalty = if is_query_empty || self.mode_index != 0 {
-                0
-            } else {
-                self.depth_penalty
-            };
-            let frec_weight = self.frecency_weight;
-            let snapshot_ref = if self.frecency {
-                self.frecency_snapshot.as_ref()
-            } else {
-                None
-            };
-            let col0 = &self.columns[0];
-            let scan_end = total.min(total_sort + 5000);
-            if scan_end > total_sort {
-                for (idx, item) in snapshot.matched_items(total_sort..scan_end).enumerate() {
-                    let raw_path = col0.raw(item.data);
-                    let has_frecency =
-                        snapshot_ref.is_some_and(|snap| snap.has_bonus_fast(raw_path.as_ref()));
-                    let is_direct = if effective_dir_first {
-                        let (tier, _) = get_item_tier_and_clean_path(raw_path.as_ref(), true);
-                        tier < 2
-                    } else {
-                        false
-                    };
-                    if has_frecency || is_direct {
-                        items.push((total_sort as usize + idx, item));
-                    }
-                }
-            }
-
-            let mut decorated: Vec<DecoratedItem<'_, T>> = items
-                .into_iter()
-                .map(|(idx, item)| {
-                    let raw_path = col0.raw(item.data);
-                    let score = compute_item_score(
-                        total,
-                        idx,
-                        raw_path.as_ref(),
-                        is_query_empty,
-                        query_len,
-                        snapshot_ref,
-                        frec_weight,
-                        self.location_bias,
-                        penalty,
-                    );
-                    let (tier, clean) =
-                        get_item_tier_and_clean_path(raw_path.as_ref(), effective_dir_first);
-                    let clean_start = clean.as_ptr() as usize - raw_path.as_ref().as_ptr() as usize;
-                    let clean_range = (clean_start, clean_start + clean.len());
-                    let (mtime, btime, size, ext_range) = match effective_sort_order {
-                        Some(
-                            crate::action::SortOrder::Modified
-                            | crate::action::SortOrder::ModifiedReverse,
-                        ) => {
-                            let m = std::fs::metadata(clean)
-                                .or_else(|_| std::fs::symlink_metadata(clean))
-                                .and_then(|meta| meta.modified())
-                                .ok();
-                            (m, None, None, None)
-                        }
-                        Some(
-                            crate::action::SortOrder::Created
-                            | crate::action::SortOrder::CreatedReverse,
-                        ) => {
-                            let meta = std::fs::metadata(clean)
-                                .or_else(|_| std::fs::symlink_metadata(clean))
-                                .ok();
-                            let b = meta
-                                .as_ref()
-                                .and_then(|m| m.created().ok())
-                                .or_else(|| meta.as_ref().and_then(|m| m.modified().ok()));
-                            (None, b, None, None)
-                        }
-                        Some(
-                            crate::action::SortOrder::Size | crate::action::SortOrder::SizeReverse,
-                        ) => {
-                            let s = std::fs::metadata(clean)
-                                .or_else(|_| std::fs::symlink_metadata(clean))
-                                .map(|meta| meta.len())
-                                .ok();
-                            (None, None, s, None)
-                        }
-                        Some(
-                            crate::action::SortOrder::Extension
-                            | crate::action::SortOrder::ExtensionReverse,
-                        ) => {
-                            let ext = std::path::Path::new(clean)
-                                .extension()
-                                .and_then(|e| e.to_str());
-                            let range = ext.map(|e| {
-                                let start =
-                                    e.as_ptr() as usize - raw_path.as_ref().as_ptr() as usize;
-                                (start, start + e.len())
-                            });
-                            (None, None, None, range)
-                        }
-                        _ => (None, None, None, None),
-                    };
-                    DecoratedItem {
-                        item,
-                        tier,
-                        raw_path,
-                        clean_range,
-                        score,
-                        mtime,
-                        btime,
-                        size,
-                        ext_range,
-                    }
-                })
-                .collect();
-
-            decorated.sort_unstable_by(|a, b| {
-                if let Some(sort_order) = effective_sort_order {
-                    use crate::action::SortOrder;
-                    if effective_dir_first && a.tier != b.tier {
-                        return a.tier.cmp(&b.tier);
-                    }
-
-                    let ord = match sort_order {
-                        SortOrder::Alphabetical => cmp_ascii_case_insensitive(a.clean(), b.clean())
-                            .then_with(|| a.clean().cmp(b.clean())),
-                        SortOrder::AlphabeticalReverse => {
-                            cmp_ascii_case_insensitive(b.clean(), a.clean())
-                                .then_with(|| b.clean().cmp(a.clean()))
-                        }
-                        SortOrder::Natural => {
-                            crate::utils::string::natural_cmp(a.clean(), b.clean())
-                                .then_with(|| a.clean().cmp(b.clean()))
-                        }
-                        SortOrder::NaturalReverse => {
-                            crate::utils::string::natural_cmp(b.clean(), a.clean())
-                                .then_with(|| b.clean().cmp(a.clean()))
-                        }
-                        SortOrder::Modified => {
-                            let a_time = a.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                            let b_time = b.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                            a_time.cmp(&b_time).then_with(|| {
-                                crate::utils::string::natural_cmp(a.clean(), b.clean())
-                            })
-                        }
-                        SortOrder::ModifiedReverse => {
-                            let a_time = a.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                            let b_time = b.mtime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                            b_time.cmp(&a_time).then_with(|| {
-                                crate::utils::string::natural_cmp(a.clean(), b.clean())
-                            })
-                        }
-                        SortOrder::Created => {
-                            let a_time = a.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                            let b_time = b.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                            a_time.cmp(&b_time).then_with(|| {
-                                crate::utils::string::natural_cmp(a.clean(), b.clean())
-                            })
-                        }
-                        SortOrder::CreatedReverse => {
-                            let a_time = a.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                            let b_time = b.btime.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                            b_time.cmp(&a_time).then_with(|| {
-                                crate::utils::string::natural_cmp(a.clean(), b.clean())
-                            })
-                        }
-                        SortOrder::Size => {
-                            let a_size = a.size.unwrap_or(0);
-                            let b_size = b.size.unwrap_or(0);
-                            a_size.cmp(&b_size).then_with(|| {
-                                crate::utils::string::natural_cmp(a.clean(), b.clean())
-                            })
-                        }
-                        SortOrder::SizeReverse => {
-                            let a_size = a.size.unwrap_or(0);
-                            let b_size = b.size.unwrap_or(0);
-                            b_size.cmp(&a_size).then_with(|| {
-                                crate::utils::string::natural_cmp(a.clean(), b.clean())
-                            })
-                        }
-                        SortOrder::Extension => cmp_ascii_case_insensitive(a.ext(), b.ext())
-                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean())),
-                        SortOrder::ExtensionReverse => cmp_ascii_case_insensitive(b.ext(), a.ext())
-                            .then_with(|| crate::utils::string::natural_cmp(a.clean(), b.clean())),
-                    };
-
-                    if ord != std::cmp::Ordering::Equal {
-                        return ord;
-                    }
-                    return b.score.cmp(&a.score);
-                }
-
-                if a.tier != b.tier {
-                    return a.tier.cmp(&b.tier);
-                }
-
-                if is_query_empty && a.tier < 2 {
-                    let cmp = cmp_ascii_case_insensitive(a.clean(), b.clean());
-                    if cmp != std::cmp::Ordering::Equal {
-                        return cmp;
-                    }
-                }
-
-                b.score
-                    .cmp(&a.score)
-                    .then_with(|| cmp_ascii_case_insensitive(a.clean(), b.clean()))
-            });
-
-            let range_start = start.min(total) as usize;
-            let range_end = end.min(total) as usize;
-            let prev_tier = if range_start > 0 && range_start <= decorated.len() {
-                decorated.get(range_start - 1).map(|d| d.tier)
-            } else {
-                None
-            };
-            let items: Vec<_> = if range_start < decorated.len() {
-                let take_count = range_end.saturating_sub(range_start);
-                decorated
-                    .into_iter()
-                    .skip(range_start)
-                    .take(take_count)
-                    .map(|d| (d.item, d.tier))
-                    .collect()
-            } else {
-                snapshot
-                    .matched_items(start.min(status.matched_count)..end.min(status.matched_count))
-                    .map(|item| {
-                        let tier = if effective_dir_first {
-                            let raw_path = col0.raw(item.data);
-                            let (tier, _) = get_item_tier_and_clean_path(raw_path.as_ref(), true);
-                            tier
-                        } else {
-                            2
-                        };
-                        (item, tier)
-                    })
-                    .collect()
-            };
-            (items, prev_tier)
+            self.sorted_window(
+                snapshot,
+                &status,
+                start,
+                end,
+                effective_sort_order,
+                effective_dir_first,
+                is_query_empty,
+                query_len,
+            )
         } else if is_query_empty && self.mode_index != 0 {
             let items: Vec<_> = (start.min(status.matched_count)..end.min(status.matched_count))
                 .filter_map(|idx| snapshot.get_item(idx).map(|item| (item, 2u8)))
