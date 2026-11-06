@@ -945,6 +945,7 @@ impl Previewer {
                         }
 
                         leftover.extend_from_slice(&buf[..n]);
+                        clean_invalid_utf8_lines(&mut leftover, try_lossy, false);
 
                         let valid_up_to = match std::str::from_utf8(&leftover) {
                             Ok(_) => leftover.len(),
@@ -1063,6 +1064,7 @@ impl Previewer {
                         return true;
                     }
 
+                    clean_invalid_utf8_lines(&mut leftover, try_lossy, true);
                     if !leftover.is_empty() {
                         match leftover.into_text() {
                             Ok(text) => {
@@ -1585,5 +1587,63 @@ mod tests {
             !lines.is_empty(),
             "Lines should be populated with 'hello world'"
         );
+    }
+}
+
+/// Cleans invalid UTF-8 out of the complete lines of `buf` (all of it at `eof`), so the
+/// decoder never waits on bytes that can never become valid: each invalid sequence becomes
+/// U+FFFD with `lossy`, and is dropped otherwise. Bytes after the last newline are left alone
+/// until `eof`, since a character there may be cut by the read and complete in the next one.
+fn clean_invalid_utf8_lines(buf: &mut Vec<u8>, lossy: bool, eof: bool) {
+    if std::str::from_utf8(buf).is_ok() {
+        return;
+    }
+    let end = if eof {
+        buf.len()
+    } else {
+        match buf.iter().rposition(|&b| b == b'\n') {
+            Some(nl) => nl + 1,
+            None => return,
+        }
+    };
+    if std::str::from_utf8(&buf[..end]).is_ok() {
+        return;
+    }
+    let mut clean = Vec::with_capacity(buf.len());
+    for chunk in buf[..end].utf8_chunks() {
+        clean.extend_from_slice(chunk.valid().as_bytes());
+        if lossy && !chunk.invalid().is_empty() {
+            clean.extend_from_slice("\u{FFFD}".as_bytes());
+        }
+    }
+    clean.extend_from_slice(&buf[end..]);
+    *buf = clean;
+}
+
+#[cfg(test)]
+mod clean_utf8_tests {
+    use super::clean_invalid_utf8_lines;
+
+    #[test]
+    fn complete_lines_are_cleaned_and_a_cut_tail_is_kept() {
+        let mut lossy = b"ok\nbad \xff byte\n\xe2\x82".to_vec(); // ends in a cut euro sign
+        clean_invalid_utf8_lines(&mut lossy, true, false);
+        assert_eq!(
+            lossy,
+            "ok\nbad \u{FFFD} byte\n"
+                .bytes()
+                .chain([0xe2, 0x82])
+                .collect::<Vec<_>>()
+        );
+
+        let mut strict = b"bad \xff byte\n".to_vec();
+        clean_invalid_utf8_lines(&mut strict, false, false);
+        assert_eq!(strict, b"bad  byte\n");
+
+        let mut no_newline = b"bad \xff".to_vec(); // may still be mid-line: wait
+        clean_invalid_utf8_lines(&mut no_newline, true, false);
+        assert_eq!(no_newline, b"bad \xff");
+        clean_invalid_utf8_lines(&mut no_newline, true, true); // at EOF: clean
+        assert_eq!(no_newline, "bad \u{FFFD}".as_bytes());
     }
 }

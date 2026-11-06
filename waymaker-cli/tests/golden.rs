@@ -1334,11 +1334,9 @@ fn golden_preview_cmd_last_line_without_newline() {
     insta::assert_snapshot!(wm.styled_screen());
 }
 
-/// BUG: with `previewer.try_lossy` a line with invalid UTF-8 should show with U+FFFD; it shows
-/// as an empty line (the bytes wait in the decoder's leftover until EOF, where the ANSI parser
-/// turns them into nothing instead of failing, so the lossy path never runs).
+/// With `previewer.try_lossy` a line with invalid UTF-8 shows U+FFFD in place of the bad bytes
+/// (it used to show as an empty line).
 #[test]
-#[ignore = "known bug: try_lossy never applies to invalid UTF-8 in a command preview"]
 fn preview_cmd_invalid_utf8_lossy_shows_replacement_char() {
     let wm = cmd_preview(
         &[
@@ -1348,18 +1346,21 @@ fn preview_cmd_invalid_utf8_lossy_shows_replacement_char() {
         ],
         "after",
     );
-    wm.wait_for_screen(|s| s.contains("bad \u{fffd} byte"));
+    wm.wait_for_screen(|s| s.contains("bad") && s.contains("byte"));
+    // The vt100 parser shows U+FFFD as a blank cell, so look for it in what wm wrote.
+    assert!(wm.screen_text().contains('\u{fffd}'));
 }
 
-/// BUG: one invalid byte stalls a streaming preview: each read cuts the valid text at the bad
-/// byte, so nothing after it is shown until the command exits.
+/// One invalid byte used to stall a streaming preview until the command exited (each read cut
+/// the valid text at the bad byte); without try_lossy the bad bytes are now dropped.
 #[test]
-#[ignore = "known bug: an invalid UTF-8 byte stalls a streaming preview until EOF"]
 fn preview_cmd_invalid_utf8_does_not_stall_streaming() {
     let wm = cmd_preview(
         &[
             "p.l",
             "x=sh -c \"printf 'bad \\377 byte\\n'; echo streamed after; sleep 30\"",
+            // see preview_cmd_streams_before_exit_with_delay_clear
+            "previewer.delay_clear=false",
         ],
         "3/3",
     );
@@ -1394,4 +1395,14 @@ fn preview_cmd_shows_the_current_item_after_fast_moves() {
         !screen.contains("preview of alpha") && !screen.contains("preview of beta"),
         "{screen}"
     );
+}
+
+/// BUG/design: with `previewer.delay_clear` (the default) a preview command's output is staged
+/// until it has 500 lines or exits, so a slow or streaming command (`tail -f`, a long build)
+/// shows nothing at all while it runs.
+#[test]
+#[ignore = "known issue: delay_clear hides a running preview's output until 500 lines or exit"]
+fn preview_cmd_streams_before_exit_with_delay_clear() {
+    let wm = cmd_preview(&["p.l", "x=sh -c \"echo streamed hello; sleep 30\""], "3/3");
+    wm.wait_for_screen(|s| s.contains("streamed hello"));
 }
