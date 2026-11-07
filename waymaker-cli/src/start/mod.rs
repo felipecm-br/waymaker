@@ -607,20 +607,33 @@ fn define_used_builtin_aliases(binds: &mut BindMap<MMAction>) {
 }
 
 pub static COMMAND_ARGS: Mutex<Vec<std::ffi::OsString>> = Mutex::new(Vec::new());
-/// Item to place the cursor on after the next sync. Seeded once from an
-/// inherited `WM_TARGET_ITEM` (or legacy `MM_TARGET_ITEM`); after that it lives
-/// only here, since mutating the process environment races with other threads.
-pub static TARGET_ITEM: std::sync::LazyLock<Mutex<Option<String>>> =
-    std::sync::LazyLock::new(|| {
-        Mutex::new(
-            std::env::var("WM_TARGET_ITEM")
+/// Where the cursor goes after a directory change or reload. One per picker, shared by the
+/// `ChDir`, `Reload` and `Synced` handlers and the fm actions.
+#[derive(Debug, Default)]
+pub struct NavMemory {
+    /// Item to place the cursor on after the next sync. Seeded from an inherited
+    /// `WM_TARGET_ITEM` (or legacy `MM_TARGET_ITEM`); after that it lives only here, since
+    /// mutating the process environment races with other threads.
+    pub target_item: Option<String>,
+    /// The item, index and directory under the cursor when the last reload started.
+    pub prev_reload_item: Option<(Option<String>, u32, std::path::PathBuf)>,
+    /// Set by `ChDir`: the next reload starts at the top instead of restoring
+    /// `prev_reload_item`.
+    pub chdir_new_dir: bool,
+}
+
+pub type SharedNav = Arc<Mutex<NavMemory>>;
+
+impl NavMemory {
+    pub fn shared_from_env() -> SharedNav {
+        Arc::new(Mutex::new(Self {
+            target_item: std::env::var("WM_TARGET_ITEM")
                 .or_else(|_| std::env::var("MM_TARGET_ITEM"))
                 .ok(),
-        )
-    });
-pub static PREV_RELOAD_ITEM: Mutex<Option<(Option<String>, u32, std::path::PathBuf)>> =
-    Mutex::new(None);
-pub static CHDIR_NEW_DIR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+            ..Self::default()
+        }))
+    }
+}
 
 pub fn process_envs(mut envs: HashMap<String, EnvValue>) -> HashMap<String, String> {
     let mut processed_envs = HashMap::new();
@@ -928,6 +941,7 @@ pub async fn start(
     // Speculative directory cache & background scanning
     let speculative_cache: Arc<Mutex<HashMap<std::path::PathBuf, Vec<String>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let nav = NavMemory::shared_from_env();
 
     mm.register_interrupt_handler(
         Interrupt::ChDir,
@@ -935,12 +949,13 @@ pub async fn start(
             cli_formatter.clone(),
             speculative_cache.clone(),
             render_tx.clone(),
+            nav.clone(),
         ),
     );
 
     mm.register_event_handler(
         Event::Synced | Event::Resynced,
-        synced_handler(render_tx.clone()),
+        synced_handler(render_tx.clone(), nav.clone()),
     );
 
     let reload_rules_spec = all_rules.clone();
@@ -973,6 +988,7 @@ pub async fn start(
             group_prefix,
             separator,
             input_separator,
+            nav: nav.clone(),
         }),
     );
 
@@ -992,6 +1008,7 @@ pub async fn start(
         fm_action: None,
         mode_history: std::collections::HashMap::new(),
         last_cwd: std::env::current_dir().ok(),
+        nav,
     };
 
     options = options

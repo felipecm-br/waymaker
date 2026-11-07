@@ -161,6 +161,8 @@ pub struct ActionContext {
     pub fm_action: Option<FmActionMode>,
     pub mode_history: std::collections::HashMap<usize, ModeHistory>,
     pub last_cwd: Option<std::path::PathBuf>,
+    /// Cursor memory across directory changes and reloads, shared with the start handlers.
+    pub nav: crate::start::SharedNav,
 }
 
 pub fn action_handler(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
@@ -704,8 +706,8 @@ mod tests {
     use super::*;
     use waymaker::Action;
 
-    /// Serializes tests that touch process-wide state: `start::TARGET_ITEM`, the
-    /// current directory (chdir actions) and env vars. Run in parallel they
+    /// Serializes tests that touch process-wide state: the current directory
+    /// (chdir actions) and env vars. Run in parallel they
     /// overwrite each other's values.
     static GLOBAL_STATE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
@@ -821,6 +823,7 @@ mod tests {
             fm_action: None,
             mode_history: std::collections::HashMap::new(),
             last_cwd: std::env::current_dir().ok(),
+            nav: Default::default(),
         };
 
         let mut mm_state = state.dispatcher(
@@ -971,6 +974,7 @@ mod tests {
             fm_action: None,
             mode_history: std::collections::HashMap::new(),
             last_cwd: std::env::current_dir().ok(),
+            nav: Default::default(),
         };
 
         let mut mm_state = state.dispatcher(
@@ -1089,6 +1093,7 @@ mod tests {
             fm_action: None,
             mode_history: std::collections::HashMap::new(),
             last_cwd: Some(temp_dir.clone()),
+            nav: Default::default(),
         };
 
         let mut mm_state = state_obj.dispatcher(
@@ -1271,6 +1276,7 @@ mod tests {
             fm_action: None,
             mode_history: std::collections::HashMap::new(),
             last_cwd: Some(temp_dir.clone()),
+            nav: Default::default(),
         };
 
         let mut mm_state = state_obj.dispatcher(
@@ -1414,6 +1420,7 @@ mod tests {
             fm_action: None,
             mode_history: std::collections::HashMap::new(),
             last_cwd: Some(cwd.clone()),
+            nav: Default::default(),
         };
 
         let mut mm_state = state_obj.dispatcher(
@@ -1472,11 +1479,11 @@ mod tests {
             "FmPasteInto must send Action::ChDir to dest_folder"
         );
 
-        // Check that TARGET_ITEM was set to the pasted file name
+        // Check that the nav target item was set to the pasted file name
         assert_eq!(
-            crate::start::TARGET_ITEM.lock().unwrap().as_deref(),
+            action_context.nav.lock().unwrap().target_item.as_deref(),
             Some("payload.txt"),
-            "TARGET_ITEM should highlight pasted item inside dest_folder"
+            "target_item should highlight pasted item inside dest_folder"
         );
 
         // 2. Execute FmUndo
@@ -1508,11 +1515,11 @@ mod tests {
             "FmUndo must send Action::ChDir to previous_dir"
         );
 
-        // Check that TARGET_ITEM was set to dest_folder name so it is selected back in previous_dir
+        // Check that the nav target item was set to dest_folder name so it is selected back in previous_dir
         assert_eq!(
-            crate::start::TARGET_ITEM.lock().unwrap().as_deref(),
+            action_context.nav.lock().unwrap().target_item.as_deref(),
             Some("target_subfolder"),
-            "TARGET_ITEM should highlight target_subfolder when returning to parent on undo"
+            "target_item should highlight target_subfolder when returning to parent on undo"
         );
 
         // 3. Execute FmRedo
@@ -1544,9 +1551,9 @@ mod tests {
         );
 
         assert_eq!(
-            crate::start::TARGET_ITEM.lock().unwrap().as_deref(),
+            action_context.nav.lock().unwrap().target_item.as_deref(),
             Some("payload.txt"),
-            "TARGET_ITEM should highlight pasted item inside dest_folder on redo"
+            "target_item should highlight pasted item inside dest_folder on redo"
         );
 
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -1635,6 +1642,7 @@ mod tests {
             fm_action: None,
             mode_history: std::collections::HashMap::new(),
             last_cwd: Some(cwd.clone()),
+            nav: Default::default(),
         };
 
         let mut mm_state = state_obj.dispatcher(
@@ -1669,9 +1677,9 @@ mod tests {
             "FmPasteInto must send Action::ChDir to dest_folder"
         );
         assert_eq!(
-            crate::start::TARGET_ITEM.lock().unwrap().as_deref(),
+            action_context.nav.lock().unwrap().target_item.as_deref(),
             Some("cut_payload.txt"),
-            "TARGET_ITEM should highlight moved item inside dest_folder"
+            "target_item should highlight moved item inside dest_folder"
         );
 
         // 2. Execute FmUndo
@@ -1698,9 +1706,9 @@ mod tests {
             "FmUndo must send Action::ChDir to previous_dir"
         );
         assert_eq!(
-            crate::start::TARGET_ITEM.lock().unwrap().as_deref(),
+            action_context.nav.lock().unwrap().target_item.as_deref(),
             Some("cut_target_subfolder"),
-            "TARGET_ITEM should highlight cut_target_subfolder when returning to parent on undo"
+            "target_item should highlight cut_target_subfolder when returning to parent on undo"
         );
 
         // 3. Execute FmRedo
@@ -1727,9 +1735,9 @@ mod tests {
             "FmRedo must send Action::ChDir to dest_folder"
         );
         assert_eq!(
-            crate::start::TARGET_ITEM.lock().unwrap().as_deref(),
+            action_context.nav.lock().unwrap().target_item.as_deref(),
             Some("cut_payload.txt"),
-            "TARGET_ITEM should highlight moved item inside dest_folder on redo"
+            "target_item should highlight moved item inside dest_folder on redo"
         );
 
         let _ = std::fs::remove_dir_all(&temp_dir);

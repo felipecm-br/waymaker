@@ -18,6 +18,7 @@ pub(super) fn chdir_handler(
     formatter: CliFormatter,
     spec_cache: SpecCache,
     render_tx: RenderSender<MMAction>,
+    nav: super::SharedNav,
 ) -> impl FnMut(&mut CliState<'_, '_>) + 'static {
     let mut history: std::collections::HashMap<std::path::PathBuf, String> =
         std::collections::HashMap::new();
@@ -57,7 +58,7 @@ pub(super) fn chdir_handler(
             target_path.to_path_buf()
         };
 
-        let mut target_to_select = TARGET_ITEM.lock().unwrap().clone();
+        let mut target_to_select = nav.lock().unwrap().target_item.clone();
         if target_to_select.is_none() {
             if target_path == Path::new("..") || path == ".." {
                 if let Ok(cwd) = std::env::current_dir()
@@ -103,15 +104,15 @@ pub(super) fn chdir_handler(
         if let Err(e) = std::env::set_current_dir(&target_dir) {
             log::warn!("ChDir({}) failed: {e}", target_dir.display());
         } else {
-            CHDIR_NEW_DIR.store(true, std::sync::atomic::Ordering::SeqCst);
+            nav.lock().unwrap().chdir_new_dir = true;
             if let Some(t) = target_to_select {
-                *TARGET_ITEM.lock().unwrap() = Some(t.clone());
+                nav.lock().unwrap().target_item = Some(t.clone());
             } else {
-                TARGET_ITEM.lock().unwrap().take();
+                nav.lock().unwrap().target_item = None;
                 // Entering a child directory (or new directory with no specific target):
                 // Reset cursor to 0 and clear any previous reload item.
                 state.picker_ui.results.cursor_jump(0);
-                *PREV_RELOAD_ITEM.lock().unwrap() = None;
+                nav.lock().unwrap().prev_reload_item = None;
             }
 
             if let Ok(new_cwd) = std::env::current_dir() {
@@ -147,14 +148,15 @@ pub(super) fn chdir_handler(
     }
 }
 
-/// `Synced`/`Resynced`: once the matcher has the item named by `TARGET_ITEM` (the directory just
+/// `Synced`/`Resynced`: once the matcher has the item named by `NavMemory::target_item` (the directory just
 /// left, or a reload's previous item), moves the cursor to it; gives up and goes to the top when
 /// the input has finished without it.
 pub(super) fn synced_handler(
     render_tx: RenderSender<MMAction>,
+    nav: super::SharedNav,
 ) -> impl Fn(&mut CliState<'_, '_>, &Event) + 'static {
     move |state, _| {
-        let target_opt = TARGET_ITEM.lock().unwrap().clone();
+        let target_opt = nav.lock().unwrap().target_item.clone();
 
         if let Some(target) = target_opt {
             let count = state.picker_ui.worker.counts().0;
@@ -173,9 +175,9 @@ pub(super) fn synced_handler(
                     waymaker::action::Action::Pos(i as i32),
                 ));
                 state.needs_redraw = true;
-                TARGET_ITEM.lock().unwrap().take();
+                nav.lock().unwrap().target_item = None;
             } else if !state.picker_ui.results.status.running {
-                TARGET_ITEM.lock().unwrap().take();
+                nav.lock().unwrap().target_item = None;
                 state.picker_ui.results.cursor_jump(0);
                 let _ = render_tx.send(waymaker::message::RenderCommand::Action(
                     waymaker::action::Action::Pos(0),
@@ -306,6 +308,7 @@ pub(super) struct ReloadDeps<F> {
     pub group_prefix: Option<String>,
     pub separator: Option<char>,
     pub input_separator: Option<char>,
+    pub nav: super::SharedNav,
 }
 
 /// `Reload`: restarts the item list for the current directory and mode (start command, the
@@ -325,12 +328,13 @@ where
         group_prefix,
         separator,
         input_separator,
+        nav,
     } = deps;
     move |state| {
         let current_dir = std::env::current_dir().unwrap_or_default();
-        let just_chdir = CHDIR_NEW_DIR.swap(false, std::sync::atomic::Ordering::SeqCst);
+        let just_chdir = std::mem::take(&mut nav.lock().unwrap().chdir_new_dir);
         if just_chdir {
-            *crate::start::PREV_RELOAD_ITEM.lock().unwrap() = None;
+            nav.lock().unwrap().prev_reload_item = None;
             state.picker_ui.results.cursor_jump(0);
         } else {
             let prev_idx = state.picker_ui.results.current_index();
@@ -339,8 +343,7 @@ where
                 .worker
                 .get_nth(prev_idx)
                 .map(|raw| state.picker_ui.worker.columns[0].raw(raw).to_string());
-            *crate::start::PREV_RELOAD_ITEM.lock().unwrap() =
-                Some((prev_item, prev_idx, current_dir.clone()));
+            nav.lock().unwrap().prev_reload_item = Some((prev_item, prev_idx, current_dir.clone()));
         }
 
         let cmd = if !state.payload().is_empty() {

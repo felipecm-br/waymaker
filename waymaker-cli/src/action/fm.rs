@@ -8,6 +8,7 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
         undo_stack,
         redo_stack,
         fm_action,
+        nav,
         ..
     } = ctx;
     match a {
@@ -192,9 +193,9 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
         }
         MMAction::FmCut => fm_cut(state, render_tx, clipboard, fm_notify),
         MMAction::FmPaste => fm_paste(state, render_tx, clipboard, fm_notify, undo_stack),
-        MMAction::FmPasteInto => fm_paste_into(state, render_tx, clipboard, undo_stack),
-        MMAction::FmUndo => fm_undo(state, render_tx, clipboard, undo_stack, redo_stack),
-        MMAction::FmRedo => fm_redo(state, render_tx, clipboard, undo_stack, redo_stack),
+        MMAction::FmPasteInto => fm_paste_into(state, render_tx, clipboard, undo_stack, nav),
+        MMAction::FmUndo => fm_undo(state, render_tx, clipboard, undo_stack, redo_stack, nav),
+        MMAction::FmRedo => fm_redo(state, render_tx, clipboard, undo_stack, redo_stack, nav),
         MMAction::FmDragDrop => {
             let paths = fm_current_items(state);
             if !paths.is_empty() {
@@ -540,6 +541,7 @@ fn fm_redo(
     clipboard: &mut crate::fm::Clipboard,
     undo_stack: &mut crate::fm::UndoStack,
     redo_stack: &mut crate::fm::UndoStack,
+    nav: &crate::start::SharedNav,
 ) {
     let action = redo_stack.lock().ok().and_then(|mut s| s.pop());
     if let Some(action) = action {
@@ -569,7 +571,7 @@ fn fm_redo(
                     && let Some(item_name) = dest.file_name()
                 {
                     let name = item_name.to_string_lossy().to_string();
-                    *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
+                    nav.lock().unwrap().target_item = Some(name.clone());
                 }
                 let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
                     target.to_string_lossy().to_string(),
@@ -606,6 +608,7 @@ fn fm_undo(
     clipboard: &mut crate::fm::Clipboard,
     undo_stack: &mut crate::fm::UndoStack,
     redo_stack: &mut crate::fm::UndoStack,
+    nav: &crate::start::SharedNav,
 ) {
     let action = undo_stack.lock().ok().and_then(|mut s| s.pop());
     if let Some(action) = action {
@@ -640,7 +643,7 @@ fn fm_undo(
                     && let Some(target_name) = target.file_name()
                 {
                     let name = target_name.to_string_lossy().to_string();
-                    *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
+                    nav.lock().unwrap().target_item = Some(name.clone());
                 }
                 let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
                     prev.to_string_lossy().to_string(),
@@ -690,6 +693,7 @@ fn fm_paste_into(
     render_tx: &mut waymaker::event::RenderSender<MMAction>,
     clipboard: &mut crate::fm::Clipboard,
     undo_stack: &mut crate::fm::UndoStack,
+    nav: &crate::start::SharedNav,
 ) {
     let clip = clipboard.lock().ok().and_then(|g| g.clone());
     if let Some(clip) = clip {
@@ -810,7 +814,7 @@ fn fm_paste_into(
                 && let Some(item_name) = dest.file_name()
             {
                 let name = item_name.to_string_lossy().to_string();
-                *crate::start::TARGET_ITEM.lock().unwrap() = Some(name.clone());
+                nav.lock().unwrap().target_item = Some(name.clone());
             }
             let _ = render_tx.send(RenderCommand::Action(Action::ChDir(
                 dest_dir.to_string_lossy().to_string(),

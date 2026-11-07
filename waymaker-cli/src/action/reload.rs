@@ -5,6 +5,7 @@ pub(super) fn handle_reload(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut 
         render_tx,
         additional_commands,
         mode_history,
+        nav,
         ..
     } = ctx;
     match a {
@@ -61,11 +62,11 @@ pub(super) fn handle_reload(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut 
                         .query
                         .set(Some(saved.query.clone()), saved.query_cursor as u16);
                     if let Some(ref target) = saved.focused_item {
-                        *crate::start::TARGET_ITEM.lock().unwrap() = Some(target.clone());
+                        nav.lock().unwrap().target_item = Some(target.clone());
                     }
                 } else {
                     state.picker_ui.query.set(Some(String::new()), 0);
-                    *crate::start::TARGET_ITEM.lock().unwrap() = None;
+                    nav.lock().unwrap().target_item = None;
                 }
                 state.picker_ui.update();
             }
@@ -110,7 +111,7 @@ pub(super) fn handle_reload(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut 
                 .get(&index)
                 .and_then(|s| s.focused_item.as_ref())
                 .is_some()
-                || crate::start::TARGET_ITEM.lock().unwrap().is_some();
+                || nav.lock().unwrap().target_item.is_some();
             if !has_target
                 && let Some(pos) = mode_history.get(&index).map(|s| s.results_index)
                 && pos > 0
@@ -156,11 +157,11 @@ pub(super) fn handle_reload(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut 
                         .query
                         .set(Some(saved.query.clone()), saved.query_cursor as u16);
                     if let Some(ref target) = saved.focused_item {
-                        *crate::start::TARGET_ITEM.lock().unwrap() = Some(target.clone());
+                        nav.lock().unwrap().target_item = Some(target.clone());
                     }
                 } else {
                     state.picker_ui.query.set(Some(String::new()), 0);
-                    *crate::start::TARGET_ITEM.lock().unwrap() = None;
+                    nav.lock().unwrap().target_item = None;
                 }
                 state.picker_ui.update();
             }
@@ -207,7 +208,7 @@ pub(super) fn handle_reload(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut 
                 .get(&index)
                 .and_then(|s| s.focused_item.as_ref())
                 .is_some()
-                || crate::start::TARGET_ITEM.lock().unwrap().is_some();
+                || nav.lock().unwrap().target_item.is_some();
             if !has_target
                 && let Some(pos) = mode_history.get(&index).map(|s| s.results_index)
                 && pos > 0
@@ -228,7 +229,7 @@ pub(super) fn handle_reload(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut 
                 state.picker_ui.update();
             }
 
-            let target_opt = crate::start::TARGET_ITEM.lock().unwrap().clone();
+            let target_opt = nav.lock().unwrap().target_item.clone();
 
             let mut target_found = false;
 
@@ -242,15 +243,14 @@ pub(super) fn handle_reload(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut 
                 if let Some(i) = found_idx {
                     state.picker_ui.results.cursor_jump(i as u32);
                     target_found = true;
-                    crate::start::TARGET_ITEM.lock().unwrap().take();
+                    nav.lock().unwrap().target_item = None;
                 }
             }
 
             if !target_found && target_opt.is_none() {
                 let mut restored = false;
-                if let Some((prev_item, prev_idx, prev_dir)) =
-                    crate::start::PREV_RELOAD_ITEM.lock().unwrap().take()
-                {
+                let prev_reload_item = nav.lock().unwrap().prev_reload_item.take();
+                if let Some((prev_item, prev_idx, prev_dir)) = prev_reload_item {
                     let current_dir = std::env::current_dir().unwrap_or_default();
                     if prev_dir == current_dir {
                         let count = state.picker_ui.worker.counts().0;
