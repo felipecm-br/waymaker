@@ -198,6 +198,25 @@ mod tests {
     }
 
     #[test]
+    fn effective_preview_binds_layer_the_users_spelling_over_the_default() {
+        let nav = crate::config::NavConfig {
+            preview_binds: HashMap::from([("Down".to_string(), Actions::from([Action::Pos(9)]))]),
+            ..Default::default()
+        };
+        let binds = nav.effective_preview_binds();
+        assert_eq!(binds.get("Down"), Some(&Actions::from([Action::Pos(9)])));
+        assert!(!binds.contains_key("down"), "{:?}", binds.keys());
+        assert_eq!(
+            binds.get("j"),
+            Some(&Actions::from([Action::PreviewDown(3)]))
+        );
+        assert_eq!(
+            binds.len(),
+            crate::config::NavConfig::default_preview_binds().len()
+        );
+    }
+
+    #[test]
     fn a_preview_override_replaces_its_key_only() {
         let defaults = crate::config::NavConfig::default_preview_binds();
         let user = HashMap::from([("Down".to_string(), Actions::from([Action::Pos(9)]))]);

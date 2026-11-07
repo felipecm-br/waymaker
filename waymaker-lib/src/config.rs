@@ -691,6 +691,19 @@ impl NavConfig {
         }
     }
 
+    /// The preview keys in effect: `[nav.preview_binds]`, plus each default key it does not bind
+    /// under any spelling.
+    pub fn effective_preview_binds(&self) -> HashMap<String, Actions<NullActionExt>> {
+        let mut layered = NavConfig {
+            binds: self.preview_binds.clone(),
+            ..Default::default()
+        };
+        for (key, actions) in Self::default_preview_binds() {
+            layered.add_default_bind(&key, actions);
+        }
+        layered.binds
+    }
+
     /// The default keys of a fullscreen or diagram preview; `[nav.preview_binds]` overrides
     /// them key by key.
     pub fn default_preview_binds() -> HashMap<String, Actions<NullActionExt>> {

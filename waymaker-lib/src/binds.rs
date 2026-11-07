@@ -696,6 +696,49 @@ pub fn display_help<A: ActionExt + Display>(
         s1.cmp(&s2)
     });
 
+    format_help_entries(entries, config)
+}
+
+/// Navigation-mode binds (`[nav.binds]`, or the preview binds) under a heading, formatted like
+/// [`display_help`]. Sorted by actions, then key.
+pub fn display_nav_help(
+    title: &str,
+    binds: &std::collections::HashMap<String, Actions<crate::action::NullActionExt>>,
+    config: &HelpDisplayConfig,
+) -> Text<'static> {
+    let mut entries: Vec<(String, Vec<Action<crate::action::NullActionExt>>)> = binds
+        .iter()
+        .map(|(key, actions)| {
+            // A bind on `" "` would show as a blank key.
+            let key = if key == " " {
+                "space".into()
+            } else {
+                key.clone()
+            };
+            (key, actions.iter().cloned().collect())
+        })
+        .collect();
+    entries.sort_by_cached_key(|(key, actions)| {
+        (
+            actions.iter().map(|a| a.to_string()).collect::<Vec<_>>(),
+            key.clone(),
+        )
+    });
+    let mut text = Text::from(vec![
+        Line::default(),
+        Line::styled(
+            title.to_string(),
+            Style::default().add_modifier(ratatui::style::Modifier::BOLD),
+        ),
+    ]);
+    text.extend(format_help_entries(entries, config));
+    text
+}
+
+fn format_help_entries<A: ActionExt + Display>(
+    entries: Vec<(String, Vec<Action<A>>)>,
+    config: &HelpDisplayConfig,
+) -> Text<'static> {
     // Process all bindings into their final visible string sequences. Items between trace delimiters are replaced by the trace message
     let entries_processed: Vec<(String, Vec<String>)> = entries
         .into_iter()
@@ -818,6 +861,40 @@ pub fn display_help<A: ActionExt + Display>(
 mod test {
     use super::*;
     use crossterm::event::MouseEvent;
+
+    #[test]
+    fn nav_help_has_a_heading_and_a_stable_order() {
+        use crate::action::NullActionExt;
+        let binds: std::collections::HashMap<String, Actions<NullActionExt>> = [
+            ("k", Action::Up(1)),
+            ("up", Action::Up(1)),
+            ("j", Action::Down(1)),
+            (" ", Action::Toggle),
+        ]
+        .into_iter()
+        .map(|(k, a)| (k.to_string(), Actions::from([a])))
+        .collect();
+        let cfg = HelpDisplayConfig {
+            colors: None,
+            ..Default::default()
+        };
+        let lines: Vec<String> = display_nav_help("Navigation", &binds, &cfg)
+            .lines
+            .iter()
+            .map(|l| l.to_string())
+            .filter(|l| !l.is_empty())
+            .collect();
+        assert_eq!(
+            lines,
+            [
+                "Navigation",
+                "j = Down",
+                "space = Toggle",
+                "k = Up",
+                "up = Up"
+            ]
+        );
+    }
 
     #[test]
     fn test_bare_printable_char() {

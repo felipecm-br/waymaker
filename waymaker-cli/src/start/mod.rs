@@ -1095,6 +1095,13 @@ pub async fn start(
     }
 
     let event_loop = EventLoop::with_binds(binds).with_tick_rate(render.tick_rate());
+    // Help lists the nav and preview binds under their own headings while nav mode resolves keys.
+    let nav_help = (render.ui.nav.active && !render.ui.nav.passthrough).then(|| {
+        (
+            render.ui.nav.binds.clone(),
+            render.ui.nav.effective_preview_binds(),
+        )
+    });
 
     // set event loop mode
     let mode = bind_mode(mode, &initial_cmd);
@@ -1135,7 +1142,18 @@ pub async fn start(
         &mut mm,
         previewer,
         cli_formatter.clone(),
-        Box::new(move |config, mode| waymaker::binds::display_help(&binds, config, Some(mode))),
+        Box::new(move |config, mode| {
+            let mut help = waymaker::binds::display_help(&binds, config, Some(mode));
+            if let Some((nav, preview)) = &nav_help {
+                help.extend(waymaker::binds::display_nav_help("Navigation", nav, config));
+                help.extend(waymaker::binds::display_nav_help(
+                    "Preview (fullscreen or diagram)",
+                    preview,
+                    config,
+                ));
+            }
+            help
+        }),
     );
 
     // ---------------------- build options ---------------------------

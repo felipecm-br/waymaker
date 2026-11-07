@@ -296,6 +296,25 @@ fn nav_keys_sent_together_see_the_state_the_earlier_key_left() {
     assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
 }
 
+/// In navigation mode, help lists the nav and preview binds under their own headings.
+#[test]
+fn nav_help_lists_nav_and_preview_binds() {
+    let wm = Launch::new(FRUIT)
+        .args(&[
+            "ui.nav.active=true",
+            "ui.nav.focus_on_start=picker",
+            "b.f1",
+            "Help",
+        ])
+        .size(200, 100)
+        .ready("banana")
+        .start();
+    wm.send("\x1bOP"); // F1
+    wm.wait_for_screen(|s| s.contains("Navigation") && s.contains("Preview (fullscreen"));
+    wm.send("q");
+    assert_eq!(wm.finish().0, 130);
+}
+
 #[test]
 fn preview_file_subcommand_previews_directory_text_and_image() {
     let bin = &wm_bin();
