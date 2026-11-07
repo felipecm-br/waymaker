@@ -427,6 +427,9 @@ fn jump(args: &'static [&'static str], rows: u16, cols: u16) -> Session {
 fn golden_jump_symlinks_underline_tiers() {
     let wm = jump(&["-o", "jump"], 40, 100);
     wm.send("j");
+    // The symlink's tree preview comes from a command; under load it can land after the
+    // screen has been quiet long enough for `styled_screen`, so wait for its content.
+    wm.wait_for(|s| s.contains("main.rs (13 B)"));
     insta::assert_snapshot!(wm.styled_screen());
 }
 
@@ -455,6 +458,9 @@ fn golden_jump_light_tier_separator_stacked() {
 fn golden_jump_double_nav_bar() {
     let wm = jump(&["-o", "jump", "results.current_nav_bar=Double"], 40, 100);
     wm.send("j");
+    // The symlink's tree preview comes from a command; under load it can land after the
+    // screen has been quiet long enough for `styled_screen`, so wait for its content.
+    wm.wait_for(|s| s.contains("main.rs (13 B)"));
     insta::assert_snapshot!(wm.styled_screen());
 }
 
