@@ -50,7 +50,7 @@ sequenceDiagram
 
 ### 1. Input to command (`event.rs`)
 
-`EventLoop::run` selects over the tick interval, signals, controller events (`Event`), rebind directives (`BindDirective`) and the terminal stream. A key becomes a `Trigger` and is looked up in the `BindMap`; the bound `Actions` are sent as `RenderCommand::KeyAction`. An unbound printable key becomes `Action::Char`, which types into the query (or into the action box or prompt when one is open). While the render loop has paused it (for `Execute`), the event loop drops the terminal stream and waits for `Event::Resume`, then replies `RenderCommand::Ack`.
+`EventLoop::run` selects over the tick interval, signals, controller events (`Event`), rebind directives (`BindDirective`) and the terminal stream. A key becomes a `Trigger` and is looked up in the `BindMap`; the bound `Actions` are sent as `RenderCommand::KeyAction`. An unbound printable key becomes `Action::Char`, which types into the query (or into the action box or prompt when one is open). Whether an input box is open, and the current bind mode, live in the picker's `InputState` ([`input_state.rs`](../waymaker-lib/src/input_state.rs)): the event loop creates it, the render loop's `State` holds the same `Arc` as `input_routing`, and while any input box is open every key goes to that box as `Action::Char` instead of being looked up. While the render loop has paused it (for `Execute`), the event loop drops the terminal stream and waits for `Event::Resume`, then replies `RenderCommand::Ack`.
 
 ### 2. Batch and dispatch (`render/mod.rs`)
 

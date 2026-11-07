@@ -130,7 +130,7 @@ pub async fn start_benchmark_input(
         terminal
             .draw(|frame| {
                 let [_breadcrumb, _action, _input, _status, _header, results_area] =
-                    picker.layout(frame_area);
+                    picker.layout(frame_area, false);
                 let (widget, _) = picker.make_table(&mut click, None, false);
                 frame.render_widget(widget, results_area);
             })

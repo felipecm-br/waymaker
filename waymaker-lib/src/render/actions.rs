@@ -61,8 +61,6 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         action: action_input,
         action_visible,
         prompt_input,
-        prompt_input_active,
-        live_input_active,
         results,
         worker,
         selector: selections,
@@ -86,10 +84,9 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         }
         Action::ToggleActionBox => {
             picker_ui.action_visible = !picker_ui.action_visible;
-            crate::ACTION_BOX_ACTIVE.store(
-                picker_ui.action_visible,
-                std::sync::atomic::Ordering::Relaxed,
-            );
+            state
+                .input_routing
+                .set_action_box_active(picker_ui.action_visible);
         }
         Action::ToggleParentPeek => {
             ui.config.parent_peek.enabled = !ui.config.parent_peek.enabled;
@@ -165,17 +162,7 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::PromptInput(..)
         | Action::LiveInput(..)
         | Action::LiveInputKey(..)) => {
-            return input_action(
-                a,
-                state,
-                ui,
-                tui,
-                events,
-                bind_tx,
-                prompt_input,
-                prompt_input_active,
-                live_input_active,
-            );
+            return input_action(a, state, ui, tui, events, bind_tx, prompt_input);
         }
 
         a @ (Action::SwitchColumn(..)
@@ -218,20 +205,19 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         }
         Action::Char(c) => {
             if !c.is_ascii_control() {
-                if state.prompt_input_active {
+                if state.prompt_input_active() {
                     prompt_input.push_char(c);
                     tui.redraw();
                 } else {
-                    let is_action_box_input = *action_visible
-                        && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed);
+                    let is_action_box_input =
+                        *action_visible && state.input_routing.action_box_active();
                     if is_action_box_input {
                         action_input.push_char(c)
                     } else {
                         if *action_visible {
                             *action_visible = false;
                             action_input.cancel();
-                            crate::ACTION_BOX_ACTIVE
-                                .store(false, std::sync::atomic::Ordering::Relaxed);
+                            state.input_routing.set_action_box_active(false);
                         }
                         if !(ui.config.nav.active
                             && !ui.config.nav.passthrough
@@ -244,9 +230,7 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             }
         }
         Action::SetMode(s) => {
-            if let Ok(mut m) = crate::MODE.lock() {
-                *m = s;
-            }
+            state.input_routing.set_mode(s);
         }
         Action::Sort(order) => {
             picker_ui.worker.set_sort_order(order);
@@ -280,121 +264,99 @@ fn query_edit_action<S: Selection, A: ActionExt>(
     match action {
         // Edit
         Action::SetQuery(context) => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.set(context, u16::MAX);
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.set(context, u16::MAX);
             } else {
                 query.set(context, u16::MAX);
             }
         }
         Action::ForwardChar => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.forward_char()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.forward_char()
             } else {
                 query.forward_char()
             }
         }
         Action::BackwardChar => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.backward_char()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.backward_char()
             } else {
                 query.backward_char()
             }
         }
         Action::ForwardWord => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.forward_word()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.forward_word()
             } else {
                 query.forward_word()
             }
         }
         Action::BackwardWord => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.backward_word()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.backward_word()
             } else {
                 query.backward_word()
             }
         }
         Action::DeleteChar => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.delete()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.delete()
             } else {
                 query.delete()
             }
         }
         Action::DeleteWord => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.delete_word()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.delete_word()
             } else {
                 query.delete_word()
             }
         }
         Action::DeleteNextChar => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.delete_next()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.delete_next()
             } else {
                 query.delete_next()
             }
         }
         Action::DeleteNextWord => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.delete_next_word()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.delete_next_word()
             } else {
                 query.delete_next_word()
             }
         }
         Action::DeleteLineStart => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.delete_line_start()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.delete_line_start()
             } else {
                 query.delete_line_start()
             }
         }
         Action::DeleteLineEnd => {
-            if state.prompt_input_active {
+            if state.prompt_input_active() {
                 prompt_input.delete_line_end()
-            } else if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            } else if *action_visible && state.input_routing.action_box_active() {
                 action_input.delete_line_end()
             } else {
                 query.delete_line_end()
@@ -757,8 +719,6 @@ fn input_action<W: Write, S: Selection, A: ActionExt>(
     events: &mut std::vec::Drain<'_, RenderCommand<A>>,
     bind_tx: &BindSender<A>,
     prompt_input: &mut QueryUI,
-    prompt_input_active: &mut bool,
-    live_input_active: &mut bool,
 ) -> Flow<S> {
     match action {
         Action::Print(payload) => {
@@ -774,16 +734,12 @@ fn input_action<W: Write, S: Selection, A: ActionExt>(
 
             state.prompt_input_stash_id = state.stash_actions(remainder, bind_tx.clone());
             state.prompt_input_template = Some(payload);
-            state.prompt_input_active = true;
-            *prompt_input_active = true;
-            crate::PROMPT_INPUT_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+            state.input_routing.set_prompt_input_active(true);
             prompt_input.cancel();
             tui.redraw();
         }
         Action::LiveInput(payload) => {
-            state.live_input_active = true;
-            *live_input_active = true;
-            crate::LIVE_INPUT_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+            state.input_routing.set_live_input_active(true);
             let template = if !payload.is_empty() {
                 payload
             } else {
@@ -793,7 +749,7 @@ fn input_action<W: Write, S: Selection, A: ActionExt>(
             tui.redraw();
         }
         Action::LiveInputKey(keys) => {
-            if state.live_input_active
+            if state.live_input_active()
                 && let Some(ref template) = state.live_input_template
             {
                 state.live_input_key = Some(keys.clone());
@@ -881,24 +837,18 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         action: action_input,
         action_visible,
         prompt_input,
-        prompt_input_active,
-        live_input_active,
         ..
     } = &mut *picker_ui;
     match action {
         Action::Cancel => {
-            if state.live_input_active {
-                state.live_input_active = false;
-                *live_input_active = false;
-                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+            if state.live_input_active() {
+                state.input_routing.set_live_input_active(false);
                 state.live_input_template = None;
                 state.live_input_key = None;
                 tui.redraw();
                 return Flow::Continue;
-            } else if state.prompt_input_active {
-                state.prompt_input_active = false;
-                *prompt_input_active = false;
-                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+            } else if state.prompt_input_active() {
+                state.input_routing.set_prompt_input_active(false);
                 if let Some(id) = state.prompt_input_stash_id.take() {
                     let _ = state.take_actions(id);
                 }
@@ -914,7 +864,7 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             } else if *action_visible {
                 *action_visible = false;
                 action_input.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.input_routing.set_action_box_active(false);
                 tui.redraw();
             } else {
                 query.cancel()
@@ -926,12 +876,10 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             tui.redraw();
         }
         Action::ToggleFocus => {
-            if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            if *action_visible && state.input_routing.action_box_active() {
                 *action_visible = false;
                 action_input.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.input_routing.set_action_box_active(false);
                 tui.redraw();
                 return Flow::Continue;
             }
@@ -954,12 +902,10 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             }
         }
         Action::FocusFilter => {
-            if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            if *action_visible && state.input_routing.action_box_active() {
                 *action_visible = false;
                 action_input.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.input_routing.set_action_box_active(false);
                 tui.redraw();
                 return Flow::Continue;
             }
@@ -974,12 +920,10 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             }
         }
         Action::FocusNav => {
-            if *action_visible
-                && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
-            {
+            if *action_visible && state.input_routing.action_box_active() {
                 *action_visible = false;
                 action_input.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.input_routing.set_action_box_active(false);
                 tui.redraw();
                 return Flow::Continue;
             }
@@ -1011,17 +955,13 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
 ) -> Flow<S> {
     let PickerUI {
         prompt_input,
-        prompt_input_active,
-        live_input_active,
         selector: selections,
         ..
     } = &mut *picker_ui;
     match action {
         Action::Accept => {
-            if state.prompt_input_active {
-                state.prompt_input_active = false;
-                *prompt_input_active = false;
-                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+            if state.prompt_input_active() {
+                state.input_routing.set_prompt_input_active(false);
                 let input_text = std::mem::take(&mut prompt_input.input);
                 prompt_input.cancel();
 
@@ -1054,18 +994,14 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             return Flow::Exit(Err(MatchError::Abort(code)));
         }
         Action::Quit(code) => {
-            if state.live_input_active {
-                state.live_input_active = false;
-                *live_input_active = false;
-                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+            if state.live_input_active() {
+                state.input_routing.set_live_input_active(false);
                 state.live_input_template = None;
                 state.live_input_key = None;
                 tui.redraw();
                 return Flow::Continue;
-            } else if state.prompt_input_active {
-                state.prompt_input_active = false;
-                *prompt_input_active = false;
-                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+            } else if state.prompt_input_active() {
+                state.input_routing.set_prompt_input_active(false);
                 if let Some(id) = state.prompt_input_stash_id.take() {
                     let _ = state.take_actions(id);
                 }
@@ -1076,7 +1012,7 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             } else if picker_ui.action_visible {
                 picker_ui.action_visible = false;
                 picker_ui.action.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.input_routing.set_action_box_active(false);
             } else if !picker_ui.selector.is_empty() {
                 // First Esc: clear multi-selections.
                 picker_ui.selector.clear();
@@ -1091,18 +1027,14 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             }
         }
         Action::Unwind(code) => {
-            if state.live_input_active {
-                state.live_input_active = false;
-                *live_input_active = false;
-                crate::LIVE_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+            if state.live_input_active() {
+                state.input_routing.set_live_input_active(false);
                 state.live_input_template = None;
                 state.live_input_key = None;
                 tui.redraw();
                 return Flow::Continue;
-            } else if state.prompt_input_active {
-                state.prompt_input_active = false;
-                *prompt_input_active = false;
-                crate::PROMPT_INPUT_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+            } else if state.prompt_input_active() {
+                state.input_routing.set_prompt_input_active(false);
                 if let Some(id) = state.prompt_input_stash_id.take() {
                     let _ = state.take_actions(id);
                 }
@@ -1113,7 +1045,7 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             } else if picker_ui.action_visible {
                 picker_ui.action_visible = false;
                 picker_ui.action.cancel();
-                crate::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+                state.input_routing.set_action_box_active(false);
                 tui.redraw();
                 return Flow::Continue;
             } else if state.sort_menu_active {

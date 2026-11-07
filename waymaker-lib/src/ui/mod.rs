@@ -144,8 +144,6 @@ pub struct PickerUI<'a, T: SSS, S: Selection> {
     pub action_visible: bool,
     pub action_config: ActionBoxConfig,
     pub prompt_input: QueryUI,
-    pub prompt_input_active: bool,
-    pub live_input_active: bool,
     pub breadcrumb_config: crate::config::BreadcrumbConfig,
     pub results: ResultsUI,
     pub query: QueryUI,
@@ -187,8 +185,6 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
                 status_inline: false,
                 ..input_config.clone()
             }),
-            prompt_input_active: false,
-            live_input_active: false,
             breadcrumb_config,
             results: ResultsUI::new(results_config, status_config),
             query: QueryUI::new(input_config),
@@ -199,7 +195,8 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
         }
     }
 
-    pub fn layout(&self, area: Rect) -> [Rect; 6] {
+    /// `input_open`: the prompt or live input is open, so the filter row shows even when hidden.
+    pub fn layout(&self, area: Rect, input_open: bool) -> [Rect; 6] {
         let PickerUI {
             query,
             action,
@@ -208,8 +205,6 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
             action_visible,
             action_config,
             breadcrumb_config,
-            prompt_input_active,
-            live_input_active,
             ..
         } = self;
 
@@ -225,7 +220,7 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
             Constraint::Length(if breadcrumb_config.show { 1 } else { 0 }), // breadcrumb
             Constraint::Length(action_height), // action (input + preview)
             Constraint::Length(
-                if query.config.show || *prompt_input_active || *live_input_active {
+                if query.config.show || input_open {
                     1 + query.config.border.height()
                 } else {
                     0

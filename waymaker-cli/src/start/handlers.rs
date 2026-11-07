@@ -666,16 +666,12 @@ where
 pub(super) fn alias_action(
     a: Action<MMAction>,
     semantic_binds: &BindMap<MMAction>,
+    mode: &str,
 ) -> waymaker::action::Actions<MMAction> {
     match a {
         Action::Accept => acs![MMAction::Accept],
         Action::Semantic(ref s) => {
-            let mode = waymaker::MODE
-                .lock()
-                .ok()
-                .map(|m| m.clone())
-                .unwrap_or_default();
-            if let Some(actions) = semantic_binds.resolve_alias(s, &mode) {
+            if let Some(actions) = semantic_binds.resolve_alias(s, mode) {
                 return actions.clone();
             }
             builtin_alias(s).unwrap_or_else(|| acs![a])

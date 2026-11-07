@@ -43,7 +43,7 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     let mut _area = area;
 
     if let Some(p) = preview_ui.as_mut() {
-        if state.live_input_active {
+        if state.live_input_active() {
             p.set_border_color_override(Some(Color::Green));
         } else {
             p.set_border_color_override(None);
@@ -168,7 +168,10 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     if is_global_breadcrumb {
         picker_ui.breadcrumb_config.show = false;
     }
-    let [breadcrumb, action, input, status, header, results] = picker_ui.layout(picker_area);
+    let [breadcrumb, action, input, status, header, results] = picker_ui.layout(
+        picker_area,
+        state.prompt_input_active() || state.live_input_active(),
+    );
     if is_global_breadcrumb {
         picker_ui.breadcrumb_config.show = original_breadcrumb_show;
     }
@@ -428,7 +431,7 @@ fn draw_picker<T: SSS, S: Selection>(frame: &mut Frame, cx: PickerCtx<'_, '_, T,
                 frame.render_widget(p, target_rect);
             }
         }
-        if state.live_input_active {
+        if state.live_input_active() {
             let line = if input.width >= 48 {
                 ratatui::text::Line::from(vec![
                     ratatui::text::Span::styled(
@@ -487,7 +490,7 @@ fn draw_picker<T: SSS, S: Selection>(frame: &mut Frame, cx: PickerCtx<'_, '_, T,
                 ])
             };
             frame.render_widget(ratatui::widgets::Paragraph::new(line), input);
-        } else if state.prompt_input_active {
+        } else if state.prompt_input_active() {
             render_input(
                 frame,
                 input,

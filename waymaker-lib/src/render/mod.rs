@@ -68,6 +68,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
     mut render_rx: mpsc::UnboundedReceiver<RenderCommand<A>>,
     controller_tx: EventSender,
     bind_tx: BindSender<A>,
+    input: crate::input_state::SharedInputState,
 
     mut dynamic_handlers: DynamicHandlers<T, S>,
     mut ext_handler: Option<ActionExtHandler<T, S, A>>,
@@ -77,6 +78,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
     mut paste_handler: Option<PasteHandler<T, S>>,
 ) -> Result<Vec<S>, MatchError> {
     let mut state = State::new();
+    state.input_routing = input;
     if ui.config.nav.active {
         match ui.config.nav.focus_on_start {
             crate::config::NavFocus::Picker => state.focus = Focus::Results,
@@ -141,7 +143,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             }
             if p.visible() && !p.command().is_empty() {
                 let poll_interval = p.poll_interval();
-                let effective_interval = if state.live_input_active {
+                let effective_interval = if state.live_input_active() {
                     poll_interval.or(Some(std::time::Duration::from_millis(150)))
                 } else {
                     poll_interval
@@ -179,10 +181,10 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             )
         };
 
-        if state.live_input_active {
-            apply_live_input(&mut buffer, state.live_input_active);
-        } else if state.prompt_input_active {
-            apply_prompt_input(&mut buffer, state.prompt_input_active);
+        if state.live_input_active() {
+            apply_live_input(&mut buffer, state.live_input_active());
+        } else if state.prompt_input_active() {
+            apply_prompt_input(&mut buffer, state.prompt_input_active());
         } else if state.sort_menu_active {
             apply_sort_menu(&mut buffer, &mut state.sort_menu_active);
         } else if ui.config.nav.active {
@@ -194,7 +196,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     // An input box (create, rename, ...) takes the keys; an info box such as
                     // "Undone ..." does not, so ctrl-r still reaches @redo after an undo.
                     (picker_ui.action_visible
-                        && crate::ACTION_BOX_ACTIVE.load(std::sync::atomic::Ordering::Relaxed))
+                        && state.input_routing.action_box_active())
                         || overlay_ui.as_ref().is_some_and(|o| o.index().is_some()),
                     &mut state.pending_nav_key,
                     &mut state.sort_menu_active,

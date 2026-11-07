@@ -50,6 +50,8 @@ pub struct ParentPeekCache {
 pub type PreviewSetPayload = Option<Result<String, Text<'static>>>;
 
 pub struct State {
+    /// Shared with the event loop: which input takes typed keys, and the bind mode.
+    pub input_routing: crate::input_state::SharedInputState,
     last_id: Option<u32>,
     interrupt: Interrupt,
     interrupt_payload: String,
@@ -81,16 +83,12 @@ pub struct State {
     pub pending_nav_key: Option<char>,
     /// Whether the sort shortcut menu is active in the footer.
     pub sort_menu_active: bool,
-    /// Whether interactive agent prompt input mode is active.
-    pub prompt_input_active: bool,
     /// Template to execute when prompt input is confirmed.
     pub prompt_input_template: Option<String>,
     /// Stashed action ID for remainder actions when prompt input is confirmed.
     pub prompt_input_stash_id: Option<u8>,
     /// Last confirmed prompt input text (also exposed as WM_INPUT / MM_INPUT and {input}).
     pub prompt_input_value: Option<String>,
-    /// Whether live passthrough keystroke streaming mode is active.
-    pub live_input_active: bool,
     /// Template to execute when keystrokes arrive in live input mode.
     pub live_input_template: Option<String>,
     /// Last dispatched live key or key sequence (also exposed as WM_KEY / MM_KEY and {key}/{keys}).
@@ -152,9 +150,20 @@ impl Default for State {
 }
 
 impl State {
+    /// Whether interactive agent prompt input mode is active.
+    pub fn prompt_input_active(&self) -> bool {
+        self.input_routing.prompt_input_active()
+    }
+
+    /// Whether live passthrough keystroke streaming mode is active.
+    pub fn live_input_active(&self) -> bool {
+        self.input_routing.live_input_active()
+    }
+
     pub fn new() -> Self {
         // this is the same as default
         Self {
+            input_routing: crate::input_state::InputState::shared(),
             last_id: None,
             interrupt: Interrupt::None,
             interrupt_payload: String::new(),
@@ -175,11 +184,9 @@ impl State {
             focus_tick: 0,
             pending_nav_key: None,
             sort_menu_active: false,
-            prompt_input_active: false,
             prompt_input_template: None,
             prompt_input_stash_id: None,
             prompt_input_value: None,
-            live_input_active: false,
             live_input_template: None,
             live_input_key: None,
 
@@ -559,7 +566,7 @@ impl<'a, 'b: 'a, T: SSS, S: Selection> MMState<'a, 'b, T, S> {
         let match_count_str = self.status().matched_count.to_string();
         let select_count_str = self.selections().len().to_string();
         let pos_str = get_current(self.picker_ui).map_or("".to_string(), |x| x.0.to_string());
-        let mode_str = crate::MODE.lock().map(|m| m.clone()).unwrap_or_default();
+        let mode_str = self.input_routing.mode();
 
         let mut vars = self.envs.clone();
         vars.reserve(24);

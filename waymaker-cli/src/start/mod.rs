@@ -819,9 +819,7 @@ pub async fn start(
         .to_string()
     };
     log::trace!("mode: {}", mode);
-    if let Ok(mut m) = waymaker::MODE.lock() {
-        *m = mode;
-    }
+    event_loop.input_state().set_mode(mode);
 
     // make matcher and matchmaker with matchmaker-and-matcher-maker
     let copy_trailing_newline = tui.copy_trailing_newline;
@@ -998,7 +996,7 @@ pub async fn start(
 
     options = options
         .ext_handler(move |x, y| action_handler(x, y, &mut action_context))
-        .ext_aliaser(move |a, _state| alias_action(a, &semantic_binds));
+        .ext_aliaser(move |a, state| alias_action(a, &semantic_binds, &state.input_routing.mode()));
 
     if nav_mode {
         log::debug!("Navigation mode enabled");

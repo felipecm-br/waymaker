@@ -214,7 +214,7 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
 
 pub(super) fn show_action_box(state: &mut MMState<'_, '_>, prompt: &str, initial: &str) {
     state.picker_ui.action_visible = true;
-    waymaker::ACTION_BOX_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+    state.input_routing.set_action_box_active(true);
     // Caret after the prefilled text (set clamps it to the end), so typing edits the name.
     state
         .picker_ui
@@ -228,7 +228,7 @@ pub(super) fn show_action_box(state: &mut MMState<'_, '_>, prompt: &str, initial
 
 pub(super) fn show_styled_action_box(state: &mut MMState<'_, '_>, prompt: &str, initial: &str) {
     state.picker_ui.action_visible = true;
-    waymaker::ACTION_BOX_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+    state.input_routing.set_action_box_active(true);
     // Caret after the prefilled text (set clamps it to the end), so typing edits the name.
     state
         .picker_ui
@@ -242,7 +242,7 @@ pub(super) fn show_styled_action_box(state: &mut MMState<'_, '_>, prompt: &str, 
 
 pub(super) fn show_styled_info_box(state: &mut MMState<'_, '_>, message: &str) {
     state.picker_ui.action_visible = true;
-    waymaker::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+    state.input_routing.set_action_box_active(false);
     state.picker_ui.action.set(Some(String::new()), 0);
     state
         .picker_ui
@@ -284,7 +284,7 @@ pub(crate) fn abbreviate_target_dir_display(dest_display_name: &str) -> String {
 
 pub(super) fn close_action_box(state: &mut MMState<'_, '_>, fm_action: &mut Option<FmActionMode>) {
     state.picker_ui.action_visible = false;
-    waymaker::ACTION_BOX_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+    state.input_routing.set_action_box_active(false);
     state.picker_ui.action.set(Some(String::new()), 0);
     state.picker_ui.action.set_prompt(None);
     *fm_action = None;
@@ -387,7 +387,7 @@ pub(super) fn commit_fm_action(
                     .action
                     .set(Some(next_from.trim_end_matches('/').to_string()), 0);
                 state.picker_ui.action_visible = true;
-                waymaker::ACTION_BOX_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+                state.input_routing.set_action_box_active(true);
                 let _ = render_tx.send(RenderCommand::Action(Action::Reload(String::new())));
                 return;
             }

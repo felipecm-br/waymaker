@@ -1,5 +1,6 @@
 use crate::action::{Action, ActionExt, Actions, NullActionExt};
 use crate::binds::{BindMap, BindMapExt, SimpleMouseEvent, Trigger, TriggerKind};
+use crate::input_state::{InputState, SharedInputState};
 use crate::message::{BindDirective, Event, RenderCommand};
 use anyhow::Result;
 use cba::bait::ResultExt;
@@ -41,6 +42,7 @@ pub struct EventLoop<A: ActionExt> {
     bind_tx: BindSender<A>,
 
     key_file: Option<PathBuf>,
+    input: SharedInputState,
     current_task: Option<tokio::task::JoinHandle<Result<()>>>,
 }
 
@@ -73,6 +75,7 @@ impl<A: ActionExt> EventLoop<A> {
             mouse_events: false,
             paused: false,
             key_file: None,
+            input: InputState::shared(),
             current_task: None,
 
             bind_rx,
@@ -102,6 +105,11 @@ impl<A: ActionExt> EventLoop<A> {
         self
     }
 
+    /// The input routing state this loop reads; the render loop must share it.
+    pub fn input_state(&self) -> SharedInputState {
+        self.input.clone()
+    }
+
     pub fn add_tx(&mut self, handler: mpsc::UnboundedSender<RenderCommand<A>>) -> &mut Self {
         self.txs.push(handler);
         self
@@ -124,7 +132,7 @@ impl<A: ActionExt> EventLoop<A> {
     }
 
     fn get_bind(&self, kind: TriggerKind) -> Option<Actions<A>> {
-        let mode = crate::MODE.lock().ok()?.clone();
+        let mode = self.input.mode();
         let direct = self
             .binds
             .get(&Trigger {
@@ -364,12 +372,9 @@ impl<A: ActionExt> EventLoop<A> {
                                         // When the action box or prompt input is active, plain character keys
                                         // must always reach the input as Action::Char regardless
                                         // of any shortcut bindings on that key.
-                                        let action_box_active = crate::ACTION_BOX_ACTIVE
-                                            .load(std::sync::atomic::Ordering::Relaxed);
-                                        let prompt_input_active = crate::PROMPT_INPUT_ACTIVE
-                                            .load(std::sync::atomic::Ordering::Relaxed);
-                                        let live_input_active = crate::LIVE_INPUT_ACTIVE
-                                            .load(std::sync::atomic::Ordering::Relaxed);
+                                        let action_box_active = self.input.action_box_active();
+                                        let prompt_input_active = self.input.prompt_input_active();
+                                        let live_input_active = self.input.live_input_active();
                                         if !action_box_active && !prompt_input_active && !live_input_active {
                                             if let Some(actions) = self.get_bind(TriggerKind::Key(key)) {
                                                 self.record_key(key.to_string());
@@ -510,9 +515,7 @@ impl<A: ActionExt> EventLoop<A> {
                     }
                 }
                 Action::SetMode(m) => {
-                    if let Ok(mut mode) = crate::MODE.lock() {
-                        *mode = m;
-                    }
+                    self.input.set_mode(m);
                 }
                 Action::Trace(t) => {
                     self.send(RenderCommand::Action(Action::Trace(t)));

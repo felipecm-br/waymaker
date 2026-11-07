@@ -508,6 +508,7 @@ impl<T: SSS, S: Selection> Matchmaker<T, S> {
         let event_controller = event_loop.controller();
         let event_controller_ = event_controller.clone();
         let bind_controller = event_loop.bind_controller();
+        let input_state = event_loop.input_state();
         let event_loop_handle = tokio::spawn(async move {
             let _ = event_loop.run().await;
         });
@@ -524,6 +525,7 @@ impl<T: SSS, S: Selection> Matchmaker<T, S> {
             render_rx,
             event_controller,
             bind_controller,
+            input_state,
             (self.event_handlers, self.interrupt_handlers),
             ext_handler,
             ext_aliaser,
@@ -1392,7 +1394,7 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
             let msg = match payload {
                 Some(Err(m)) => {
                     let m = if is_empty(&m) {
-                        let mode = crate::MODE.lock().map(|m| m.clone()).unwrap_or_default();
+                        let mode = state.input_routing.mode();
                         help_factory(&help_config, &mode)
                     } else {
                         m
