@@ -550,8 +550,11 @@ impl FromStr for TriggerKind {
     type Err = String;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        // try semantic
-        if let Some(s) = value.strip_prefix("@") {
+        // try semantic. A name starting with a key separator (`@-a`, `@+a`) is a key
+        // combination with `@` instead: that is how one displays (`a-@` shows as `@-a`).
+        if let Some(s) = value.strip_prefix("@")
+            && !s.starts_with(['-', '+'])
+        {
             if s.chars().all(allowed_semantic_char) && !s.is_empty() {
                 return Ok(TriggerKind::Semantic(s.to_string()));
             } else if !s.is_empty() {
@@ -563,7 +566,19 @@ impl FromStr for TriggerKind {
 
         // 1. Try KeyCombination
         if let Ok(key) = KeyCombination::from_str(value) {
-            return Ok(TriggerKind::Key(key));
+            // A literal control character (a newline, a tab) is never what the terminal sends
+            // for that key, and it would be saved back as the key's name ("\n" as "Enter").
+            if let Some(c) = key.codes.iter().find_map(|code| match code {
+                crossterm::event::KeyCode::Char(c) if c.is_control() => Some(*c),
+                _ => None,
+            }) {
+                return Err(format!(
+                    "{c:?} is a control character, not a key name: write the key's name (enter, tab, ...)"
+                ));
+            }
+            // The event loop looks keys up normalized; a chord such as `t-backtab` does not
+            // parse that way.
+            return Ok(TriggerKind::Key(key.normalized()));
         }
 
         // 2. Try MouseEvent
@@ -597,7 +612,10 @@ impl FromStr for TriggerKind {
             return Ok(TriggerKind::Mouse(SimpleMouseEvent { kind, modifiers }));
         }
 
-        if let Ok(event) = value.parse::<Event>() {
+        // An empty name parses as an event set with no events, which would never fire.
+        if let Ok(event) = value.parse::<Event>()
+            && !event.is_empty()
+        {
             return Ok(TriggerKind::Event(event));
         }
 
@@ -894,6 +912,34 @@ mod test {
                 "up = Up"
             ]
         );
+    }
+
+    /// Found by the `trigger` fuzz target: "\n" parsed as a key and was saved back as "Enter".
+    /// Neither a control character nor an empty name can ever fire.
+    #[test]
+    fn control_characters_are_not_key_names() {
+        // An empty key (after trimming) is no trigger either.
+        for s in [
+            "\n", "\t", "\r", "\u{1b}", "ctrl-\n", "nav^^\n", "", "nav^^",
+        ] {
+            assert!(s.parse::<Trigger>().is_err(), "{s:?}");
+        }
+        for s in ["enter", "tab", "esc", "ctrl-j", "space", " "] {
+            assert!(s.parse::<Trigger>().is_ok(), "{s:?}");
+        }
+    }
+
+    /// Found by the `trigger` fuzz target: the key combination `a-@` displays as `@-a`, which
+    /// parsed as the semantic trigger `@-a`.
+    #[test]
+    fn a_key_combination_with_at_round_trips() {
+        let combo: Trigger = "a-@".parse().unwrap();
+        assert!(matches!(combo.kind, TriggerKind::Key(_)), "{combo:?}");
+        assert_eq!(combo.to_string().parse::<Trigger>(), Ok(combo));
+        assert!(matches!(
+            "@bookmark".parse::<Trigger>().unwrap().kind,
+            TriggerKind::Semantic(_)
+        ));
     }
 
     #[test]
