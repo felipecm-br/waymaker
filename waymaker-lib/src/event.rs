@@ -19,6 +19,9 @@ use std::path::PathBuf;
 use tokio::sync::mpsc;
 use tokio::time::{self};
 
+#[cfg(test)]
+mod nav_tests;
+
 pub type RenderSender<A = NullActionExt> = mpsc::UnboundedSender<RenderCommand<A>>;
 pub type EventSender = mpsc::UnboundedSender<Event>;
 pub type BindSender<A> = mpsc::UnboundedSender<BindDirective<A>>;

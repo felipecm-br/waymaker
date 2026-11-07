@@ -104,7 +104,7 @@ pub(super) fn action_from_null<A: ActionExt>(action: Action<NullActionExt>) -> O
 }
 
 /// Pre-process `buffer` when the sort menu is active: intercept the next key to select a sort order or cancel.
-pub(super) fn apply_sort_menu<A: ActionExt>(
+pub(crate) fn apply_sort_menu<A: ActionExt>(
     buffer: &mut Vec<RenderCommand<A>>,
     sort_menu_active: &mut bool,
 ) {
@@ -217,7 +217,7 @@ fn push_nav_actions<A: ActionExt>(
 
 #[inline]
 #[cfg(test)]
-pub(super) fn get_nav_bind<'a>(
+pub(crate) fn get_nav_bind<'a>(
     focus_binds: &'a std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
     key: &str,
 ) -> Option<&'a crate::action::Actions<NullActionExt>> {
@@ -277,7 +277,7 @@ pub(super) fn update_sim_focus<A: ActionExt>(action: &Action<A>, sim_focus: &mut
     }
 }
 
-pub(super) fn process_results_nav_key<A: ActionExt>(
+pub(crate) fn process_results_nav_key<A: ActionExt>(
     key: &str,
     fallback_action: Option<Action<A>>,
     focus_binds: &super::nav_keymap::NavKeymap,
@@ -465,77 +465,6 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
             }
         }
     }
-}
-
-/// Pre-process `buffer` for navigation mode: simulate `ToggleFocus` events encountered in the
-/// batch and expand `Action::Char` events into `nav_binds` actions while focus is on results.
-#[cfg(test)]
-pub(super) fn apply_focus_binds<A: ActionExt>(
-    buffer: &mut Vec<RenderCommand<A>>,
-    initial_focus: Focus,
-    focus_binds: &std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
-    overlay_active: bool,
-    pending_nav_key: &mut Option<char>,
-    sort_menu_active: &mut bool,
-    preview_fullscreen: bool,
-) {
-    apply_focus_binds_mode(
-        buffer,
-        initial_focus,
-        focus_binds,
-        &std::collections::HashMap::new(),
-        overlay_active,
-        pending_nav_key,
-        sort_menu_active,
-        preview_fullscreen,
-        false,
-    );
-}
-
-#[cfg(test)]
-pub(super) fn apply_focus_binds_mode<A: ActionExt>(
-    buffer: &mut Vec<RenderCommand<A>>,
-    initial_focus: Focus,
-    focus_binds: &std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
-    preview_binds: &std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
-    overlay_active: bool,
-    pending_nav_key: &mut Option<char>,
-    sort_menu_active: &mut bool,
-    preview_fullscreen: bool,
-    preview_diagram_mode: bool,
-) {
-    if overlay_active {
-        for cmd in buffer {
-            if let RenderCommand::KeyAction { action, .. } = cmd {
-                *cmd = RenderCommand::Action(action.clone());
-            }
-        }
-        return;
-    }
-
-    if *sort_menu_active {
-        apply_sort_menu(buffer, sort_menu_active);
-        return;
-    }
-
-    let mut out = Vec::with_capacity(buffer.len());
-    let keymap = super::nav_keymap::NavKeymap::from_strings(focus_binds);
-    let preview_keymap = super::nav_keymap::NavKeymap::from_layers(
-        &crate::config::NavConfig::default_preview_binds(),
-        preview_binds,
-    );
-    let mut resolver = NavResolver::new(
-        initial_focus,
-        &keymap,
-        &preview_keymap,
-        preview_fullscreen,
-        preview_diagram_mode,
-    );
-    for cmd in buffer.drain(..) {
-        resolver.feed(cmd, pending_nav_key, sort_menu_active, &mut out);
-    }
-
-    *buffer = out;
 }
 
 /// Resolves navigation-mode keys one command at a time; the event loop runs one per input
