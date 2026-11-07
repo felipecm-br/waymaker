@@ -617,7 +617,14 @@ fn fm_rename_caret_starts_at_the_end() {
 fn fm_trash_moves_to_the_xdg_trash_and_undo_restores() {
     let wm = fm();
     let work = wm.dir.path().join("work");
-    let trashed = wm.dir.path().join("XDG_DATA_HOME/Trash/files/top.md");
+    // fm::move_to_trash uses dirs::data_local_dir(): $XDG_DATA_HOME on Linux, but always
+    // ~/Library/Application Support on macOS (HOME is the test dir in both).
+    let trash = wm.dir.path().join(if cfg!(target_os = "macos") {
+        "Library/Application Support/Trash"
+    } else {
+        "XDG_DATA_HOME/Trash"
+    });
+    let trashed = trash.join("files/top.md");
     nav_to(&wm, "top.md");
     wm.send("d");
     wm.send(ENTER);
@@ -625,10 +632,7 @@ fn fm_trash_moves_to_the_xdg_trash_and_undo_restores() {
         !work.join("top.md").exists() && trashed.is_file()
     });
     assert!(
-        wm.dir
-            .path()
-            .join("XDG_DATA_HOME/Trash/info/top.md.trashinfo")
-            .is_file(),
+        trash.join("info/top.md.trashinfo").is_file(),
         "no .trashinfo written"
     );
     wm.send("u");
