@@ -520,14 +520,6 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
                             out.push(RenderCommand::Action(Action::ToggleFocus));
                         }
                     }
-                    Action::FocusFilter => {
-                        *sim_focus = Focus::Input;
-                        out.push(RenderCommand::Action(Action::FocusFilter));
-                    }
-                    Action::FocusNav => {
-                        *sim_focus = Focus::Results;
-                        out.push(RenderCommand::Action(Action::FocusNav));
-                    }
                     Action::Char(_) => {
                         // Drop unbound plain characters in nav mode
                     }

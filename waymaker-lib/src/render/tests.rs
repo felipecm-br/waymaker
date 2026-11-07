@@ -1571,3 +1571,350 @@ fn test_apply_live_input() {
 //         }
 //     }
 // }
+
+/// Runs one key through `process_results_nav_key` and returns what it emitted.
+fn nav_key(
+    key: &str,
+    focus_binds: &HashMap<String, Actions<NullActionExt>>,
+    preview_fullscreen: bool,
+    preview_diagram_mode: bool,
+) -> (Vec<Action<NullActionExt>>, Focus) {
+    let mut pending = None;
+    let mut sort_menu_active = false;
+    let mut focus = Focus::Results;
+    let mut out = Vec::new();
+    keys::process_results_nav_key::<NullActionExt>(
+        key,
+        None,
+        focus_binds,
+        &mut pending,
+        &mut sort_menu_active,
+        &mut focus,
+        &mut out,
+        preview_fullscreen,
+        preview_diagram_mode,
+    );
+    let actions = out
+        .into_iter()
+        .filter_map(|c| match c {
+            RenderCommand::Action(a) => Some(a),
+            _ => None,
+        })
+        .collect();
+    (actions, focus)
+}
+
+/// Outside fullscreen, J/K/u/d/s/+/-/0/]/[ fall back to preview and diagram controls, unless the
+/// user bound one of the keys of that group in `[nav.binds]`: a user bind always wins.
+#[test]
+fn test_nav_preview_fallbacks_yield_to_user_binds() {
+    let groups: &[(&[&str], &[&str], Action<NullActionExt>)] = &[
+        (
+            &["J", "shift-j", "ctrl-shift-j", "ctrl-J"],
+            &["J", "shift-j", "ctrl-shift-j", "ctrl-J"],
+            Action::PreviewDown(5),
+        ),
+        (
+            &["K", "shift-k", "ctrl-shift-k", "ctrl-K"],
+            &["K", "shift-k", "ctrl-shift-k", "ctrl-K"],
+            Action::PreviewUp(5),
+        ),
+        (
+            &["ctrl-u", "u"],
+            &["ctrl-u", "u"],
+            Action::PreviewHalfPageUp,
+        ),
+        (
+            &["ctrl-d", "d"],
+            &["ctrl-d", "d"],
+            Action::PreviewHalfPageDown,
+        ),
+        (&["s"], &["s"], Action::ToggleDiagram),
+        (&["+", "="], &["+", "="], Action::DiagramZoomIn),
+        (&["-"], &["-"], Action::DiagramZoomOut),
+        (&["0"], &["0"], Action::DiagramResetZoom),
+    ];
+    let user = Action::<NullActionExt>::Pos(42);
+    for (pressed, suppressors, builtin) in groups {
+        for key in *pressed {
+            let (out, _) = nav_key(key, &HashMap::new(), false, false);
+            assert_eq!(out, vec![builtin.clone()], "{key} with no binds");
+            for bound in *suppressors {
+                let binds = HashMap::from([(bound.to_string(), Actions::from([user.clone()]))]);
+                let (out, _) = nav_key(key, &binds, false, false);
+                assert!(
+                    !out.contains(builtin),
+                    "{key} must not fire {builtin:?} when {bound} is bound, got {out:?}"
+                );
+            }
+        }
+    }
+    // ]/n and [/N yield only to a bind on the pressed key itself.
+    for (key, builtin) in [
+        ("]", Action::NextDiagram),
+        ("n", Action::NextDiagram),
+        ("[", Action::PrevDiagram),
+        ("N", Action::PrevDiagram),
+    ] {
+        let (out, _) = nav_key(key, &HashMap::new(), false, false);
+        assert_eq!(out, vec![builtin.clone()], "{key} with no binds");
+        let binds = HashMap::from([(key.to_string(), Actions::from([user.clone()]))]);
+        let (out, _) = nav_key(key, &binds, false, false);
+        assert_eq!(out, vec![user.clone()], "{key} bound by the user");
+    }
+}
+
+/// Esc (any case) leaves fullscreen or diagram preview; Enter leaves only fullscreen, and other
+/// keys never do.
+#[test]
+fn test_nav_preview_exit_keys() {
+    let none = HashMap::new();
+    for (key, fullscreen, diagram, exits) in [
+        ("esc", true, false, true),
+        ("Esc", false, true, true),
+        ("enter", true, false, true),
+        ("enter", false, true, false),
+        ("x", true, false, false),
+        ("x", false, true, false),
+    ] {
+        let (out, focus) = nav_key(key, &none, fullscreen, diagram);
+        assert_eq!(
+            out.contains(&Action::CyclePreview),
+            exits,
+            "{key} fullscreen={fullscreen} diagram={diagram}: {out:?}"
+        );
+        assert_eq!(focus == Focus::Input, exits, "{key}: focus {focus:?}");
+    }
+}
+
+/// With the sort menu open, Esc closes it and is swallowed; another key closes it and its action
+/// still runs.
+#[test]
+fn test_sort_menu_esc_is_swallowed_other_keys_pass_through() {
+    let mut active = true;
+    let mut buffer = vec![RenderCommand::<NullActionExt>::KeyAction {
+        key: "esc".into(),
+        action: Action::Down(1),
+    }];
+    keys::apply_sort_menu(&mut buffer, &mut active);
+    assert!(!active);
+    assert!(buffer.is_empty(), "{buffer:?}");
+
+    let mut active = true;
+    let mut buffer = vec![RenderCommand::<NullActionExt>::KeyAction {
+        key: "x".into(),
+        action: Action::Down(1),
+    }];
+    keys::apply_sort_menu(&mut buffer, &mut active);
+    assert!(!active);
+    assert!(
+        matches!(buffer.as_slice(), [RenderCommand::Action(Action::Down(1))]),
+        "{buffer:?}"
+    );
+}
+
+/// Runs a buffer through `apply_focus_binds_mode` and returns the resulting actions.
+fn focus_mode(
+    cmds: Vec<RenderCommand<NullActionExt>>,
+    focus: Focus,
+    focus_binds: &HashMap<String, Actions<NullActionExt>>,
+    preview_fullscreen: bool,
+    preview_diagram_mode: bool,
+) -> Vec<Action<NullActionExt>> {
+    let mut buffer = cmds;
+    let mut pending = None;
+    let mut sort_menu_active = false;
+    keys::apply_focus_binds_mode(
+        &mut buffer,
+        focus,
+        focus_binds,
+        false,
+        &mut pending,
+        &mut sort_menu_active,
+        preview_fullscreen,
+        preview_diagram_mode,
+    );
+    buffer
+        .into_iter()
+        .map(|c| match c {
+            RenderCommand::Action(a) | RenderCommand::KeyAction { action: a, .. } => a,
+            other => panic!("unexpected {other:?}"),
+        })
+        .collect()
+}
+
+/// Editing actions (typed char, backspace, left, right) edit the filter when it has focus, and
+/// are read as navigation keys when the results have focus or a preview fills the screen.
+#[test]
+fn test_nav_editing_actions_follow_focus_and_preview() {
+    let binds = HashMap::from([
+        ("x".to_string(), Actions::from([Action::Pos(1)])),
+        ("backspace".to_string(), Actions::from([Action::Pos(2)])),
+        ("left".to_string(), Actions::from([Action::Pos(3)])),
+        ("right".to_string(), Actions::from([Action::Pos(4)])),
+    ]);
+    let cases: [(Action<NullActionExt>, Action<NullActionExt>); 4] = [
+        (Action::Char('x'), Action::Pos(1)),
+        (Action::DeleteChar, Action::Pos(2)),
+        (Action::BackwardChar, Action::Pos(3)),
+        (Action::ForwardChar, Action::Pos(4)),
+    ];
+    for (input, nav) in cases {
+        // Filter focused, no preview: the filter gets the edit.
+        let out = focus_mode(
+            vec![input.clone().into()],
+            Focus::Input,
+            &binds,
+            false,
+            false,
+        );
+        assert_eq!(out, vec![input.clone()], "{input:?} in the filter");
+        // Results focused: the nav bind for that key.
+        let out = focus_mode(
+            vec![input.clone().into()],
+            Focus::Results,
+            &binds,
+            false,
+            false,
+        );
+        assert_eq!(out, vec![nav.clone()], "{input:?} in the results");
+    }
+    // A fullscreen or diagram preview takes left/right even with the filter focused.
+    let none = HashMap::new();
+    let out = focus_mode(
+        vec![Action::BackwardChar.into()],
+        Focus::Input,
+        &none,
+        true,
+        false,
+    );
+    assert_eq!(out, vec![Action::PreviewHScroll(-6)]);
+    let out = focus_mode(
+        vec![Action::ForwardChar.into()],
+        Focus::Input,
+        &none,
+        false,
+        true,
+    );
+    assert_eq!(out, vec![Action::PreviewHScroll(6)]);
+    // ... and typed keys.
+    let out = focus_mode(
+        vec![RenderCommand::KeyAction {
+            key: "j".into(),
+            action: Action::Char('j'),
+        }],
+        Focus::Input,
+        &none,
+        false,
+        true,
+    );
+    assert_eq!(out, vec![Action::PreviewDown(3)]);
+    let out = focus_mode(
+        vec![Action::Char('j').into()],
+        Focus::Input,
+        &none,
+        true,
+        false,
+    );
+    assert_eq!(out, vec![Action::PreviewDown(3)]);
+}
+
+/// Up/Down actions scroll a fullscreen or diagram preview; otherwise they move the cursor as
+/// sent, even when the user bound "up"/"down" in nav mode (those binds apply to keys).
+#[test]
+fn test_nav_up_down_actions_scroll_only_a_full_preview() {
+    let binds = HashMap::from([
+        ("up".to_string(), Actions::from([Action::Pos(8)])),
+        ("down".to_string(), Actions::from([Action::Pos(9)])),
+    ]);
+    for focus in [Focus::Input, Focus::Results] {
+        let out = focus_mode(vec![Action::Up(1).into()], focus, &binds, false, false);
+        assert_eq!(out, vec![Action::Up(1)], "{focus:?}");
+        let out = focus_mode(vec![Action::Down(1).into()], focus, &binds, false, false);
+        assert_eq!(out, vec![Action::Down(1)], "{focus:?}");
+    }
+    let none = HashMap::new();
+    let out = focus_mode(
+        vec![Action::Up(1).into()],
+        Focus::Results,
+        &none,
+        true,
+        false,
+    );
+    assert_eq!(out, vec![Action::PreviewUp(3)]);
+    let out = focus_mode(
+        vec![Action::Down(1).into()],
+        Focus::Results,
+        &none,
+        false,
+        true,
+    );
+    assert_eq!(out, vec![Action::PreviewDown(3)]);
+}
+
+/// In the results, unbound typed characters and editing keys do nothing, `g b` jumps to the last
+/// item, and `g t` to the first.
+#[test]
+fn test_nav_unbound_keys_in_results() {
+    let none = HashMap::new();
+    for (key, action) in [
+        ("x", Action::Char('x')),
+        ("ctrl-w", Action::DeleteWord),
+        ("delete", Action::DeleteNextChar),
+        ("alt-d", Action::DeleteNextWord),
+        ("ctrl-a", Action::DeleteLineStart),
+        ("ctrl-e", Action::DeleteLineEnd),
+    ] {
+        let (out, _) = nav_key_with_fallback(key, action.clone(), &none);
+        assert!(
+            out.is_empty(),
+            "{key} -> {action:?} should be dropped, got {out:?}"
+        );
+    }
+    let gb = focus_mode(
+        vec![Action::Char('g').into(), Action::Char('b').into()],
+        Focus::Results,
+        &none,
+        false,
+        false,
+    );
+    assert_eq!(gb, vec![Action::Pos(-1)]);
+    let gt = focus_mode(
+        vec![Action::Char('g').into(), Action::Char('t').into()],
+        Focus::Results,
+        &none,
+        false,
+        false,
+    );
+    assert_eq!(gt, vec![Action::Pos(0)]);
+}
+
+fn nav_key_with_fallback(
+    key: &str,
+    fallback: Action<NullActionExt>,
+    focus_binds: &HashMap<String, Actions<NullActionExt>>,
+) -> (Vec<Action<NullActionExt>>, Focus) {
+    let mut pending = None;
+    let mut sort_menu_active = false;
+    let mut focus = Focus::Results;
+    let mut out = Vec::new();
+    keys::process_results_nav_key::<NullActionExt>(
+        key,
+        Some(fallback),
+        focus_binds,
+        &mut pending,
+        &mut sort_menu_active,
+        &mut focus,
+        &mut out,
+        false,
+        false,
+    );
+    let actions = out
+        .into_iter()
+        .filter_map(|c| match c {
+            RenderCommand::Action(a) => Some(a),
+            _ => None,
+        })
+        .collect();
+    (actions, focus)
+}
