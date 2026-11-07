@@ -65,3 +65,10 @@ Size: about 3–5 sessions. It removes roughly 500 lines.
 1. **Preview keys are configurable.** They become default binds in a `preview` mode that users can override like any other bind.
 2. **General key sequences.** A `KeySequence` trigger replaces the hard-coded `g` prefix. A key that begins a bound sequence waits for the next key, with no timeout, as `g` does today. A sequence and a single key can't both start with the same key in the same mode; config validation reports the conflict.
 3. **Help lists nav binds under their own heading.**
+
+## Progress
+
+- Step 1 (8e843a4): focus lives in `InputState`.
+- Step 2a (da95c02): `NavResolver` resolves nav keys one command at a time.
+- Step 2b: `NavKeymap` parses `[nav.binds]` keys into key combinations and sequences. A differential property test against the old string matching found two parsing differences, both fixed: `shift-?`/`?`, and crokey reading `J` as `j`.
+- Next, step 3: the event loop resolves nav keys through `NavResolver` + `NavKeymap`; preview keys become a configurable `preview` mode; review the bind snapshot.
