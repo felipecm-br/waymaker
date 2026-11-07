@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 0640551c6224a079b61f9271ee570dd6a722fb480960bf8da9987c372e7bab0c # shrinks to items = ["#0;xxxx", "#1;xxxx", "#2;xxxx", "#3;xxxx", "#4;xxxx", "#5;xxxx", "#6;xxxx", "#7;xxxx", "#8;xxxx", "#9;xxxx", "#10;xxx", "#11;xxx", "#12;xxx", "#13;xxx", "#14;xxx", "#15;xxx", "#16;", "#17;", "#18;", "#19;"], width = 12, height = 1, wrap = false, scroll_wrap = false, ops = []
+cc 67d886c077a2f4d41b3d3bc27f65f16230928e1602b81edaef5f22c49b703739 # shrinks to items = ["#0;xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "#1;xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"], width = 16, height = 7, wrap = true, scroll_wrap = false, ops = [Next, Prev]
