@@ -4,9 +4,16 @@
 
 - The keys of a fullscreen or diagram preview are configurable: `[ui.nav.preview_binds]` overrides them key by key (`"J" = "PreviewDown(30)"`); unlisted keys keep their defaults
 - `[ui.nav.binds]` keys are matched as keys rather than strings, so `shift-j` and `J`, or `Esc` and `esc`, name the same key
+- The navigation-mode keys that were built in (outside a fullscreen preview `J`/`K` scroll it, `u`/`d` by half a page, `s`, `+`/`=`, `-`, `0`, `]`/`n` and `[`/`N` drive diagrams, `,` opens the sort menu, `gg`/`gt`/`gb`) are default binds: `[ui.nav.binds]` can rebind each one. A bind replaces only its own key; binding `u` used to disable the `ctrl-u` default too
+- Any two-key sequence in `[ui.nav.binds]` works (`zz = "Pos(0)"`), not only the `g` ones. A startup warning names a sequence that can never fire: one whose first key is also bound alone, or one longer than two keys
+- In navigation mode, help lists the navigation keys and the preview keys in effect under their own headings
 
 ### 🐛 Bug Fixes
 
+- `,` in navigation mode never showed the sort menu: it opened and closed again at once
+- Navigation-mode keys typed in quick succession (or pasted) could be read against the focus or preview state from before the previous key took effect; each key now waits for the previous one to be applied
+- Previewing a Markdown file whose Mermaid `classDiagram` has non-ASCII names (`Usuário`) crashed wm. Fixed by updating `mermaid-text` to 0.58
+- A bind trigger that is a literal control character (a newline or tab inside the TOML key) or empty was accepted as a bind that could never fire; it is now a config error. The key chord `a-@` was saved back as the semantic trigger `@-a`
 - With `results.wrap` on, moving up onto a first row that was cut off left it cut, showing only its last line; it is now drawn whole
 - A `[binds]` key bound to a built-in file-manager alias (`@create`, `@rename`, `@delete`, `@zip`, `@unzip`, `@yank`, `@cut`, `@undo`, `@redo`, ...) did nothing: the bind was dropped at startup. The default `F2` (`@rename`) now renames
 - The `jump` preset showed `a Add`, `r Rename`, `d Trash` and `z/Z Zip` hints but bound none of them; the keys now do what the hints say
@@ -22,6 +29,7 @@
 
 ### 🧪 Testing
 
+- Fuzz targets (`fuzz/`, cargo-fuzz) for bind triggers, actions, the query, status templates, and the Markdown and Mermaid previews; CI runs each on every push. They found the trigger and `mermaid-text` bugs above
 - Golden frames now count toward coverage (each `wm` exits normally), plus new frames for clipped and stacked rows, tiers, symlinks, mouse input, every preview action and many picker actions; pty tests for the file manager on real files. Line coverage 71% -> 76%; the CI floor is 72%
 
 ## [0.8.0] - 2026-11-05
