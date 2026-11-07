@@ -636,13 +636,19 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
                 update_sim_focus(&action, &mut sim_focus);
                 out.push(RenderCommand::Action(action));
             }
-            RenderCommand::Action(Action::DeleteChar)
-                if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode =>
-            {
+            // Editing actions read as navigation keys in the results or a full preview.
+            RenderCommand::Action(
+                action @ (Action::DeleteChar | Action::BackwardChar | Action::ForwardChar),
+            ) if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode => {
                 last_consumed_nav_key = None;
+                let key = match action {
+                    Action::DeleteChar => "backspace",
+                    Action::BackwardChar => "left",
+                    _ => "right",
+                };
                 process_results_nav_key(
-                    "backspace",
-                    Some(Action::DeleteChar),
+                    key,
+                    Some(action),
                     focus_binds,
                     pending_nav_key,
                     sort_menu_active,
@@ -652,59 +658,19 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
                     preview_diagram_mode,
                 );
             }
-            RenderCommand::Action(Action::BackwardChar)
-                if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode =>
-            {
-                last_consumed_nav_key = None;
-                process_results_nav_key(
-                    "left",
-                    Some(Action::BackwardChar),
-                    focus_binds,
-                    pending_nav_key,
-                    sort_menu_active,
-                    &mut sim_focus,
-                    &mut out,
-                    preview_fullscreen,
-                    preview_diagram_mode,
-                );
-            }
-            RenderCommand::Action(Action::ForwardChar)
-                if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode =>
-            {
-                last_consumed_nav_key = None;
-                process_results_nav_key(
-                    "right",
-                    Some(Action::ForwardChar),
-                    focus_binds,
-                    pending_nav_key,
-                    sort_menu_active,
-                    &mut sim_focus,
-                    &mut out,
-                    preview_fullscreen,
-                    preview_diagram_mode,
-                );
-            }
-            RenderCommand::Action(Action::Up(n)) if preview_fullscreen || preview_diagram_mode => {
-                last_consumed_nav_key = None;
-                process_results_nav_key(
-                    "up",
-                    Some(Action::Up(n)),
-                    focus_binds,
-                    pending_nav_key,
-                    sort_menu_active,
-                    &mut sim_focus,
-                    &mut out,
-                    preview_fullscreen,
-                    preview_diagram_mode,
-                );
-            }
-            RenderCommand::Action(Action::Down(n))
+            // Up/Down scroll a fullscreen or diagram preview.
+            RenderCommand::Action(action @ (Action::Up(_) | Action::Down(_)))
                 if preview_fullscreen || preview_diagram_mode =>
             {
                 last_consumed_nav_key = None;
+                let key = if matches!(action, Action::Up(_)) {
+                    "up"
+                } else {
+                    "down"
+                };
                 process_results_nav_key(
-                    "down",
-                    Some(Action::Down(n)),
+                    key,
+                    Some(action),
                     focus_binds,
                     pending_nav_key,
                     sort_menu_active,
