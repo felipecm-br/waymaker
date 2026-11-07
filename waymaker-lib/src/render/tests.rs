@@ -459,6 +459,35 @@ fn test_apply_live_input() {
 
 /// With the sort menu open, Esc closes it and is swallowed; another key closes it and its action
 /// still runs.
+/// Each letter in the sort menu picks its order (upper case reverses it).
+#[test]
+fn test_sort_menu_letters() {
+    use crate::action::SortOrder::*;
+    for (c, order) in [
+        ('a', Alphabetical),
+        ('A', AlphabeticalReverse),
+        ('n', Natural),
+        ('N', NaturalReverse),
+        ('m', Modified),
+        ('M', ModifiedReverse),
+        ('b', Created),
+        ('B', CreatedReverse),
+        ('s', Size),
+        ('S', SizeReverse),
+        ('e', Extension),
+        ('E', ExtensionReverse),
+    ] {
+        let mut active = true;
+        let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char(c))];
+        keys::apply_sort_menu(&mut buffer, &mut active);
+        assert!(!active, "{c}");
+        assert!(
+            matches!(buffer.as_slice(), [RenderCommand::Action(Action::Sort(Some(o)))] if *o == order),
+            "{c}: {buffer:?}"
+        );
+    }
+}
+
 #[test]
 fn test_sort_menu_esc_is_swallowed_other_keys_pass_through() {
     let mut active = true;

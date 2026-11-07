@@ -214,7 +214,23 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
             b.publish(RenderView::default(), 2);
         });
+        // The publish wakes the waiter: it does not sit out the limit.
+        let start = std::time::Instant::now();
         assert!(a.render_caught_up(2, Duration::from_secs(5)).await);
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "{:?}",
+            start.elapsed()
+        );
         publisher.await.unwrap();
+
+        // Publishing a fence already reached wakes nobody, and changes nothing.
+        let c = Arc::clone(&a);
+        let republisher = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            c.publish(RenderView::default(), 2);
+        });
+        assert!(!a.render_caught_up(3, Duration::from_millis(200)).await);
+        republisher.await.unwrap();
     }
 }

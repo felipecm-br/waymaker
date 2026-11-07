@@ -1654,3 +1654,72 @@ fn test_preview_keys_pinned_before_they_become_binds() {
         assert_eq!(out, vec![PreviewUp(0)], "gg fullscreen={fullscreen}");
     }
 }
+
+/// A bind that moves focus moves it for the rest of the same input event: a key command after
+/// it is resolved for the pane that now has focus.
+#[test]
+fn test_focus_moves_within_one_event() {
+    let binds = HashMap::from([
+        ("/".to_string(), Actions::from([Action::FocusFilter])),
+        ("j".to_string(), Actions::from([Action::Down(1)])),
+    ]);
+    let run = |focus: Focus, cmds: Vec<RenderCommand<NullActionExt>>| {
+        let mut buffer = cmds;
+        let (mut pending, mut sort) = (None, false);
+        apply_focus_binds(
+            &mut buffer,
+            focus,
+            &binds,
+            false,
+            &mut pending,
+            &mut sort,
+            false,
+        );
+        buffer
+            .into_iter()
+            .map(|c| match c {
+                RenderCommand::Action(a) => a,
+                other => panic!("{other:?}"),
+            })
+            .collect::<Vec<_>>()
+    };
+    let key = |k: &str, action: Action<NullActionExt>| RenderCommand::KeyAction {
+        key: k.into(),
+        action,
+    };
+
+    // A nav bind's FocusFilter: the char after it is typed into the filter.
+    assert_eq!(
+        run(
+            Focus::Results,
+            vec![
+                key("/", Action::Char('/')),
+                RenderCommand::Action(Action::Char('j'))
+            ]
+        ),
+        vec![Action::FocusFilter, Action::Char('j')]
+    );
+    // From the filter, a global ToggleFocus or FocusNav hands the next key to the results.
+    for to_results in [Action::ToggleFocus, Action::FocusNav] {
+        assert_eq!(
+            run(
+                Focus::Input,
+                vec![key("x", to_results.clone()), key("j", Action::Char('j'))]
+            ),
+            vec![to_results, Action::Down(1)]
+        );
+    }
+}
+
+/// In diagram mode, characters drive the diagram even while the filter has focus.
+#[test]
+fn test_diagram_mode_reads_chars_with_the_filter_focused() {
+    let out = focus_mode(
+        vec![RenderCommand::Action(Action::Char('j'))],
+        Focus::Input,
+        &HashMap::new(),
+        false,
+        true,
+    );
+    assert_eq!(out, vec![Action::PreviewDown(3)]);
+}
