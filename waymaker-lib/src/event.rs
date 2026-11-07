@@ -141,11 +141,8 @@ impl<A: ActionExt> EventLoop<A> {
     /// [`run`]: EventLoop::run
     pub fn set_nav(&mut self, nav: &crate::config::NavConfig) {
         self.nav = (nav.active && !nav.passthrough).then(|| NavKeys {
-            binds: NavKeymap::from_strings(&nav.binds),
-            preview: NavKeymap::from_layers(
-                &crate::config::NavConfig::default_preview_binds(),
-                &nav.preview_binds,
-            ),
+            binds: NavKeymap::from_strings(&nav.effective_binds()),
+            preview: NavKeymap::from_strings(&nav.effective_preview_binds()),
         });
     }
 
@@ -569,10 +566,8 @@ impl<A: ActionExt> EventLoop<A> {
             view.preview_diagram,
         );
         let mut out = Vec::with_capacity(commands.len());
-        // The render loop opens the menu when it applies the SortMenu this emits.
-        let mut sort_menu = false;
         for command in commands {
-            resolver.feed(command, &mut self.pending_nav_key, &mut sort_menu, &mut out);
+            resolver.feed(command, &mut self.pending_nav_key, &mut out);
         }
         out
     }

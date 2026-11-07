@@ -694,14 +694,91 @@ impl NavConfig {
     /// The preview keys in effect: `[nav.preview_binds]`, plus each default key it does not bind
     /// under any spelling.
     pub fn effective_preview_binds(&self) -> HashMap<String, Actions<NullActionExt>> {
+        Self::layer(&self.preview_binds, Self::default_preview_binds())
+    }
+
+    /// The navigation keys in effect: `[nav.binds]` (with the profile's defaults), plus each
+    /// [`fallback_binds`](Self::fallback_binds) key it does not bind under any spelling.
+    pub fn effective_binds(&self) -> HashMap<String, Actions<NullActionExt>> {
+        Self::layer(&self.binds, Self::fallback_binds())
+    }
+
+    /// `binds`, plus each of `defaults` whose key `binds` does not bind under any spelling.
+    fn layer(
+        binds: &HashMap<String, Actions<NullActionExt>>,
+        defaults: HashMap<String, Actions<NullActionExt>>,
+    ) -> HashMap<String, Actions<NullActionExt>> {
         let mut layered = NavConfig {
-            binds: self.preview_binds.clone(),
+            binds: binds.clone(),
             ..Default::default()
         };
-        for (key, actions) in Self::default_preview_binds() {
+        for (key, actions) in defaults {
             layered.add_default_bind(&key, actions);
         }
         layered.binds
+    }
+
+    /// Keys every navigation profile has, `none` included, unless `[nav.binds]` binds them:
+    /// preview scrolling and diagram controls (while the preview is not fullscreen, where the
+    /// preview binds take these keys), the sort menu and the `g` sequences.
+    pub fn fallback_binds() -> HashMap<String, Actions<NullActionExt>> {
+        let table: [(&[&str], Action<NullActionExt>); 14] = [
+            (&["J"], Action::PreviewDown(5)),
+            (&["K"], Action::PreviewUp(5)),
+            (&["u"], Action::PreviewHalfPageUp),
+            (&["d"], Action::PreviewHalfPageDown),
+            (&["s"], Action::ToggleDiagram),
+            (&["+", "="], Action::DiagramZoomIn),
+            (&["-"], Action::DiagramZoomOut),
+            (&["0"], Action::DiagramResetZoom),
+            (&["]", "n"], Action::NextDiagram),
+            (&["[", "N"], Action::PrevDiagram),
+            (&[","], Action::SortMenu),
+            (&["gg"], Action::PreviewUp(0)),
+            (&["gt"], Action::Pos(0)),
+            (&["gb"], Action::Pos(-1)),
+        ];
+        let mut binds = HashMap::new();
+        for (keys, action) in table {
+            for key in keys {
+                binds.insert(key.to_string(), Actions::from([action.clone()]));
+            }
+        }
+        binds
+    }
+
+    /// Bound key sequences that can never fire: one whose first key is also bound on its own
+    /// (the single key wins), and one longer than two keys. Unbinds (`[]`) do not count.
+    pub fn sequence_conflicts(&self) -> Vec<String> {
+        let mut problems = Vec::new();
+        for (key, actions) in &self.binds {
+            if actions.0.is_empty() {
+                continue;
+            }
+            let Some(crate::render::NavKey::Sequence(seq)) = crate::render::parse_nav_key(key)
+            else {
+                continue;
+            };
+            if seq.len() > 2 {
+                problems.push(format!(
+                    "'{key}' is a sequence of {} keys; only two-key sequences are supported",
+                    seq.len()
+                ));
+                continue;
+            }
+            let first: String = key.chars().take(1).collect();
+            if let Some((single, _)) = self
+                .binds
+                .iter()
+                .find(|(k, a)| !a.0.is_empty() && crate::render::same_nav_key(k, &first))
+            {
+                problems.push(format!(
+                    "'{key}' starts with '{single}', which is bound on its own, so '{key}' never fires"
+                ));
+            }
+        }
+        problems.sort();
+        problems
     }
 
     /// The default keys of a fullscreen or diagram preview; `[nav.preview_binds]` overrides

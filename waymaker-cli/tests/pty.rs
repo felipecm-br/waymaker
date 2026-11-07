@@ -296,7 +296,9 @@ fn nav_keys_sent_together_see_the_state_the_earlier_key_left() {
     assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
 }
 
-/// In navigation mode, help lists the nav and preview binds under their own headings.
+/// In navigation mode, help lists the nav binds in effect under their own heading, the
+/// fallback keys (such as `d`, half a page down) included. The preview keys follow below, past
+/// what this screen shows: the help pane does not scroll.
 #[test]
 fn nav_help_lists_nav_and_preview_binds() {
     let wm = Launch::new(FRUIT)
@@ -310,7 +312,7 @@ fn nav_help_lists_nav_and_preview_binds() {
         .ready("banana")
         .start();
     wm.send("\x1bOP"); // F1
-    wm.wait_for_screen(|s| s.contains("Navigation") && s.contains("Preview (fullscreen"));
+    wm.wait_for_screen(|s| s.contains("Navigation") && s.contains("d = PreviewHalfPageDown"));
     wm.send("q");
     assert_eq!(wm.finish().0, 130);
 }

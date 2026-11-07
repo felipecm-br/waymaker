@@ -1205,6 +1205,23 @@ fn test_get_nav_bind_question_mark() {
     assert_eq!(res_rev.unwrap()[0], Action::Help("".into()));
 }
 
+/// The nav and preview keymaps the event loop builds for `[nav.binds]` = `focus_binds`.
+fn keymaps(
+    focus_binds: &HashMap<String, Actions<NullActionExt>>,
+) -> (
+    crate::render::nav_keymap::NavKeymap,
+    crate::render::nav_keymap::NavKeymap,
+) {
+    let nav = crate::config::NavConfig {
+        binds: focus_binds.clone(),
+        ..Default::default()
+    };
+    (
+        crate::render::nav_keymap::NavKeymap::from_strings(&nav.effective_binds()),
+        crate::render::nav_keymap::NavKeymap::from_strings(&nav.effective_preview_binds()),
+    )
+}
+
 /// Runs one key through `process_results_nav_key` and returns what it emitted.
 fn nav_key(
     key: &str,
@@ -1213,20 +1230,15 @@ fn nav_key(
     preview_diagram_mode: bool,
 ) -> (Vec<Action<NullActionExt>>, Focus) {
     let mut pending = None;
-    let mut sort_menu_active = false;
     let mut focus = Focus::Results;
     let mut out = Vec::new();
-    let keymap = crate::render::nav_keymap::NavKeymap::from_strings(focus_binds);
-    let preview = crate::render::nav_keymap::NavKeymap::from_strings(
-        &crate::config::NavConfig::default_preview_binds(),
-    );
+    let (keymap, preview) = keymaps(focus_binds);
     crate::render::keys::process_results_nav_key::<NullActionExt>(
         key,
         None,
         &keymap,
         &preview,
         &mut pending,
-        &mut sort_menu_active,
         &mut focus,
         &mut out,
         preview_fullscreen,
@@ -1242,64 +1254,94 @@ fn nav_key(
     (actions, focus)
 }
 
-/// Outside fullscreen, J/K/u/d/s/+/-/0/]/[ fall back to preview and diagram controls, unless the
-/// user bound one of the keys of that group in `[nav.binds]`: a user bind always wins.
+/// Outside fullscreen, J/K/u/d/s/+/-/0/]/[ (`NavConfig::fallback_binds`) scroll the preview and
+/// drive diagrams, unless `[nav.binds]` binds that key, under any spelling. Each key stands on
+/// its own: binding `u` leaves `d` alone, and `+` and `=` are separate keys.
 #[test]
 fn test_nav_preview_fallbacks_yield_to_user_binds() {
-    let groups: &[(&[&str], &[&str], Action<NullActionExt>)] = &[
-        (
-            &["J", "shift-j", "ctrl-shift-j", "ctrl-J"],
-            &["J", "shift-j", "ctrl-shift-j", "ctrl-J"],
-            Action::PreviewDown(5),
-        ),
-        (
-            &["K", "shift-k", "ctrl-shift-k", "ctrl-K"],
-            &["K", "shift-k", "ctrl-shift-k", "ctrl-K"],
-            Action::PreviewUp(5),
-        ),
-        (
-            &["ctrl-u", "u"],
-            &["ctrl-u", "u"],
-            Action::PreviewHalfPageUp,
-        ),
-        (
-            &["ctrl-d", "d"],
-            &["ctrl-d", "d"],
-            Action::PreviewHalfPageDown,
-        ),
-        (&["s"], &["s"], Action::ToggleDiagram),
-        (&["+", "="], &["+", "="], Action::DiagramZoomIn),
-        (&["-"], &["-"], Action::DiagramZoomOut),
-        (&["0"], &["0"], Action::DiagramResetZoom),
+    use Action::*;
+    let keys: &[(&[&str], Action<NullActionExt>)] = &[
+        (&["J", "shift-j"], PreviewDown(5)),
+        (&["K", "shift-k"], PreviewUp(5)),
+        (&["u"], PreviewHalfPageUp),
+        (&["d"], PreviewHalfPageDown),
+        (&["s"], ToggleDiagram),
+        (&["+"], DiagramZoomIn),
+        (&["="], DiagramZoomIn),
+        (&["-"], DiagramZoomOut),
+        (&["0"], DiagramResetZoom),
+        (&["]"], NextDiagram),
+        (&["n"], NextDiagram),
+        (&["["], PrevDiagram),
+        (&["N"], PrevDiagram),
     ];
     let user = Action::<NullActionExt>::Pos(42);
-    for (pressed, suppressors, builtin) in groups {
-        for key in *pressed {
-            let (out, _) = nav_key(key, &HashMap::new(), false, false);
-            assert_eq!(out, vec![builtin.clone()], "{key} with no binds");
-            for bound in *suppressors {
+    for (spellings, builtin) in keys {
+        for pressed in *spellings {
+            let (out, _) = nav_key(pressed, &HashMap::new(), false, false);
+            assert_eq!(out, vec![builtin.clone()], "{pressed} with no binds");
+            for bound in *spellings {
                 let binds = HashMap::from([(bound.to_string(), Actions::from([user.clone()]))]);
-                let (out, _) = nav_key(key, &binds, false, false);
-                assert!(
-                    !out.contains(builtin),
-                    "{key} must not fire {builtin:?} when {bound} is bound, got {out:?}"
-                );
+                let (out, _) = nav_key(pressed, &binds, false, false);
+                assert_eq!(out, vec![user.clone()], "{pressed} with {bound} bound");
             }
         }
     }
-    // ]/n and [/N yield only to a bind on the pressed key itself.
-    for (key, builtin) in [
-        ("]", Action::NextDiagram),
-        ("n", Action::NextDiagram),
-        ("[", Action::PrevDiagram),
-        ("N", Action::PrevDiagram),
-    ] {
-        let (out, _) = nav_key(key, &HashMap::new(), false, false);
-        assert_eq!(out, vec![builtin.clone()], "{key} with no binds");
-        let binds = HashMap::from([(key.to_string(), Actions::from([user.clone()]))]);
-        let (out, _) = nav_key(key, &binds, false, false);
-        assert_eq!(out, vec![user.clone()], "{key} bound by the user");
-    }
+    let binds = HashMap::from([("u".to_string(), Actions::from([user.clone()]))]);
+    assert_eq!(
+        nav_key("d", &binds, false, false).0,
+        vec![PreviewHalfPageDown]
+    );
+    let binds = HashMap::from([("+".to_string(), Actions::from([user.clone()]))]);
+    assert_eq!(nav_key("=", &binds, false, false).0, vec![DiagramZoomIn]);
+}
+
+/// Any key that starts a bound two-key sequence waits for the next key, not only `g`; a key
+/// that is also bound on its own fires at once, and the key that breaks a sequence does only
+/// what it is bound to.
+#[test]
+fn test_nav_sequences_with_any_first_key() {
+    let binds = HashMap::from([
+        ("zz".to_string(), Actions::from([Action::Pos(7)])),
+        ("x".to_string(), Actions::from([Action::Pos(1)])),
+        ("xy".to_string(), Actions::from([Action::Pos(2)])),
+    ]);
+    let (keymap, preview) = keymaps(&binds);
+    let run = |keys: &[&str]| {
+        let mut pending = None;
+        let mut focus = Focus::Results;
+        let mut out = Vec::new();
+        for key in keys {
+            crate::render::keys::process_results_nav_key::<NullActionExt>(
+                key,
+                Some(Action::Char(key.chars().next().unwrap())),
+                &keymap,
+                &preview,
+                &mut pending,
+                &mut focus,
+                &mut out,
+                false,
+                false,
+            );
+        }
+        let actions: Vec<_> = out
+            .into_iter()
+            .filter_map(|c| match c {
+                RenderCommand::Action(a) => Some(a),
+                _ => None,
+            })
+            .collect();
+        (actions, pending)
+    };
+    assert_eq!(run(&["z"]), (vec![], Some('z')));
+    assert_eq!(run(&["z", "z"]), (vec![Action::Pos(7)], None));
+    // `z` then `j`: j does its own bind (Down) and nothing else.
+    assert_eq!(run(&["z", "j"]).1, None);
+    // `x` is bound on its own, so `xy` never starts.
+    assert_eq!(run(&["x", "y"]).0, vec![Action::Pos(1)]);
+    // The default g sequences still work.
+    assert_eq!(run(&["g", "t"]).0, vec![Action::Pos(0)]);
+    assert_eq!(run(&["g", "b"]).0, vec![Action::Pos(-1)]);
 }
 
 /// In a fullscreen preview, h/l and H/L scroll sideways by 6 and 18 columns.
@@ -1518,20 +1560,15 @@ fn nav_key_with_fallback(
     focus_binds: &HashMap<String, Actions<NullActionExt>>,
 ) -> (Vec<Action<NullActionExt>>, Focus) {
     let mut pending = None;
-    let mut sort_menu_active = false;
     let mut focus = Focus::Results;
     let mut out = Vec::new();
-    let keymap = crate::render::nav_keymap::NavKeymap::from_strings(focus_binds);
-    let preview = crate::render::nav_keymap::NavKeymap::from_strings(
-        &crate::config::NavConfig::default_preview_binds(),
-    );
+    let (keymap, preview) = keymaps(focus_binds);
     crate::render::keys::process_results_nav_key::<NullActionExt>(
         key,
         Some(fallback),
         &keymap,
         &preview,
         &mut pending,
-        &mut sort_menu_active,
         &mut focus,
         &mut out,
         false,

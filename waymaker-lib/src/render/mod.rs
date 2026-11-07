@@ -7,6 +7,8 @@ mod live_input;
 mod mouse;
 pub(crate) mod nav_keymap;
 
+pub(crate) use nav_keymap::{NavKey, parse_nav_key};
+
 /// Whether two nav-bind keys name the same key (`Esc`/`esc`, `space`/`" "`, `shift-j`/`J`).
 /// Keys that do not parse compare as strings.
 pub fn same_nav_key(a: &str, b: &str) -> bool {

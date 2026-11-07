@@ -3,8 +3,8 @@
 //! `[nav.binds]` keys are strings today, matched against the event loop's key names with
 //! special cases (case-insensitive names, `space` vs `" "`, `?` vs `shift-?`). Parsing them into
 //! normalized `KeyCombination`s makes equal keys equal, and strings such as `gg` that are not a
-//! key name become key sequences. The differential test below checks it agrees with the old
-//! string matching in `keys::get_nav_bind`.
+//! key name become key sequences (two keys long; the first waits for the second). The
+//! differential test below checks it agrees with the old string matching in `keys::get_nav_bind`.
 
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -45,7 +45,7 @@ fn parse_one(s: &str) -> Option<KeyCombination> {
 }
 
 /// Parses a `[nav.binds]` key: a key name or combination, else a sequence of single characters.
-pub(super) fn parse_nav_key(s: &str) -> Option<NavKey> {
+pub(crate) fn parse_nav_key(s: &str) -> Option<NavKey> {
     if let Some(k) = parse_one(s) {
         return Some(NavKey::Single(k));
     }
@@ -64,8 +64,18 @@ pub(super) fn parse_nav_key(s: &str) -> Option<NavKey> {
 #[derive(Debug, Default)]
 pub(crate) struct NavKeymap {
     binds: HashMap<NavKey, Actions<NullActionExt>>,
-    /// The keys exactly as written, for checks that compare spellings.
-    spellings: std::collections::HashSet<String>,
+}
+
+/// What a key does to a two-key sequence ([`NavKeymap::step`]).
+pub(crate) enum Step<'a> {
+    /// It completed a bound sequence.
+    Sequence(&'a Actions<NullActionExt>),
+    /// It starts a bound sequence and is not bound on its own: wait for the next key.
+    Waiting,
+    /// It followed a waiting key but completes no bound sequence.
+    Broken,
+    /// No sequence is involved: resolve the key on its own.
+    Key,
 }
 
 impl NavKeymap {
@@ -74,36 +84,35 @@ impl NavKeymap {
             .iter()
             .filter_map(|(k, v)| parse_nav_key(k).map(|key| (key, v.clone())))
             .collect();
-        Self {
-            binds,
-            spellings: map.keys().cloned().collect(),
-        }
-    }
-
-    /// `defaults` with `overrides` on top: an override replaces the default for the same key,
-    /// whatever its spelling.
-    pub(crate) fn from_layers(
-        defaults: &HashMap<String, Actions<NullActionExt>>,
-        overrides: &HashMap<String, Actions<NullActionExt>>,
-    ) -> Self {
-        let mut keymap = Self::from_strings(defaults);
-        for (k, v) in overrides {
-            if let Some(key) = parse_nav_key(k) {
-                keymap.binds.insert(key, v.clone());
-            }
-            keymap.spellings.insert(k.clone());
-        }
-        keymap
-    }
-
-    /// Whether `key` is bound with exactly this spelling.
-    pub(super) fn contains_spelling(&self, key: &str) -> bool {
-        self.spellings.contains(key)
+        Self { binds }
     }
 
     /// The actions bound to `key`, a key name as the event loop reports it.
     pub(super) fn get(&self, key: &str) -> Option<&Actions<NullActionExt>> {
         self.binds.get(&parse_nav_key(key)?)
+    }
+
+    /// Feeds `key` to the two-key sequences: `pending` holds the first key while it waits.
+    pub(super) fn step(&self, pending: &mut Option<char>, key: &str) -> Step<'_> {
+        if let Some(first) = pending.take() {
+            let seq = parse_one(&first.to_string())
+                .zip(parse_one(key))
+                .and_then(|(a, b)| self.binds.get(&NavKey::Sequence(vec![a, b])));
+            return seq.map_or(Step::Broken, Step::Sequence);
+        }
+        let mut chars = key.chars();
+        if let (Some(c), None) = (chars.next(), chars.next())
+            && self.get(key).is_none()
+            && let Some(k) = parse_one(key)
+            && self
+                .binds
+                .keys()
+                .any(|b| matches!(b, NavKey::Sequence(s) if s.len() == 2 && s[0] == k))
+        {
+            *pending = Some(c);
+            return Step::Waiting;
+        }
+        Step::Key
     }
 }
 
@@ -217,10 +226,38 @@ mod tests {
     }
 
     #[test]
+    fn sequence_conflicts_name_unreachable_sequences() {
+        let nav = crate::config::NavConfig {
+            binds: [
+                ("g", vec![Action::Pos(1)]),
+                ("gg", vec![Action::Pos(0)]),
+                ("zz", vec![Action::Pos(2)]),
+                ("abc", vec![Action::Pos(3)]),
+                // An unbind does not make a conflict.
+                ("x", vec![]),
+                ("xy", vec![Action::Pos(4)]),
+            ]
+            .into_iter()
+            .map(|(k, a)| (k.to_string(), Actions(a)))
+            .collect(),
+            ..Default::default()
+        };
+        assert_eq!(
+            nav.sequence_conflicts(),
+            [
+                "'abc' is a sequence of 3 keys; only two-key sequences are supported",
+                "'gg' starts with 'g', which is bound on its own, so 'gg' never fires",
+            ]
+        );
+    }
+
+    #[test]
     fn a_preview_override_replaces_its_key_only() {
-        let defaults = crate::config::NavConfig::default_preview_binds();
-        let user = HashMap::from([("Down".to_string(), Actions::from([Action::Pos(9)]))]);
-        let keymap = NavKeymap::from_layers(&defaults, &user);
+        let nav = crate::config::NavConfig {
+            preview_binds: HashMap::from([("Down".to_string(), Actions::from([Action::Pos(9)]))]),
+            ..Default::default()
+        };
+        let keymap = NavKeymap::from_strings(&nav.effective_preview_binds());
         assert_eq!(keymap.get("down"), Some(&Actions::from([Action::Pos(9)])));
         assert_eq!(
             keymap.get("j"),

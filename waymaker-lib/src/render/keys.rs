@@ -277,192 +277,84 @@ pub(super) fn update_sim_focus<A: ActionExt>(action: &Action<A>, sim_focus: &mut
     }
 }
 
+/// Resolves one key while the results have focus or a preview fills the screen. `fallback_action`
+/// is what the global binds made of the key; it applies when no nav or preview bind takes it.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn process_results_nav_key<A: ActionExt>(
     key: &str,
     fallback_action: Option<Action<A>>,
     focus_binds: &super::nav_keymap::NavKeymap,
     preview_binds: &super::nav_keymap::NavKeymap,
     pending_nav_key: &mut Option<char>,
-    sort_menu_active: &mut bool,
     sim_focus: &mut Focus,
     out: &mut Vec<RenderCommand<A>>,
     preview_fullscreen: bool,
     preview_diagram_mode: bool,
 ) {
-    if preview_fullscreen || preview_diagram_mode {
-        // g and G keep their own arms: g waits for a second g, G cancels that wait.
-        if key != "g"
-            && key != "G"
-            && let Some(actions) = preview_binds.get(key)
-        {
-            push_nav_actions(actions, sim_focus, out);
-            return;
-        }
-        match key {
-            "g" => {
-                if *pending_nav_key == Some('g') {
-                    *pending_nav_key = None;
-                    if let Some(actions) = preview_binds.get("gg") {
-                        push_nav_actions(actions, sim_focus, out);
-                    }
-                } else {
-                    *pending_nav_key = Some('g');
-                }
-                return;
-            }
-            "G" => {
-                *pending_nav_key = None;
-                if let Some(actions) = preview_binds.get("G") {
-                    push_nav_actions(actions, sim_focus, out);
-                }
-                return;
-            }
-            k if k.eq_ignore_ascii_case("esc") || (preview_fullscreen && k == "enter") => {
-                *sim_focus = Focus::Input;
-                out.push(RenderCommand::Action(Action::CyclePreview));
-                return;
-            }
-            k => {
-                *pending_nav_key = None;
-                if let Some(actions) = focus_binds.get(k) {
-                    push_nav_actions(actions, sim_focus, out);
-                    return;
-                }
-                if let Some(action) = fallback_action {
-                    update_sim_focus(&action, sim_focus);
-                    out.push(RenderCommand::Action(action));
-                }
-                return;
-            }
-        }
-    } else {
-        // Non-fullscreen preview scrolling and diagram controls fallback
-        if (key == "J" || key == "shift-j" || key == "ctrl-shift-j" || key == "ctrl-J")
-            && !focus_binds.contains_spelling("J")
-            && !focus_binds.contains_spelling("shift-j")
-            && !focus_binds.contains_spelling("ctrl-shift-j")
-            && !focus_binds.contains_spelling("ctrl-J")
-        {
-            out.push(RenderCommand::Action(Action::PreviewDown(5)));
-            return;
-        }
-        if (key == "K" || key == "shift-k" || key == "ctrl-shift-k" || key == "ctrl-K")
-            && !focus_binds.contains_spelling("K")
-            && !focus_binds.contains_spelling("shift-k")
-            && !focus_binds.contains_spelling("ctrl-shift-k")
-            && !focus_binds.contains_spelling("ctrl-K")
-        {
-            out.push(RenderCommand::Action(Action::PreviewUp(5)));
-            return;
-        }
-        if (key == "ctrl-u" || key == "u")
-            && !focus_binds.contains_spelling("ctrl-u")
-            && !focus_binds.contains_spelling("u")
-        {
-            out.push(RenderCommand::Action(Action::PreviewHalfPageUp));
-            return;
-        }
-        if (key == "ctrl-d" || key == "d")
-            && !focus_binds.contains_spelling("ctrl-d")
-            && !focus_binds.contains_spelling("d")
-        {
-            out.push(RenderCommand::Action(Action::PreviewHalfPageDown));
-            return;
-        }
-        if key == "s" && !focus_binds.contains_spelling("s") {
-            out.push(RenderCommand::Action(Action::ToggleDiagram));
-            return;
-        }
-        if (key == "+" || key == "=")
-            && !focus_binds.contains_spelling("+")
-            && !focus_binds.contains_spelling("=")
-        {
-            out.push(RenderCommand::Action(Action::DiagramZoomIn));
-            return;
-        }
-        if key == "-" && !focus_binds.contains_spelling("-") {
-            out.push(RenderCommand::Action(Action::DiagramZoomOut));
-            return;
-        }
-        if key == "0" && !focus_binds.contains_spelling("0") {
-            out.push(RenderCommand::Action(Action::DiagramResetZoom));
-            return;
-        }
-        if (key == "]" || key == "n") && !focus_binds.contains_spelling(key) {
-            out.push(RenderCommand::Action(Action::NextDiagram));
-            return;
-        }
-        if (key == "[" || key == "N") && !focus_binds.contains_spelling(key) {
-            out.push(RenderCommand::Action(Action::PrevDiagram));
-            return;
-        }
-    }
+    use super::nav_keymap::Step;
 
-    if key == "," {
-        *pending_nav_key = None;
-        *sort_menu_active = true;
-        out.push(RenderCommand::Action(Action::SortMenu));
+    if preview_fullscreen || preview_diagram_mode {
+        match preview_binds.step(pending_nav_key, key) {
+            Step::Sequence(actions) => return push_nav_actions(actions, sim_focus, out),
+            Step::Waiting => return,
+            Step::Broken | Step::Key => {}
+        }
+        if let Some(actions) = preview_binds.get(key) {
+            return push_nav_actions(actions, sim_focus, out);
+        }
+        if key.eq_ignore_ascii_case("esc") || (preview_fullscreen && key == "enter") {
+            *sim_focus = Focus::Input;
+            out.push(RenderCommand::Action(Action::CyclePreview));
+            return;
+        }
+        if let Some(actions) = focus_binds.get(key) {
+            return push_nav_actions(actions, sim_focus, out);
+        }
+        if let Some(action) = fallback_action {
+            update_sim_focus(&action, sim_focus);
+            out.push(RenderCommand::Action(action));
+        }
         return;
     }
-    match pending_nav_key.take() {
-        Some('g') => {
-            if key == "g" {
-                let seq = "gg".to_string();
-                if let Some(actions) = focus_binds.get(&seq) {
-                    push_nav_actions(actions, sim_focus, out);
-                } else {
-                    out.push(RenderCommand::Action(Action::PreviewUp(0)));
-                }
-            } else if key == "t" {
-                let seq = "gt".to_string();
-                if let Some(actions) = focus_binds.get(&seq) {
-                    push_nav_actions(actions, sim_focus, out);
-                } else {
-                    out.push(RenderCommand::Action(Action::Pos(0)));
-                }
-            } else if key == "b" {
-                let seq = "gb".to_string();
-                if let Some(actions) = focus_binds.get(&seq) {
-                    push_nav_actions(actions, sim_focus, out);
-                } else {
-                    out.push(RenderCommand::Action(Action::Pos(-1)));
-                }
-            } else if let Some(actions) = focus_binds.get(key) {
+
+    match focus_binds.step(pending_nav_key, key) {
+        Step::Sequence(actions) => return push_nav_actions(actions, sim_focus, out),
+        Step::Waiting => return,
+        // The key after a waiting key does only what it is bound to.
+        Step::Broken => {
+            if let Some(actions) = focus_binds.get(key) {
                 push_nav_actions(actions, sim_focus, out);
+            }
+            return;
+        }
+        Step::Key => {}
+    }
+    if let Some(actions) = focus_binds.get(key) {
+        return push_nav_actions(actions, sim_focus, out);
+    }
+    let Some(action) = fallback_action else {
+        return;
+    };
+    match &action {
+        Action::ToggleFocus => {
+            if key.eq_ignore_ascii_case("esc") {
+                out.push(RenderCommand::Action(Action::Quit(130)));
+            } else {
+                *sim_focus = Focus::Input;
+                out.push(RenderCommand::Action(Action::ToggleFocus));
             }
         }
+        // Unbound plain characters and editing actions do nothing in the results.
+        Action::Char(_)
+        | Action::DeleteChar
+        | Action::DeleteWord
+        | Action::DeleteNextChar
+        | Action::DeleteNextWord
+        | Action::DeleteLineStart
+        | Action::DeleteLineEnd => {}
         _ => {
-            if key == "g" && !focus_binds.contains_spelling("g") {
-                *pending_nav_key = Some('g');
-            } else if let Some(actions) = focus_binds.get(key) {
-                push_nav_actions(actions, sim_focus, out);
-            } else if let Some(action) = fallback_action {
-                match &action {
-                    Action::ToggleFocus => {
-                        if key.eq_ignore_ascii_case("esc") {
-                            out.push(RenderCommand::Action(Action::Quit(130)));
-                        } else {
-                            *sim_focus = Focus::Input;
-                            out.push(RenderCommand::Action(Action::ToggleFocus));
-                        }
-                    }
-                    Action::Char(_) => {
-                        // Drop unbound plain characters in nav mode
-                    }
-                    Action::DeleteChar
-                    | Action::DeleteWord
-                    | Action::DeleteNextChar
-                    | Action::DeleteNextWord
-                    | Action::DeleteLineStart
-                    | Action::DeleteLineEnd => {
-                        // Drop unbound editing actions in nav mode
-                    }
-                    _ => {
-                        update_sim_focus(&action, sim_focus);
-                        out.push(RenderCommand::Action(action));
-                    }
-                }
-            }
+            update_sim_focus(&action, sim_focus);
+            out.push(RenderCommand::Action(action));
         }
     }
 }
@@ -508,7 +400,6 @@ impl<'b> NavResolver<'b> {
         &mut self,
         cmd: RenderCommand<A>,
         pending_nav_key: &mut Option<char>,
-        sort_menu_active: &mut bool,
         out: &mut Vec<RenderCommand<A>>,
     ) {
         let focus_binds = self.focus_binds;
@@ -576,7 +467,6 @@ impl<'b> NavResolver<'b> {
                         focus_binds,
                         preview_binds,
                         pending_nav_key,
-                        sort_menu_active,
                         &mut sim_focus,
                         out,
                         preview_fullscreen,
@@ -597,7 +487,6 @@ impl<'b> NavResolver<'b> {
                         focus_binds,
                         preview_binds,
                         pending_nav_key,
-                        sort_menu_active,
                         &mut sim_focus,
                         out,
                         preview_fullscreen,
@@ -627,7 +516,6 @@ impl<'b> NavResolver<'b> {
                         focus_binds,
                         preview_binds,
                         pending_nav_key,
-                        sort_menu_active,
                         &mut sim_focus,
                         out,
                         preview_fullscreen,
@@ -650,7 +538,6 @@ impl<'b> NavResolver<'b> {
                         focus_binds,
                         preview_binds,
                         pending_nav_key,
-                        sort_menu_active,
                         &mut sim_focus,
                         out,
                         preview_fullscreen,

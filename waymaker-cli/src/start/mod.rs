@@ -286,6 +286,11 @@ fn apply_nav_binds(cli: &Cli, mut config: Config) -> Config {
         nb("b", waymaker::acs![Action::Semantic("pins".into())]);
         nb("*", waymaker::acs![Action::Semantic("pin".into())]);
     }
+    if config.render.ui.nav.active {
+        for problem in config.render.ui.nav.sequence_conflicts() {
+            wbog!("[ui.nav.binds] {problem}.");
+        }
+    }
     config
 }
 
@@ -1098,7 +1103,7 @@ pub async fn start(
     // Help lists the nav and preview binds under their own headings while nav mode resolves keys.
     let nav_help = (render.ui.nav.active && !render.ui.nav.passthrough).then(|| {
         (
-            render.ui.nav.binds.clone(),
+            render.ui.nav.effective_binds(),
             render.ui.nav.effective_preview_binds(),
         )
     });
