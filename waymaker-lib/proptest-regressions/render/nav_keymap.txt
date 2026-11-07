@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc e2bca67be55326a4f82f2a91fc072d33092a6d199e4574b3db1c71453b514715 # shrinks to map = {"shift-?": Actions([Pos(0)])}, key = "?"
+cc 4df0ee322a132e0f6b392e840d48a6e4fbd036ce55f8f92f2b359f67a9d7ee79 # shrinks to map = {"k": Actions([Pos(89)]), "K": Actions([Pos(30)]), "gt": Actions([Pos(28)]), "Backspace": Actions([Pos(9)]), "ctrl-u": Actions([Pos(70)])}, key = "K"
