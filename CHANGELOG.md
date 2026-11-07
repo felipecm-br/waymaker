@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-07
+
 ### ✨ Features
 
 - The keys of a fullscreen or diagram preview are configurable: `[ui.nav.preview_binds]` overrides them key by key (`"J" = "PreviewDown(30)"`); unlisted keys keep their defaults

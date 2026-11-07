@@ -3804,7 +3804,7 @@ dependencies = [
 
 [[package]]
 name = "waymaker-cli"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
@@ -3845,7 +3845,7 @@ dependencies = [
 
 [[package]]
 name = "waymaker-lib"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
