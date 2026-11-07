@@ -71,4 +71,6 @@ Size: about 3–5 sessions. It removes roughly 500 lines.
 - Step 1 (8e843a4): focus lives in `InputState`.
 - Step 2a (da95c02): `NavResolver` resolves nav keys one command at a time.
 - Step 2b: `NavKeymap` parses `[nav.binds]` keys into key combinations and sequences. A differential property test against the old string matching found two parsing differences, both fixed: `shift-?`/`?`, and crokey reading `J` as `j`.
-- Next, step 3: the event loop resolves nav keys through `NavResolver` + `NavKeymap`; preview keys become a configurable `preview` mode; review the bind snapshot.
+- Step 3a (e40fb53): `NavResolver` looks nav binds up by parsed key (`NavKeymap`); `gg`/`gt`/`gb` are key sequences.
+- Step 3b (034eed6): preview keys are data (`NavConfig::default_preview_binds`), overridden by `[ui.nav.preview_binds]`. Defaults merge by parsed key (`NavConfig::add_default_bind`), so a user's `Esc` keeps precedence over the default `esc`.
+- Next, step 3c: resolve nav keys in the event loop. Share fullscreen, diagram, overlay and sort-menu state through `InputState`; drop `last_consumed_nav_key`. Then step 4: delete the render-side resolver, port the `keys.rs` tests, and list nav and preview binds under their own heading in help.
