@@ -1930,3 +1930,74 @@ fn nav_key_with_fallback(
         .collect();
     (actions, focus)
 }
+
+/// Pins every key of a fullscreen or diagram preview, in every spelling the hard-coded table
+/// accepts, before those keys become configurable binds (docs/PROPOSAL-UNIFIED-BINDS.md, 3b).
+#[test]
+fn test_preview_keys_pinned_before_they_become_binds() {
+    use Action::*;
+    let table: &[(&[&str], Action<NullActionExt>)] = &[
+        (&["j", "down", "Down"], PreviewDown(3)),
+        (&["k", "up", "Up"], PreviewUp(3)),
+        (&["h", "left", "Left"], PreviewHScroll(-6)),
+        (&["l", "right", "Right"], PreviewHScroll(6)),
+        (
+            &["J", "shift-j", "shift-down", "Shift-Down", "Shift-down"],
+            PreviewDown(15),
+        ),
+        (
+            &["K", "shift-k", "shift-up", "Shift-Up", "Shift-up"],
+            PreviewUp(15),
+        ),
+        (
+            &["H", "shift-left", "Shift-Left", "Shift-left"],
+            PreviewHScroll(-18),
+        ),
+        (
+            &["L", "shift-right", "Shift-Right", "Shift-right"],
+            PreviewHScroll(18),
+        ),
+        (&["ctrl-u", "u"], PreviewHalfPageUp),
+        (&["ctrl-d", "d"], PreviewHalfPageDown),
+        (&["s"], ToggleDiagram),
+        (&["n", "]"], NextDiagram),
+        (&["N", "["], PrevDiagram),
+        (&["+", "="], DiagramZoomIn),
+        (&["-"], DiagramZoomOut),
+        (&["0"], DiagramResetZoom),
+        (&["y"], Accept),
+        (&["ctrl-c"], Abort(130)),
+        (&["G"], PreviewDown(0)),
+    ];
+    let none = HashMap::new();
+    for (fullscreen, diagram) in [(true, false), (false, true)] {
+        for (keys, expected) in table {
+            for key in *keys {
+                let (out, _) = nav_key(key, &none, fullscreen, diagram);
+                assert_eq!(
+                    out,
+                    vec![expected.clone()],
+                    "{key} fullscreen={fullscreen} diagram={diagram}"
+                );
+            }
+        }
+        // g g: the first g waits, the second goes to the top.
+        let out = focus_mode(
+            vec![
+                RenderCommand::KeyAction {
+                    key: "g".into(),
+                    action: Action::Char('g'),
+                },
+                RenderCommand::KeyAction {
+                    key: "g".into(),
+                    action: Action::Char('g'),
+                },
+            ],
+            Focus::Results,
+            &none,
+            fullscreen,
+            diagram,
+        );
+        assert_eq!(out, vec![PreviewUp(0)], "gg fullscreen={fullscreen}");
+    }
+}
