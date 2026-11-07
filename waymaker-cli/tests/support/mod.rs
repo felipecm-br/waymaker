@@ -370,10 +370,22 @@ pub fn isolate_env(cmd: &mut CommandBuilder, dir: &Path) {
     // Presets and previews run `wm` by name: make that the binary under test, not an installed one.
     let bin = wm_bin();
     let bin_dir = bin.parent().unwrap();
+    // `wm preview-file` uses `bat` when the host has it, and its own line-number gutter
+    // otherwise, so preview frames differed between machines (CI runners have no `bat`).
+    // A `bat` that always fails makes every host take the built-in path.
+    let stubs = dir.join("test-stubs");
+    std::fs::create_dir_all(&stubs).unwrap();
+    let bat = stubs.join("bat");
+    std::fs::write(&bat, "#!/bin/sh\nexit 1\n").unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&bat, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
     cmd.env(
         "PATH",
         format!(
-            "{}:{}",
+            "{}:{}:{}",
+            stubs.display(),
             bin_dir.display(),
             std::env::var("PATH").unwrap_or_default()
         ),

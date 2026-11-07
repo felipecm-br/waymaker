@@ -6,7 +6,7 @@ expression: wm.styled_screen()
  0|
  1| ~/work
  2| │   g_enough_to_wrap_in_t↵│file_1_with_a_name_long_enough_to_wrap_i
- 3| │   he_list/              │     1 x
+ 3| │   he_list/              │     1 │ x
  4| │   file_0_with_a_name_lo↵│
  5| │   ng_enough_to_wrap_in_↵│
  6| │   the_list.txt          │
@@ -46,7 +46,7 @@ expression: wm.styled_screen()
 -- styles --
  1: 1 fg=6 bold | 2 fg=6 | 3-6 fg=6 bold
  2: 1 fg=8 | 4 fg=4 | 27 fg=8 dim | 28-68 fg=8
- 3: 1 fg=8 | 4 fg=4 | 28 fg=8 | 31-34 fg=246 | 36 fg=231
+ 3: 1 fg=8 | 4 fg=4 | 28 fg=8
  4: 1 fg=8 | 4 fg=7 | 27 fg=8 dim | 28 fg=8
  5: 1 fg=8 | 4 fg=7 | 27 fg=8 dim | 28 fg=8
  6: 1 fg=8 | 4 fg=7 | 28 fg=8
