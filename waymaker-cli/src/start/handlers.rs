@@ -119,7 +119,7 @@ pub(super) fn chdir_handler(
                 let store = waymaker::frecency::FrecencyStore::open();
                 let _ = store.add(&new_cwd.to_string_lossy());
                 if state.ui.config.nav.active {
-                    state.focus = waymaker::render::Focus::Results;
+                    state.set_focus(waymaker::render::Focus::Results);
                     if state.picker_ui.query.mode_index() != 0 {
                         let _ = render_tx.send(waymaker::message::RenderCommand::Action(
                             waymaker::action::Action::Custom(crate::action::MMAction::ReloadNext(

@@ -81,8 +81,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
     state.input_routing = input;
     if ui.config.nav.active {
         match ui.config.nav.focus_on_start {
-            crate::config::NavFocus::Picker => state.focus = Focus::Results,
-            crate::config::NavFocus::Filter => state.focus = Focus::Input,
+            crate::config::NavFocus::Picker => state.set_focus(Focus::Results),
+            crate::config::NavFocus::Filter => state.set_focus(Focus::Input),
         }
     }
 
@@ -191,7 +191,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             if !ui.config.nav.passthrough {
                 apply_focus_binds_mode(
                     &mut buffer,
-                    state.focus,
+                    state.focus(),
                     &ui.config.nav.binds,
                     // An input box (create, rename, ...) takes the keys; an info box such as
                     // "Undone ..." does not, so ctrl-r still reaches @redo after an undo.

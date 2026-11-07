@@ -913,7 +913,7 @@ mod tests {
 
         // 8. Test nav mode focus behavior
         mm_state.ui.config.nav.active = true;
-        mm_state.focus = waymaker::render::Focus::Results;
+        mm_state.set_focus(waymaker::render::Focus::Results);
         action_handler(
             MMAction::ReloadNext(None),
             &mut mm_state,
@@ -921,7 +921,7 @@ mod tests {
         );
         let mode_0_hist = action_context.mode_history.get(&0).unwrap();
         assert_eq!(mode_0_hist.focus, waymaker::render::Focus::Results);
-        assert_eq!(mm_state.focus, waymaker::render::Focus::Input);
+        assert_eq!(mm_state.focus(), waymaker::render::Focus::Input);
 
         // Switch to mode 2 (Bookmarks) - when no prior nav_mode history, should default to Focus::Results
         action_context.mode_history.remove(&2);
@@ -931,7 +931,7 @@ mod tests {
             &mut action_context,
         );
         assert_eq!(action_context.additional_commands.1, 2);
-        assert_eq!(mm_state.focus, waymaker::render::Focus::Results);
+        assert_eq!(mm_state.focus(), waymaker::render::Focus::Results);
 
         // Switch back to mode 0 - should restore Nav mode (Focus::Results)
         action_handler(
@@ -940,7 +940,7 @@ mod tests {
             &mut action_context,
         );
         assert_eq!(action_context.additional_commands.1, 0);
-        assert_eq!(mm_state.focus, waymaker::render::Focus::Results);
+        assert_eq!(mm_state.focus(), waymaker::render::Focus::Results);
     }
 
     #[test]

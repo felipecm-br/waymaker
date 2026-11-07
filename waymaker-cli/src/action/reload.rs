@@ -166,7 +166,7 @@ fn switch_mode(
                 query_cursor: state.picker_ui.query.cursor,
                 results_index: state.picker_ui.results.index(),
                 focused_item,
-                focus: state.focus,
+                focus: state.focus(),
             },
         );
         if let Some(saved) = mode_history.get(&index) {
@@ -206,7 +206,7 @@ fn switch_mode(
         } else {
             waymaker::render::Focus::Results
         };
-        state.focus = focus_to_set;
+        state.set_focus(focus_to_set);
         match focus_to_set {
             waymaker::render::Focus::Results => {
                 let _ = render_tx.send(RenderCommand::Action(Action::FocusNav));
@@ -216,7 +216,7 @@ fn switch_mode(
             }
         }
     } else {
-        state.focus = waymaker::render::Focus::Input;
+        state.set_focus(waymaker::render::Focus::Input);
         let _ = render_tx.send(RenderCommand::Action(Action::FocusFilter));
     }
 

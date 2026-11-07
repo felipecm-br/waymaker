@@ -72,9 +72,6 @@ pub struct State {
     pub(crate) synced: [bool; 2], // ran, synced
     pub reloading: bool,
     pub needs_redraw: bool,
-
-    /// Current focus pane (used when `nav_mode` is enabled).
-    pub focus: Focus,
     /// Current blink phase for the navigation indicator.
     pub(crate) focus_blink: bool,
     /// Tick counter driving the blink half-cycle.
@@ -150,6 +147,15 @@ impl Default for State {
 }
 
 impl State {
+    /// Which pane has keyboard focus in navigation mode; shared with the event loop.
+    pub fn focus(&self) -> Focus {
+        self.input_routing.focus()
+    }
+
+    pub fn set_focus(&self, focus: Focus) {
+        self.input_routing.set_focus(focus);
+    }
+
     /// Whether interactive agent prompt input mode is active.
     pub fn prompt_input_active(&self) -> bool {
         self.input_routing.prompt_input_active()
@@ -179,7 +185,6 @@ impl State {
             dragging: None,
             overlay_index: None,
             col: None,
-            focus: Focus::Results,
             focus_blink: true,
             focus_tick: 0,
             pending_nav_key: None,

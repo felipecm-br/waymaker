@@ -146,7 +146,7 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::Reload(..)) => return command_action(a, state, tui, events, bind_tx),
         Action::ChDir(payload) => {
             if ui.config.nav.active {
-                state.focus = Focus::Results;
+                state.set_focus(Focus::Results);
                 state.focus_blink = true;
                 state.focus_tick = 0;
                 let prompt = &ui.config.nav.prompt;
@@ -221,7 +221,7 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                         }
                         if !(ui.config.nav.active
                             && !ui.config.nav.passthrough
-                            && state.focus == Focus::Results)
+                            && state.focus() == Focus::Results)
                         {
                             query.push_char(c)
                         }
@@ -884,16 +884,16 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                 return Flow::Continue;
             }
             if ui.config.nav.active {
-                state.focus = match state.focus {
+                state.set_focus(match state.focus() {
                     Focus::Input => Focus::Results,
                     Focus::Results => Focus::Input,
-                };
+                });
                 state.focus_blink = true;
                 state.focus_tick = 0;
 
                 let prompt = &ui.config.nav.prompt;
                 if !prompt.is_empty() {
-                    let prompt = match state.focus {
+                    let prompt = match state.focus() {
                         Focus::Results => Some(ratatui::text::Line::raw(prompt.clone())),
                         Focus::Input => None,
                     };
@@ -910,7 +910,7 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                 return Flow::Continue;
             }
             if ui.config.nav.active {
-                state.focus = Focus::Input;
+                state.set_focus(Focus::Input);
                 state.focus_blink = true;
                 state.focus_tick = 0;
                 let prompt = &ui.config.nav.prompt;
@@ -928,7 +928,7 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                 return Flow::Continue;
             }
             if ui.config.nav.active {
-                state.focus = Focus::Results;
+                state.set_focus(Focus::Results);
                 state.focus_blink = true;
                 state.focus_tick = 0;
                 let prompt = &ui.config.nav.prompt;
@@ -1111,14 +1111,14 @@ fn preview_layout_action<W: Write, S: Selection, A: ActionExt>(
                     state.update_preview_payload(p.command());
                 }
                 if p.is_fullscreen() {
-                    state.focus = Focus::Results;
+                    state.set_focus(Focus::Results);
                     state.preview_fullscreen = true;
                 } else {
-                    state.focus = if ui.config.nav.active {
+                    state.set_focus(if ui.config.nav.active {
                         Focus::Results
                     } else {
                         Focus::Input
-                    };
+                    });
                     state.preview_fullscreen = false;
                 }
                 tui.redraw();
@@ -1161,14 +1161,14 @@ fn preview_layout_action<W: Write, S: Selection, A: ActionExt>(
                         state.update_preview_payload(p.command());
                     }
                     if p.is_fullscreen() {
-                        state.focus = Focus::Results;
+                        state.set_focus(Focus::Results);
                         state.preview_fullscreen = true;
                     } else {
-                        state.focus = if ui.config.nav.active {
+                        state.set_focus(if ui.config.nav.active {
                             Focus::Results
                         } else {
                             Focus::Input
-                        };
+                        });
                         state.preview_fullscreen = false;
                     }
                     tui.redraw();
@@ -1207,14 +1207,14 @@ fn preview_layout_action<W: Write, S: Selection, A: ActionExt>(
                             state.update_preview_payload(p.command());
                         }
                         if p.is_fullscreen() {
-                            state.focus = Focus::Results;
+                            state.set_focus(Focus::Results);
                             state.preview_fullscreen = true;
                         } else {
-                            state.focus = if ui.config.nav.active {
+                            state.set_focus(if ui.config.nav.active {
                                 Focus::Results
                             } else {
                                 Focus::Input
-                            };
+                            });
                             state.preview_fullscreen = false;
                         }
                         tui.redraw();
@@ -1418,7 +1418,7 @@ mod tests {
             };
             ui.config.nav.active = true;
             let mut state = State::new();
-            state.focus = Focus::Results;
+            state.set_focus(Focus::Results);
             picker_ui.action_visible = true;
             state.input_routing.set_action_box_active(box_takes_input);
             let mut tui = Tui::headless(
@@ -1433,7 +1433,7 @@ mod tests {
                 &mut picker_ui,
                 &mut tui,
             );
-            (picker_ui.action_visible, state.focus)
+            (picker_ui.action_visible, state.focus())
         };
         assert_eq!(
             run(true),

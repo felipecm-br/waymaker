@@ -57,7 +57,7 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
         breadcrumb_layout(picker_ui, state, preview_ui, _area);
     _area = area_left;
 
-    let is_filter_mode = state.focus == Focus::Input;
+    let is_filter_mode = state.focus() == Focus::Input;
     let show_sort_menu = state.sort_menu_active;
     let show_nav_hints = if state.preview_fullscreen {
         true
@@ -344,7 +344,7 @@ fn focus_infos<T: SSS, S: Selection>(
         .unwrap_or('│')
         .to_string();
     let input_focus_info = nav_mode.then_some(FocusInfo {
-        focused: state.focus == Focus::Input,
+        focused: state.focus() == Focus::Input,
         blink_phase: state.focus_blink,
         color: nav_color,
         do_blink: nav_do_blink,
@@ -355,7 +355,7 @@ fn focus_infos<T: SSS, S: Selection>(
         nav_prompt: ui.config.nav.prompt.clone(),
     });
     let results_focus_info = nav_mode.then_some(FocusInfo {
-        focused: state.focus == Focus::Results,
+        focused: state.focus() == Focus::Results,
         blink_phase: state.focus_blink,
         color: nav_color,
         do_blink: nav_do_blink,

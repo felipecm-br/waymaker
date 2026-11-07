@@ -24,6 +24,8 @@ pub struct InputState {
     prompt_input: AtomicBool,
     /// A live input (query typed into a running command) takes typed characters.
     live_input: AtomicBool,
+    /// In navigation mode, the filter has keyboard focus (else the results do).
+    input_focused: AtomicBool,
 }
 
 impl InputState {
@@ -64,6 +66,20 @@ impl InputState {
     pub fn set_live_input_active(&self, active: bool) {
         self.live_input.store(active, Ordering::Relaxed);
     }
+
+    /// Which pane has keyboard focus in navigation mode (the results by default).
+    pub fn focus(&self) -> crate::render::Focus {
+        if self.input_focused.load(Ordering::Relaxed) {
+            crate::render::Focus::Input
+        } else {
+            crate::render::Focus::Results
+        }
+    }
+
+    pub fn set_focus(&self, focus: crate::render::Focus) {
+        self.input_focused
+            .store(focus == crate::render::Focus::Input, Ordering::Relaxed);
+    }
 }
 
 #[cfg(test)]
@@ -86,5 +102,18 @@ mod tests {
         let a2 = Arc::clone(&a);
         assert_eq!(a2.mode(), "t0");
         assert!(a2.action_box_active() && a2.prompt_input_active() && a2.live_input_active());
+    }
+
+    #[test]
+    fn focus_starts_on_the_results_and_is_shared() {
+        use crate::render::Focus;
+        let a = InputState::shared();
+        assert_eq!(a.focus(), Focus::Results);
+        let b = Arc::clone(&a);
+        b.set_focus(Focus::Input);
+        assert_eq!(a.focus(), Focus::Input);
+        a.set_focus(Focus::Results);
+        assert_eq!(b.focus(), Focus::Results);
+        assert_eq!(InputState::shared().focus(), Focus::Results);
     }
 }
