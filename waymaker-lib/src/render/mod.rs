@@ -5,7 +5,6 @@ mod frame;
 mod keys;
 mod live_input;
 mod mouse;
-#[allow(dead_code)] // wired in at step 3 of docs/PROPOSAL-UNIFIED-BINDS.md
 mod nav_keymap;
 mod state;
 #[cfg(test)]

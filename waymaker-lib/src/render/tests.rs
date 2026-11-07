@@ -1583,10 +1583,11 @@ fn nav_key(
     let mut sort_menu_active = false;
     let mut focus = Focus::Results;
     let mut out = Vec::new();
+    let keymap = super::nav_keymap::NavKeymap::from_strings(focus_binds);
     keys::process_results_nav_key::<NullActionExt>(
         key,
         None,
-        focus_binds,
+        &keymap,
         &mut pending,
         &mut sort_menu_active,
         &mut focus,
@@ -1908,10 +1909,11 @@ fn nav_key_with_fallback(
     let mut sort_menu_active = false;
     let mut focus = Focus::Results;
     let mut out = Vec::new();
+    let keymap = super::nav_keymap::NavKeymap::from_strings(focus_binds);
     keys::process_results_nav_key::<NullActionExt>(
         key,
         Some(fallback),
-        focus_binds,
+        &keymap,
         &mut pending,
         &mut sort_menu_active,
         &mut focus,

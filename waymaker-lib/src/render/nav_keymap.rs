@@ -64,6 +64,8 @@ pub(super) fn parse_nav_key(s: &str) -> Option<NavKey> {
 #[derive(Debug, Default)]
 pub(super) struct NavKeymap {
     binds: HashMap<NavKey, Actions<NullActionExt>>,
+    /// The keys exactly as written, for checks that compare spellings.
+    spellings: std::collections::HashSet<String>,
 }
 
 impl NavKeymap {
@@ -72,7 +74,15 @@ impl NavKeymap {
             .iter()
             .filter_map(|(k, v)| parse_nav_key(k).map(|key| (key, v.clone())))
             .collect();
-        Self { binds }
+        Self {
+            binds,
+            spellings: map.keys().cloned().collect(),
+        }
+    }
+
+    /// Whether `key` is bound with exactly this spelling.
+    pub(super) fn contains_spelling(&self, key: &str) -> bool {
+        self.spellings.contains(key)
     }
 
     /// The actions bound to `key`, a key name as the event loop reports it.

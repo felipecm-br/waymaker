@@ -242,6 +242,7 @@ fn push_nav_actions<A: ActionExt>(
 }
 
 #[inline]
+#[cfg(test)]
 pub(super) fn get_nav_bind<'a>(
     focus_binds: &'a std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
     key: &str,
@@ -305,7 +306,7 @@ pub(super) fn update_sim_focus<A: ActionExt>(action: &Action<A>, sim_focus: &mut
 pub(super) fn process_results_nav_key<A: ActionExt>(
     key: &str,
     fallback_action: Option<Action<A>>,
-    focus_binds: &std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
+    focus_binds: &super::nav_keymap::NavKeymap,
     pending_nav_key: &mut Option<char>,
     sort_menu_active: &mut bool,
     sim_focus: &mut Focus,
@@ -340,7 +341,7 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
             }
             k => {
                 *pending_nav_key = None;
-                if let Some(actions) = get_nav_bind(focus_binds, k) {
+                if let Some(actions) = focus_binds.get(k) {
                     push_nav_actions(actions, sim_focus, out);
                     return;
                 }
@@ -354,61 +355,61 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
     } else {
         // Non-fullscreen preview scrolling and diagram controls fallback
         if (key == "J" || key == "shift-j" || key == "ctrl-shift-j" || key == "ctrl-J")
-            && !focus_binds.contains_key("J")
-            && !focus_binds.contains_key("shift-j")
-            && !focus_binds.contains_key("ctrl-shift-j")
-            && !focus_binds.contains_key("ctrl-J")
+            && !focus_binds.contains_spelling("J")
+            && !focus_binds.contains_spelling("shift-j")
+            && !focus_binds.contains_spelling("ctrl-shift-j")
+            && !focus_binds.contains_spelling("ctrl-J")
         {
             out.push(RenderCommand::Action(Action::PreviewDown(5)));
             return;
         }
         if (key == "K" || key == "shift-k" || key == "ctrl-shift-k" || key == "ctrl-K")
-            && !focus_binds.contains_key("K")
-            && !focus_binds.contains_key("shift-k")
-            && !focus_binds.contains_key("ctrl-shift-k")
-            && !focus_binds.contains_key("ctrl-K")
+            && !focus_binds.contains_spelling("K")
+            && !focus_binds.contains_spelling("shift-k")
+            && !focus_binds.contains_spelling("ctrl-shift-k")
+            && !focus_binds.contains_spelling("ctrl-K")
         {
             out.push(RenderCommand::Action(Action::PreviewUp(5)));
             return;
         }
         if (key == "ctrl-u" || key == "u")
-            && !focus_binds.contains_key("ctrl-u")
-            && !focus_binds.contains_key("u")
+            && !focus_binds.contains_spelling("ctrl-u")
+            && !focus_binds.contains_spelling("u")
         {
             out.push(RenderCommand::Action(Action::PreviewHalfPageUp));
             return;
         }
         if (key == "ctrl-d" || key == "d")
-            && !focus_binds.contains_key("ctrl-d")
-            && !focus_binds.contains_key("d")
+            && !focus_binds.contains_spelling("ctrl-d")
+            && !focus_binds.contains_spelling("d")
         {
             out.push(RenderCommand::Action(Action::PreviewHalfPageDown));
             return;
         }
-        if key == "s" && !focus_binds.contains_key("s") {
+        if key == "s" && !focus_binds.contains_spelling("s") {
             out.push(RenderCommand::Action(Action::ToggleDiagram));
             return;
         }
         if (key == "+" || key == "=")
-            && !focus_binds.contains_key("+")
-            && !focus_binds.contains_key("=")
+            && !focus_binds.contains_spelling("+")
+            && !focus_binds.contains_spelling("=")
         {
             out.push(RenderCommand::Action(Action::DiagramZoomIn));
             return;
         }
-        if key == "-" && !focus_binds.contains_key("-") {
+        if key == "-" && !focus_binds.contains_spelling("-") {
             out.push(RenderCommand::Action(Action::DiagramZoomOut));
             return;
         }
-        if key == "0" && !focus_binds.contains_key("0") {
+        if key == "0" && !focus_binds.contains_spelling("0") {
             out.push(RenderCommand::Action(Action::DiagramResetZoom));
             return;
         }
-        if (key == "]" || key == "n") && !focus_binds.contains_key(key) {
+        if (key == "]" || key == "n") && !focus_binds.contains_spelling(key) {
             out.push(RenderCommand::Action(Action::NextDiagram));
             return;
         }
-        if (key == "[" || key == "N") && !focus_binds.contains_key(key) {
+        if (key == "[" || key == "N") && !focus_binds.contains_spelling(key) {
             out.push(RenderCommand::Action(Action::PrevDiagram));
             return;
         }
@@ -424,33 +425,33 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
         Some('g') => {
             if key == "g" {
                 let seq = "gg".to_string();
-                if let Some(actions) = get_nav_bind(focus_binds, &seq) {
+                if let Some(actions) = focus_binds.get(&seq) {
                     push_nav_actions(actions, sim_focus, out);
                 } else {
                     out.push(RenderCommand::Action(Action::PreviewUp(0)));
                 }
             } else if key == "t" {
                 let seq = "gt".to_string();
-                if let Some(actions) = get_nav_bind(focus_binds, &seq) {
+                if let Some(actions) = focus_binds.get(&seq) {
                     push_nav_actions(actions, sim_focus, out);
                 } else {
                     out.push(RenderCommand::Action(Action::Pos(0)));
                 }
             } else if key == "b" {
                 let seq = "gb".to_string();
-                if let Some(actions) = get_nav_bind(focus_binds, &seq) {
+                if let Some(actions) = focus_binds.get(&seq) {
                     push_nav_actions(actions, sim_focus, out);
                 } else {
                     out.push(RenderCommand::Action(Action::Pos(-1)));
                 }
-            } else if let Some(actions) = get_nav_bind(focus_binds, key) {
+            } else if let Some(actions) = focus_binds.get(key) {
                 push_nav_actions(actions, sim_focus, out);
             }
         }
         _ => {
-            if key == "g" && !focus_binds.contains_key("g") {
+            if key == "g" && !focus_binds.contains_spelling("g") {
                 *pending_nav_key = Some('g');
-            } else if let Some(actions) = get_nav_bind(focus_binds, key) {
+            } else if let Some(actions) = focus_binds.get(key) {
                 push_nav_actions(actions, sim_focus, out);
             } else if let Some(action) = fallback_action {
                 match &action {
@@ -533,9 +534,10 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
     }
 
     let mut out = Vec::with_capacity(buffer.len());
+    let keymap = super::nav_keymap::NavKeymap::from_strings(focus_binds);
     let mut resolver = NavResolver::new(
         initial_focus,
-        focus_binds,
+        &keymap,
         preview_fullscreen,
         preview_diagram_mode,
     );
@@ -551,7 +553,7 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
 /// loop applies them) and the last key a nav bind consumed (a global bind's further actions on
 /// that key are then dropped).
 pub(super) struct NavResolver<'b> {
-    focus_binds: &'b std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
+    focus_binds: &'b super::nav_keymap::NavKeymap,
     preview_fullscreen: bool,
     preview_diagram_mode: bool,
     sim_focus: Focus,
@@ -561,7 +563,7 @@ pub(super) struct NavResolver<'b> {
 impl<'b> NavResolver<'b> {
     pub(super) fn new(
         initial_focus: Focus,
-        focus_binds: &'b std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
+        focus_binds: &'b super::nav_keymap::NavKeymap,
         preview_fullscreen: bool,
         preview_diagram_mode: bool,
     ) -> Self {
@@ -609,7 +611,7 @@ impl<'b> NavResolver<'b> {
                         break 'feed;
                     }
                     if sim_focus == Focus::Results {
-                        if let Some(actions) = get_nav_bind(focus_binds, "esc") {
+                        if let Some(actions) = focus_binds.get("esc") {
                             push_nav_actions(actions, &mut sim_focus, out);
                         } else {
                             out.push(RenderCommand::Action(Action::Quit(130)));
@@ -679,7 +681,7 @@ impl<'b> NavResolver<'b> {
                         preview_fullscreen,
                         preview_diagram_mode,
                     );
-                    if !preview_fullscreen && get_nav_bind(focus_binds, &key).is_some() {
+                    if !preview_fullscreen && focus_binds.get(&key).is_some() {
                         last_consumed_nav_key = Some(key);
                     } else {
                         last_consumed_nav_key = None;
