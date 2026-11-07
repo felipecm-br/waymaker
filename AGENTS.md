@@ -41,6 +41,14 @@ Behaviour guards, all in `cargo test`:
 - `test_bind_tables_snapshot` in `waymaker-cli/src/config.rs`: every bind of the default config and of each preset.
 - `waymaker-cli/tests/pty.rs`: key-sequence tests for the filter and for navigation mode (`jump`).
 - Set `WM_TEST_BIN=/path/to/wm` to run the end-to-end tests (`--test golden --test pty`) against another binary, e.g. a downloaded release.
+- Property tests: `layout_props` in `waymaker-lib/src/ui/results/tests.rs` (random items, sizes, wrap and cursor moves; every frame keeps the cursor in range and on screen), `waymaker-lib/src/proptests.rs` (trigger, query and status-template parsing) and `waymaker-cli/src/proptests.rs` (the `-o path=value` pipeline over every config path, through the macro-generated `set` and `apply`). CI runs a few hundred cases each; after touching that code, raise `with_cases` locally for one deep run. Commit the seeds proptest writes to `proptest-regressions/`.
+
+Writing end-to-end tests:
+
+- `Session::wait_for` searches every byte `wm` has written so far, so it returns at once if the text was ever drawn (an earlier frame, a preview, a footer hint). Before a key whose effect is asynchronous (reload, directory change, preview) followed by Enter or a snapshot, wait with `wait_for_screen` for text that only the new state shows.
+- Output must not depend on the host: tools found on `PATH` (such as `bat`, stubbed out by `isolate_env`) and platform directories (the trash is under `~/Library/Application Support` on macOS) differ between machines and CI runners.
+
+Mutation testing checks that the tests would notice a change, not only that code runs: `cargo mutants -f <file> --test-package waymaker-lib --test-package waymaker-cli -j 2`. Set `TMPDIR` to a directory on disk: `/tmp` may be a small RAM-backed tmpfs, and each job copies the tree and its `target/`. A survivor is either a missing test (add it) or redundant code (remove it).
 
 `scripts/regress.py OLD_WM NEW_WM` compares two release binaries (`wm -f` output, peak memory, speed); CI's `regress` job runs it against the base commit. Use it for any change to matching, ingest or rendering.
 
