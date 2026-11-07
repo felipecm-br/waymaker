@@ -1352,3 +1352,98 @@ fn diagram_step_action<S: Selection, A: ActionExt>(
     }
     Flow::Proceed
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::action::NullActionExt;
+    use crate::config::{QueryConfig, ResultsConfig, StatusConfig};
+    use crate::nucleo::Column;
+
+    fn three_columns() -> Worker<String> {
+        Worker::new(
+            ["a", "b", "c"].map(|n| Column::new(n, |item: &String| item.as_str().into())),
+            0,
+        )
+    }
+
+    /// Next/PrevColumn type the `%name ` filter of the column after/before the active one,
+    /// wrapping around and skipping hidden columns.
+    #[test]
+    fn test_next_prev_column_wrap_and_skip_hidden() {
+        let run = |action: Action<NullActionExt>, hidden: Vec<bool>| {
+            let mut query = QueryUI::new(QueryConfig::default());
+            let mut results = ResultsUI::new(ResultsConfig::default(), StatusConfig::default());
+            results.hidden_columns = hidden;
+            let mut worker = three_columns();
+            let _ = column_action::<String, String, NullActionExt>(
+                action,
+                &mut query,
+                &mut results,
+                &mut worker,
+            );
+            query.input.clone()
+        };
+        assert_eq!(run(Action::NextColumn, vec![]), "%b ");
+        assert_eq!(run(Action::PrevColumn, vec![]), "%c ");
+        assert_eq!(run(Action::PrevColumn, vec![false, false, true]), "%b ");
+        assert_eq!(run(Action::NextColumn, vec![false, true, false]), "%c ");
+    }
+
+    /// FocusFilter closes an input action box and does nothing else; with only an info box
+    /// showing (it takes no input) it moves the focus to the filter and leaves the box.
+    #[test]
+    fn test_focus_filter_closes_only_an_input_box() {
+        use crate::config::*;
+        use crate::selector::Selector;
+        use crate::ui::UI;
+
+        let run = |box_takes_input: bool| {
+            let mut matcher = nucleo::Matcher::default();
+            let mut picker_ui = PickerUI::new(
+                ResultsConfig::default(),
+                StatusConfig::default(),
+                QueryConfig::default(),
+                DisplayConfig::default(),
+                ActionBoxConfig::default(),
+                BreadcrumbConfig::default(),
+                &mut matcher,
+                Worker::<String>::new_single_column(),
+                Selector::new(|_s: &String| (0u32, ())).disabled(),
+            );
+            let mut ui = UI {
+                layout: None,
+                area: ratatui::layout::Rect::default(),
+                config: UiConfig::default(),
+            };
+            ui.config.nav.active = true;
+            let mut state = State::new();
+            state.focus = Focus::Results;
+            picker_ui.action_visible = true;
+            state.input_routing.set_action_box_active(box_takes_input);
+            let mut tui = Tui::headless(
+                crate::config::TerminalConfig::default(),
+                ratatui::layout::Rect::new(0, 0, 40, 10),
+            )
+            .unwrap();
+            let _ = focus_action::<_, String, (), NullActionExt>(
+                Action::FocusFilter,
+                &mut state,
+                &mut ui,
+                &mut picker_ui,
+                &mut tui,
+            );
+            (picker_ui.action_visible, state.focus)
+        };
+        assert_eq!(
+            run(true),
+            (false, Focus::Results),
+            "input box: closed, focus kept"
+        );
+        assert_eq!(
+            run(false),
+            (true, Focus::Input),
+            "info box: kept, focus to filter"
+        );
+    }
+}

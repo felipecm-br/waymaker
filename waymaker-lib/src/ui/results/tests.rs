@@ -708,11 +708,13 @@ mod layout_props {
             height in 1u16..20,
             wrap in any::<bool>(),
             scroll_wrap in any::<bool>(),
+            stacked in any::<bool>(),
             ops in prop::collection::vec(op(), 0..40),
         ) {
             let mut config = ResultsConfig::default();
             config.wrap = wrap;
             config.scroll_wrap = scroll_wrap;
+            config.stacked_columns = stacked;
             let mut ui = ResultsUI::new(config, StatusConfig::default());
             let area = ratatui::layout::Rect::new(0, 0, width, height);
             ui.update_dimensions(&area);
