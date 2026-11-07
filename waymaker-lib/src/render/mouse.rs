@@ -52,46 +52,7 @@ pub(super) fn handle_mouse<T: SSS, S: Selection>(
                     let drag_width = p.drag_width();
                     if drag_width > 0 {
                         let side = p.setting().map(|s| &s.layout.side).unwrap_or(&Side::Right);
-                        match side {
-                            Side::Right => {
-                                let drag_area = Rect {
-                                    x: layout.preview.x,
-                                    y: layout.preview.y,
-                                    width: drag_width,
-                                    height: layout.preview.height,
-                                };
-                                drag_area.contains(pos)
-                            }
-                            Side::Left => {
-                                let drag_area = Rect {
-                                    x: layout.preview.x
-                                        + layout.preview.width.saturating_sub(drag_width),
-                                    y: layout.preview.y,
-                                    width: drag_width,
-                                    height: layout.preview.height,
-                                };
-                                drag_area.contains(pos)
-                            }
-                            Side::Bottom => {
-                                let drag_area = Rect {
-                                    x: layout.preview.x,
-                                    y: layout.preview.y,
-                                    width: layout.preview.width,
-                                    height: drag_width,
-                                };
-                                drag_area.contains(pos)
-                            }
-                            Side::Top => {
-                                let drag_area = Rect {
-                                    x: layout.preview.x,
-                                    y: layout.preview.y
-                                        + layout.preview.height.saturating_sub(drag_width),
-                                    width: layout.preview.width,
-                                    height: drag_width,
-                                };
-                                drag_area.contains(pos)
-                            }
-                        }
+                        drag_edge(layout.preview, side, drag_width).contains(pos)
                     } else {
                         false
                     }
@@ -185,35 +146,10 @@ pub(super) fn handle_mouse<T: SSS, S: Selection>(
                 && let Some(p) = preview_ui.as_mut()
             {
                 let side = p.setting().map(|s| &s.layout.side).unwrap_or(&Side::Right);
-                match side {
-                    Side::Right => {
-                        if pos.x < start_pos.x {
-                            p.expand(start_pos.x - pos.x);
-                        } else if pos.x > start_pos.x {
-                            p.shrink(pos.x - start_pos.x);
-                        }
-                    }
-                    Side::Left => {
-                        if pos.x > start_pos.x {
-                            p.expand(pos.x - start_pos.x);
-                        } else if pos.x < start_pos.x {
-                            p.shrink(start_pos.x - pos.x);
-                        }
-                    }
-                    Side::Bottom => {
-                        if pos.y < start_pos.y {
-                            p.expand(start_pos.y - pos.y);
-                        } else if pos.y > start_pos.y {
-                            p.shrink(pos.y - start_pos.y);
-                        }
-                    }
-                    Side::Top => {
-                        if pos.y > start_pos.y {
-                            p.expand(pos.y - start_pos.y);
-                        } else if pos.y < start_pos.y {
-                            p.shrink(start_pos.y - pos.y);
-                        }
-                    }
+                match drag_resize(side, start_pos, pos) {
+                    Some(Ok(n)) => p.expand(n),
+                    Some(Err(n)) => p.shrink(n),
+                    None => {}
                 }
                 state.dragging = Some(pos);
                 state.needs_redraw = true;
@@ -236,4 +172,97 @@ pub(super) fn handle_mouse<T: SSS, S: Selection>(
     }
 
     Flow::Proceed
+}
+
+/// The strip of the preview, `drag_width` deep along the edge facing the picker, where a click
+/// starts a resize drag (used when the layout has no gap column).
+fn drag_edge(preview: Rect, side: &crate::config::Side, drag_width: u16) -> Rect {
+    use crate::config::Side;
+    match side {
+        Side::Right => Rect {
+            x: preview.x,
+            y: preview.y,
+            width: drag_width,
+            height: preview.height,
+        },
+        Side::Left => Rect {
+            x: preview.x + preview.width.saturating_sub(drag_width),
+            y: preview.y,
+            width: drag_width,
+            height: preview.height,
+        },
+        Side::Bottom => Rect {
+            x: preview.x,
+            y: preview.y,
+            width: preview.width,
+            height: drag_width,
+        },
+        Side::Top => Rect {
+            x: preview.x,
+            y: preview.y + preview.height.saturating_sub(drag_width),
+            width: preview.width,
+            height: drag_width,
+        },
+    }
+}
+
+/// How a drag from `start` to `pos` resizes a preview on `side`: `Ok(n)` grows it by `n`,
+/// `Err(n)` shrinks it, `None` leaves it (no movement along the resize axis). Moving the edge
+/// towards the picker grows the preview.
+fn drag_resize(
+    side: &crate::config::Side,
+    start: Position,
+    pos: Position,
+) -> Option<Result<u16, u16>> {
+    use crate::config::Side;
+    let (from, to, grow_when_less) = match side {
+        Side::Right => (start.x, pos.x, true),
+        Side::Left => (start.x, pos.x, false),
+        Side::Bottom => (start.y, pos.y, true),
+        Side::Top => (start.y, pos.y, false),
+    };
+    if to == from {
+        return None;
+    }
+    let delta = from.abs_diff(to);
+    Some(if (to < from) == grow_when_less {
+        Ok(delta)
+    } else {
+        Err(delta)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Side;
+
+    #[test]
+    fn drag_edge_is_the_preview_side_facing_the_picker() {
+        let preview = Rect::new(10, 5, 40, 20);
+        assert_eq!(drag_edge(preview, &Side::Right, 2), Rect::new(10, 5, 2, 20));
+        assert_eq!(drag_edge(preview, &Side::Left, 2), Rect::new(48, 5, 2, 20));
+        assert_eq!(
+            drag_edge(preview, &Side::Bottom, 1),
+            Rect::new(10, 5, 40, 1)
+        );
+        assert_eq!(drag_edge(preview, &Side::Top, 1), Rect::new(10, 24, 40, 1));
+    }
+
+    #[test]
+    fn dragging_the_edge_towards_the_picker_grows_the_preview() {
+        let at = |x, y| Position::new(x, y);
+        let start = at(20, 10);
+        // Right-side preview: its edge is on the left; dragging left grows it.
+        assert_eq!(drag_resize(&Side::Right, start, at(17, 10)), Some(Ok(3)));
+        assert_eq!(drag_resize(&Side::Right, start, at(24, 10)), Some(Err(4)));
+        assert_eq!(drag_resize(&Side::Left, start, at(25, 10)), Some(Ok(5)));
+        assert_eq!(drag_resize(&Side::Left, start, at(18, 10)), Some(Err(2)));
+        assert_eq!(drag_resize(&Side::Bottom, start, at(20, 7)), Some(Ok(3)));
+        assert_eq!(drag_resize(&Side::Top, start, at(20, 12)), Some(Ok(2)));
+        assert_eq!(drag_resize(&Side::Top, start, at(20, 9)), Some(Err(1)));
+        // Movement across the resize axis does nothing.
+        assert_eq!(drag_resize(&Side::Right, start, at(20, 3)), None);
+        assert_eq!(drag_resize(&Side::Bottom, start, at(1, 10)), None);
+    }
 }
