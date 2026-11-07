@@ -168,14 +168,6 @@ pub struct ActionContext {
 pub fn action_handler(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
     let ActionContext {
         bind_tx,
-        render_tx,
-        output_template,
-        print_handle,
-        output_separator,
-        fm_notify,
-        undo_stack,
-        redo_stack,
-        fm_action,
         mode_history,
         last_cwd,
         ..
@@ -212,58 +204,7 @@ pub fn action_handler(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Action
         a @ (MMAction::ReloadNext(..) | MMAction::ReloadPrev | MMAction::ReloadReady(..)) => {
             reload::handle_reload(a, state, ctx)
         }
-        MMAction::Accept => {
-            if state.picker_ui.action_visible {
-                commit_fm_action(
-                    state, render_tx, undo_stack, redo_stack, fm_action, *fm_notify,
-                );
-                return;
-            }
-
-            let repeat = |s: String| {
-                use std::io::IsTerminal;
-                if std::io::stdout().is_terminal() {
-                    print_handle.push(s);
-                } else {
-                    print!("{}{}", s, output_separator);
-                }
-            };
-
-            let cwd = std::env::current_dir().ok();
-            let selected_items = state.map_selected_to_vec(|_, x| {
-                let s = x.to_cow().to_string();
-                if let Some(ref dir) = cwd {
-                    let p = std::path::Path::new(&s);
-                    if p.is_relative() {
-                        let full = dir.join(p);
-                        if full.exists() {
-                            return full.to_string_lossy().to_string();
-                        }
-                    }
-                }
-                s
-            });
-            if state.picker_ui.worker.frecency {
-                let store = waymaker::frecency::FrecencyStore::open();
-                for item in &selected_items {
-                    let _ = store.add(item);
-                }
-            }
-
-            if let Some(template) = output_template {
-                crate::formatter::format_cli(state, template, Some(&repeat));
-            } else if selected_items.is_empty() {
-                // Nothing to output: exit like a failed match so scripts can tell.
-                state.should_quit_nomatch = true;
-                return;
-            } else {
-                for item in selected_items {
-                    repeat(item);
-                }
-            }
-
-            state.should_quit = true;
-        }
+        MMAction::Accept => accept(state, ctx),
         // state
         MMAction::CycleSort => {
             let threshold = match state.picker_ui.worker.get_stability() {
@@ -372,127 +313,209 @@ pub fn action_handler(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Action
             state.discriminant_payload = Some(2);
             state.set_interrupt(Interrupt::Execute, s);
         }
-        MMAction::Transform(payload) => {
-            let cmd = format_cli(state, &payload, None);
-            if cmd.is_empty() {
-                error!("Failed to format transform command: {payload}");
-                return;
-            }
-            let vars = state.make_env_vars();
+        MMAction::Transform(payload) => transform(payload, state, ctx),
+        MMAction::TransformConfig(payload) => transform_config(payload, state, ctx),
+        MMAction::Confirm(payload) => confirm(payload, state, ctx),
+        MMAction::Prompt(payload) => prompt(payload, state, ctx),
+    }
+}
 
-            let render_tx = render_tx.clone();
-            if let Some(contents) = Command::from_script(&cmd)
-                .envs(vars)
-                .read_to_string()
-                ._elog()
-            {
-                debug!("Transform output:\n{}", contents);
+/// Accept: commits an open fm action box, else prints the selection (or the output template) and quits;
+/// with nothing selected and no template, quits as "no match".
+fn accept(state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
+    let ActionContext {
+        render_tx,
+        undo_stack,
+        redo_stack,
+        fm_action,
+        fm_notify,
+        print_handle,
+        output_separator,
+        output_template,
+        ..
+    } = ctx;
+    if state.picker_ui.action_visible {
+        commit_fm_action(
+            state, render_tx, undo_stack, redo_stack, fm_action, *fm_notify,
+        );
+        return;
+    }
 
-                for line in contents.lines() {
-                    match Action::<MMAction>::from_str(line) {
-                        Ok(action) => {
-                            let _ = render_tx.send(RenderCommand::Action(action));
-                        }
-                        Err(_) => {
-                            error!("Failed to parse action from transform output: {}", line);
-                        }
-                    }
+    let repeat = |s: String| {
+        use std::io::IsTerminal;
+        if std::io::stdout().is_terminal() {
+            print_handle.push(s);
+        } else {
+            print!("{}{}", s, output_separator);
+        }
+    };
+
+    let cwd = std::env::current_dir().ok();
+    let selected_items = state.map_selected_to_vec(|_, x| {
+        let s = x.to_cow().to_string();
+        if let Some(ref dir) = cwd {
+            let p = std::path::Path::new(&s);
+            if p.is_relative() {
+                let full = dir.join(p);
+                if full.exists() {
+                    return full.to_string_lossy().to_string();
                 }
             }
         }
-        MMAction::TransformConfig(payload) => {
-            let cmd = format_cli(state, &payload, None);
-            if cmd.is_empty() {
-                error!("Failed to format transform-config command: {payload}");
-                return;
-            }
-            let vars = state.make_env_vars();
-
-            if let Some(contents) = Command::from_script(&cmd)
-                .envs(vars)
-                .read_to_string()
-                ._elog()
-            {
-                debug!("TransformConfig output:\n{}", contents);
-
-                let words: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
-                match crate::parse::get_pairs(words) {
-                    Ok(pairs) => {
-                        let mut partial = PartialRenderConfig::default();
-                        for (path, val) in pairs {
-                            let mut parts = split_on_unescaped_delimiter(&val, "|||");
-                            if let Err(e) = crate::parse::try_split_kv(&mut parts, false) {
-                                error!("Failed to split KV for {}: {e}", path.join("."));
-                                continue;
-                            }
-
-                            if let Err(e) = partial.set(path.as_slice(), &parts) {
-                                error!("Failed to set partial for {}: {e}", path.join("."));
-                            }
-                        }
-
-                        log::debug!("Parsed config update: {partial:?}");
-
-                        // Apply the partial to UI components
-                        state.ui.config.apply(partial.ui);
-                        state.picker_ui.query.config.apply(partial.query);
-                        state.picker_ui.results.config.apply(partial.results);
-                        state.picker_ui.results.status_config.apply(partial.status);
-                        state.footer_ui.config.apply(partial.footer);
-                        state.picker_ui.header.config.apply(partial.header);
-
-                        if let Some(preview_ui) = state.preview_ui.as_mut() {
-                            preview_ui.config.apply(partial.preview);
-                        }
-
-                        let _ = render_tx.send(RenderCommand::Refresh);
-                    }
-                    Err(e) => {
-                        error!("Failed to parse pairs from TransformConfig output: {e}");
-                    }
-                }
-            }
-        }
-        MMAction::Confirm(payload) => {
-            let (prompt_tmpl, cmd_tmpl) = if let Some((p, c)) = payload.split_once('|') {
-                (p.trim(), c.trim())
-            } else if let Some((p, c)) = payload.split_once(":::") {
-                (p.trim(), c.trim())
-            } else {
-                (payload.as_str(), "")
-            };
-
-            let formatted_prompt = format_cli(state, prompt_tmpl, None);
-            let formatted_cmd = format_keeping_input(state, cmd_tmpl);
-
-            *fm_action = Some(FmActionMode::Custom {
-                command: formatted_cmd,
-            });
-            show_styled_action_box(state, &formatted_prompt, "");
-        }
-        MMAction::Prompt(payload) => {
-            let parts: Vec<&str> = payload.split('|').collect();
-            let (prompt_tmpl, cmd_tmpl, initial_tmpl) = match parts.len() {
-                0 => ("", "", ""),
-                1 => (parts[0].trim(), "", ""),
-                2 => (parts[0].trim(), parts[1].trim(), ""),
-                _ => (parts[0].trim(), parts[1].trim(), parts[2].trim()),
-            };
-
-            let formatted_prompt = crate::formatter::format_cli(state, prompt_tmpl, None);
-            let formatted_cmd = format_keeping_input(state, cmd_tmpl);
-            let formatted_initial = if !initial_tmpl.is_empty() {
-                crate::formatter::format_cli(state, initial_tmpl, None)
-            } else {
-                String::new()
-            };
-
-            *fm_action = Some(FmActionMode::Custom {
-                command: formatted_cmd,
-            });
-            show_styled_action_box(state, &formatted_prompt, &formatted_initial);
+        s
+    });
+    if state.picker_ui.worker.frecency {
+        let store = waymaker::frecency::FrecencyStore::open();
+        for item in &selected_items {
+            let _ = store.add(item);
         }
     }
+
+    if let Some(template) = output_template {
+        crate::formatter::format_cli(state, template, Some(&repeat));
+    } else if selected_items.is_empty() {
+        // Nothing to output: exit like a failed match so scripts can tell.
+        state.should_quit_nomatch = true;
+        return;
+    } else {
+        for item in selected_items {
+            repeat(item);
+        }
+    }
+
+    state.should_quit = true;
+}
+
+/// `Transform(cmd)`: runs the command and sends each line of its output as an action.
+fn transform(payload: String, state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
+    let ActionContext { render_tx, .. } = ctx;
+    let cmd = format_cli(state, &payload, None);
+    if cmd.is_empty() {
+        error!("Failed to format transform command: {payload}");
+        return;
+    }
+    let vars = state.make_env_vars();
+
+    let render_tx = render_tx.clone();
+    if let Some(contents) = Command::from_script(&cmd)
+        .envs(vars)
+        .read_to_string()
+        ._elog()
+    {
+        debug!("Transform output:\n{}", contents);
+
+        for line in contents.lines() {
+            match Action::<MMAction>::from_str(line) {
+                Ok(action) => {
+                    let _ = render_tx.send(RenderCommand::Action(action));
+                }
+                Err(_) => {
+                    error!("Failed to parse action from transform output: {}", line);
+                }
+            }
+        }
+    }
+}
+
+/// `TransformConfig(cmd)`: runs the command and applies its `path=value` lines to the live UI config.
+fn transform_config(payload: String, state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
+    let ActionContext { render_tx, .. } = ctx;
+    let cmd = format_cli(state, &payload, None);
+    if cmd.is_empty() {
+        error!("Failed to format transform-config command: {payload}");
+        return;
+    }
+    let vars = state.make_env_vars();
+
+    if let Some(contents) = Command::from_script(&cmd)
+        .envs(vars)
+        .read_to_string()
+        ._elog()
+    {
+        debug!("TransformConfig output:\n{}", contents);
+
+        let words: Vec<String> = contents.lines().map(|s| s.to_string()).collect();
+        match crate::parse::get_pairs(words) {
+            Ok(pairs) => {
+                let mut partial = PartialRenderConfig::default();
+                for (path, val) in pairs {
+                    let mut parts = split_on_unescaped_delimiter(&val, "|||");
+                    if let Err(e) = crate::parse::try_split_kv(&mut parts, false) {
+                        error!("Failed to split KV for {}: {e}", path.join("."));
+                        continue;
+                    }
+
+                    if let Err(e) = partial.set(path.as_slice(), &parts) {
+                        error!("Failed to set partial for {}: {e}", path.join("."));
+                    }
+                }
+
+                log::debug!("Parsed config update: {partial:?}");
+
+                // Apply the partial to UI components
+                state.ui.config.apply(partial.ui);
+                state.picker_ui.query.config.apply(partial.query);
+                state.picker_ui.results.config.apply(partial.results);
+                state.picker_ui.results.status_config.apply(partial.status);
+                state.footer_ui.config.apply(partial.footer);
+                state.picker_ui.header.config.apply(partial.header);
+
+                if let Some(preview_ui) = state.preview_ui.as_mut() {
+                    preview_ui.config.apply(partial.preview);
+                }
+
+                let _ = render_tx.send(RenderCommand::Refresh);
+            }
+            Err(e) => {
+                error!("Failed to parse pairs from TransformConfig output: {e}");
+            }
+        }
+    }
+}
+
+/// `Confirm(prompt|cmd)`: shows a yes/no box that runs `cmd` on confirm.
+fn confirm(payload: String, state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
+    let ActionContext { fm_action, .. } = ctx;
+    let (prompt_tmpl, cmd_tmpl) = if let Some((p, c)) = payload.split_once('|') {
+        (p.trim(), c.trim())
+    } else if let Some((p, c)) = payload.split_once(":::") {
+        (p.trim(), c.trim())
+    } else {
+        (payload.as_str(), "")
+    };
+
+    let formatted_prompt = format_cli(state, prompt_tmpl, None);
+    let formatted_cmd = format_keeping_input(state, cmd_tmpl);
+
+    *fm_action = Some(FmActionMode::Custom {
+        command: formatted_cmd,
+    });
+    show_styled_action_box(state, &formatted_prompt, "");
+}
+
+/// `Prompt(prompt|cmd|initial)`: shows an input box; `cmd` runs with the typed text as `{input}`.
+fn prompt(payload: String, state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
+    let ActionContext { fm_action, .. } = ctx;
+    let parts: Vec<&str> = payload.split('|').collect();
+    let (prompt_tmpl, cmd_tmpl, initial_tmpl) = match parts.len() {
+        0 => ("", "", ""),
+        1 => (parts[0].trim(), "", ""),
+        2 => (parts[0].trim(), parts[1].trim(), ""),
+        _ => (parts[0].trim(), parts[1].trim(), parts[2].trim()),
+    };
+
+    let formatted_prompt = crate::formatter::format_cli(state, prompt_tmpl, None);
+    let formatted_cmd = format_keeping_input(state, cmd_tmpl);
+    let formatted_initial = if !initial_tmpl.is_empty() {
+        crate::formatter::format_cli(state, initial_tmpl, None)
+    } else {
+        String::new()
+    };
+
+    *fm_action = Some(FmActionMode::Custom {
+        command: formatted_cmd,
+    });
+    show_styled_action_box(state, &formatted_prompt, &formatted_initial);
 }
 
 /// Formats a Prompt/Confirm command template now, but leaves `{input}` for the text the user
