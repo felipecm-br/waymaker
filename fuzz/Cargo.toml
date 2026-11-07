@@ -1,0 +1,64 @@
+# Fuzz targets for the parsers that read user input or file contents.
+# Run with `cargo +nightly fuzz run <target>` from the repository root; see fuzz/README.md.
+[package]
+name = "waymaker-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+waymaker-lib = { path = "../waymaker-lib", default-features = false }
+
+# Not part of the main workspace: it builds with nightly and sanitizer flags.
+[workspace]
+members = ["."]
+
+# Same nucleo fork as the main workspace (Cargo.toml); keep the two in step.
+[patch.crates-io]
+nucleo = { git = "https://github.com/felipecm-br/nucleo", branch = "waymaker" }
+
+[[bin]]
+name = "trigger"
+path = "fuzz_targets/trigger.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "action"
+path = "fuzz_targets/action.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "query"
+path = "fuzz_targets/query.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "status_template"
+path = "fuzz_targets/status_template.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "markdown"
+path = "fuzz_targets/markdown.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mermaid"
+path = "fuzz_targets/mermaid.rs"
+test = false
+doc = false
+bench = false
