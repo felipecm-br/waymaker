@@ -900,12 +900,12 @@ impl ResultsUI {
             };
         let get_dynamic_multi_prefix =
             |is_first: bool, is_last: bool| styler.dynamic_multi_prefix(is_first, is_last);
-        let apply_tier_underline =
-            |t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize| {
-                styler.tier_underline(t, target_w, skip_spans)
-            };
-        let style_text = |t: ratatui::text::Text<'a>, x: usize, is_current_row: bool| {
-            styler.style_text(t, x, is_current_row)
+        let frame = &RowsFrame {
+            styler,
+            widths,
+            cwd,
+            is_underline_mode,
+            active_column,
         };
 
         let mut drain_iter = results.drain(start_index as usize..).peekable();
@@ -996,207 +996,129 @@ impl ResultsUI {
                 None
             };
 
-            if as_cols {
-                // scroll down
-                if self.is_current(i) && self.config.vscroll_current_only && self.vscroll > 0 {
-                    for (x, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
-                        if self.col.is_none() || self.col() == Some(x) {
-                            let scroll = self.vscroll as usize;
-
-                            if scroll < t.lines.len() {
-                                t.lines = t.lines.split_off(scroll);
-                            } else {
-                                t.lines.clear();
-                            }
-                        }
-                    }
-                }
-
-                let mut height = row
-                    .iter()
-                    .map(|t| t.height() as u16)
-                    .max()
-                    .unwrap_or_default();
-
-                if remaining_height < height {
-                    height = remaining_height;
-
-                    for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
-                        clip_text_lines(t, height, self.reverse());
-                    }
-                }
-                remaining_height -= height;
-
-                // same as above
-                let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
-                let target_prefix_col =
-                    if is_spinner && widths.get(spinner_col_idx).copied().unwrap_or(0) != 0 {
-                        spinner_col_idx
-                    } else {
-                        first_visible
-                    };
-
-                let last_visible = widths
-                    .iter()
-                    .enumerate()
-                    .rev()
-                    .find_map(|(i, w)| (*w != 0).then_some(i));
-
-                let mut row_texts: Vec<_> = row
-                    .iter()
-                    .take(last_visible.map(|x| x + 1).unwrap_or(0))
-                    .cloned()
-                    // highlight
-                    .enumerate()
-                    .map(|(x, mut t)| {
-                        t = style_text(t, x, self.is_current(i));
-                        if let Some(color) = b_color {
-                            apply_bookmark_text_style(&mut t, color);
-                        }
-
-                        // prefix after hscroll
-                        if x == target_prefix_col {
-                            prefix_span(
-                                &mut t,
-                                prefix.clone(),
-                                self.active_prefix_style(
-                                    &icon_name_hz,
-                                    is_selected,
-                                    is_spinner,
-                                    cwd,
-                                ),
-                                self.inactive_prefix_style(
-                                    &icon_name_hz,
-                                    is_selected && !is_current_row,
-                                    is_spinner,
-                                    cwd,
-                                ),
-                                is_current_row,
-                                if !is_selected {
-                                    nav_bar_span.clone()
-                                } else {
-                                    None
-                                },
-                                self.config.current_style,
-                                self.config.current_nav_bar_style,
-                            );
-                            if self.config.icons {
-                                insert_icon_span(
-                                    &mut t,
-                                    &icon_name_hz,
-                                    !is_selected && nav_bar_span.is_some(),
-                                    is_current_row,
-                                    self.config.uncolor_current_icon,
-                                    self.config.invert_current_icon,
-                                    self.config.current_icon_style,
-                                    is_pinned,
-                                    is_yanked,
-                                    is_cut,
-                                    self.mode_index,
-                                    &self.config,
-                                    self.get_flash_op(&icon_name_hz, cwd),
-                                );
-                            }
-                            if self.config.symlink.active {
-                                maybe_append_symlink_target(
-                                    &mut t,
-                                    &icon_name_hz,
-                                    self.config.symlink.style.into(),
-                                    widths[target_prefix_col],
-                                );
-                            }
-                        };
-                        t
-                    })
-                    .collect();
-
-                if self.config.right_align_last && row_texts.len() > 1 {
-                    row_texts.last_mut().unwrap().alignment = Some(Alignment::Right)
-                }
-
-                if is_underline_mode
-                    && matches!(
-                        drain_iter.peek(),
-                        Some((Some(crate::nucleo::GroupHeader::TierSeparator), _, _))
-                    )
-                {
-                    let total_allocated: u16 = widths.iter().sum();
-                    let total_available = self.width.saturating_sub(self.column_spacing_width());
-                    let surplus = total_available.saturating_sub(total_allocated);
-                    let num_cols = row_texts.len();
-                    let has_nav = !is_selected && nav_bar_span.is_some();
-                    let prefix_skip = if has_nav { 2 } else { 1 };
-                    for (col_idx, t) in row_texts.iter_mut().enumerate() {
-                        let is_last_col = col_idx == num_cols.saturating_sub(1);
-                        let base_w = widths.get(col_idx).copied().unwrap_or(0);
-                        let target_w = if is_last_col {
-                            base_w + surplus
-                        } else {
-                            base_w
-                        } as usize;
-                        let skip = if col_idx == target_prefix_col {
-                            prefix_skip
-                        } else {
-                            0
-                        };
-                        apply_tier_underline(t, target_w, skip);
-                    }
-                }
-
-                // push
-                let mut row = Row::new(row_texts).height(height);
-
-                if self.is_current(i) {
-                    match self.config.row_connection {
-                        RowConnectionStyle::Capped => {
-                            row = row.style(self.config.inactive_current_style)
-                        }
-                        RowConnectionStyle::Full => row = row.style(self.config.current_style),
-                        _ => {}
-                    }
-                } else if is_selected {
-                    row = row.style(Style::from(self.config.selected_style));
-                }
-
-                rows.push(row);
+            let row_ctx = RowCtx {
+                i,
+                prefix,
+                icon_name_hz,
+                is_spinner,
+                spinner_col_idx,
+                is_yanked,
+                is_cut,
+                is_selected,
+                is_current_row,
+                is_pinned,
+                b_color,
+                nav_bar_span,
+            };
+            remaining_height = if as_cols {
+                self.push_columns_row(frame, &mut drain_iter, rows, row, row_ctx, remaining_height)
             } else {
-                let mut push = vec![];
-                let mut vscroll_to_skip = if self.is_current(i) && self.config.vscroll_current_only
-                {
-                    self.vscroll as usize
-                } else {
-                    0
-                };
+                self.push_stacked_row(frame, &mut drain_iter, rows, row, row_ctx, remaining_height)
+            };
+            i += 1;
+        }
+        (i, remaining_height)
+    }
 
-                for (x, mut col) in row.into_iter().enumerate() {
-                    if vscroll_to_skip > 0 {
-                        let col_height = col.lines.len();
-                        if vscroll_to_skip >= col_height {
-                            vscroll_to_skip -= col_height;
-                            continue;
-                        } else {
-                            col.lines = col.lines.split_off(vscroll_to_skip);
-                            vscroll_to_skip = 0;
-                        }
+    /// One item as a table row with a cell per column; returns the height left over.
+    fn push_columns_row<'a, T: SSS>(
+        &self,
+        frame: &RowsFrame<'_>,
+        drain_iter: &mut RowsIter<'_, 'a, T>,
+        rows: &mut Vec<Row<'a>>,
+        mut row: Vec<ratatui::text::Text<'a>>,
+        row_ctx: RowCtx,
+        mut remaining_height: u16,
+    ) -> u16 {
+        let RowCtx {
+            i,
+            prefix,
+            icon_name_hz,
+            is_spinner,
+            spinner_col_idx,
+            is_yanked,
+            is_cut,
+            is_selected,
+            is_current_row,
+            is_pinned,
+            b_color,
+            nav_bar_span,
+        } = row_ctx;
+        let RowsFrame {
+            styler,
+            widths,
+            cwd,
+            is_underline_mode,
+            ..
+        } = *frame;
+        let style_text = |t: ratatui::text::Text<'a>, x: usize, is_current_row: bool| {
+            styler.style_text(t, x, is_current_row)
+        };
+        let apply_tier_underline =
+            |t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize| {
+                styler.tier_underline(t, target_w, skip_spans)
+            };
+        // scroll down
+        if self.is_current(i) && self.config.vscroll_current_only && self.vscroll > 0 {
+            for (x, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
+                if self.col.is_none() || self.col() == Some(x) {
+                    let scroll = self.vscroll as usize;
+
+                    if scroll < t.lines.len() {
+                        t.lines = t.lines.split_off(scroll);
+                    } else {
+                        t.lines.clear();
                     }
+                }
+            }
+        }
 
-                    let mut height = col.height() as u16;
+        let mut height = row
+            .iter()
+            .map(|t| t.height() as u16)
+            .max()
+            .unwrap_or_default();
 
-                    if remaining_height == 0 {
-                        break;
-                    } else if remaining_height < height {
-                        height = remaining_height;
-                        clip_text_lines(&mut col, remaining_height, self.reverse());
-                    }
-                    remaining_height -= height;
+        if remaining_height < height {
+            height = remaining_height;
 
-                    if let Some(color) = b_color {
-                        apply_bookmark_text_style(&mut col, color);
-                    }
+            for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
+                clip_text_lines(t, height, self.reverse());
+            }
+        }
+        remaining_height -= height;
 
-                    let is_current_row = self.is_current(i);
+        // same as above
+        let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
+        let target_prefix_col =
+            if is_spinner && widths.get(spinner_col_idx).copied().unwrap_or(0) != 0 {
+                spinner_col_idx
+            } else {
+                first_visible
+            };
+
+        let last_visible = widths
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(i, w)| (*w != 0).then_some(i));
+
+        let mut row_texts: Vec<_> = row
+            .iter()
+            .take(last_visible.map(|x| x + 1).unwrap_or(0))
+            .cloned()
+            // highlight
+            .enumerate()
+            .map(|(x, mut t)| {
+                t = style_text(t, x, self.is_current(i));
+                if let Some(color) = b_color {
+                    apply_bookmark_text_style(&mut t, color);
+                }
+
+                // prefix after hscroll
+                if x == target_prefix_col {
                     prefix_span(
-                        &mut col,
+                        &mut t,
                         prefix.clone(),
                         self.active_prefix_style(&icon_name_hz, is_selected, is_spinner, cwd),
                         self.inactive_prefix_style(
@@ -1214,9 +1136,9 @@ impl ResultsUI {
                         self.config.current_style,
                         self.config.current_nav_bar_style,
                     );
-                    if self.config.icons && x == 0 {
+                    if self.config.icons {
                         insert_icon_span(
-                            &mut col,
+                            &mut t,
                             &icon_name_hz,
                             !is_selected && nav_bar_span.is_some(),
                             is_current_row,
@@ -1231,78 +1153,243 @@ impl ResultsUI {
                             self.get_flash_op(&icon_name_hz, cwd),
                         );
                     }
-                    if self.config.symlink.active && x == 0 {
+                    if self.config.symlink.active {
                         maybe_append_symlink_target(
-                            &mut col,
+                            &mut t,
                             &icon_name_hz,
                             self.config.symlink.style.into(),
-                            self.width,
+                            widths[target_prefix_col],
                         );
                     }
+                };
+                t
+            })
+            .collect();
 
-                    let is_active_col = active_column == x;
-
-                    match self.config.row_connection {
-                        RowConnectionStyle::Disjoint => {
-                            if is_active_col {
-                                col = col.style(if is_current_row {
-                                    self.config.current_style
-                                } else {
-                                    self.config.style
-                                });
-                            } else {
-                                col = col.style(if is_current_row {
-                                    self.config.inactive_current_style
-                                } else {
-                                    self.config.inactive_style
-                                });
-                            }
-                        }
-                        RowConnectionStyle::Capped => {
-                            if is_active_col {
-                                col = col.style(if is_current_row {
-                                    self.config.current_style
-                                } else {
-                                    self.config.style
-                                });
-                            }
-                        }
-                        RowConnectionStyle::Full => {}
-                    }
-
-                    if is_underline_mode
-                        && matches!(
-                            drain_iter.peek(),
-                            Some((Some(crate::nucleo::GroupHeader::TierSeparator), _, _))
-                        )
-                    {
-                        let target_w = self.width as usize;
-                        let has_nav = !is_selected && nav_bar_span.is_some();
-                        let prefix_skip = if has_nav { 2 } else { 1 };
-                        let skip = if x == 0 { prefix_skip } else { 0 };
-                        apply_tier_underline(&mut col, target_w, skip);
-                    }
-
-                    // push
-                    let mut row = Row::new(vec![col]).height(height);
-                    if is_current_row {
-                        match self.config.row_connection {
-                            RowConnectionStyle::Capped => {
-                                row = row.style(self.config.inactive_current_style)
-                            }
-                            RowConnectionStyle::Full => row = row.style(self.config.current_style),
-                            _ => {}
-                        }
-                    } else if is_selected {
-                        row = row.style(Style::from(self.config.selected_style));
-                    }
-                    push.push(row);
-                }
-                rows.extend(push);
-            }
-            i += 1;
+        if self.config.right_align_last && row_texts.len() > 1 {
+            row_texts.last_mut().unwrap().alignment = Some(Alignment::Right)
         }
-        (i, remaining_height)
+
+        if is_underline_mode
+            && matches!(
+                drain_iter.peek(),
+                Some((Some(crate::nucleo::GroupHeader::TierSeparator), _, _))
+            )
+        {
+            let total_allocated: u16 = widths.iter().sum();
+            let total_available = self.width.saturating_sub(self.column_spacing_width());
+            let surplus = total_available.saturating_sub(total_allocated);
+            let num_cols = row_texts.len();
+            let has_nav = !is_selected && nav_bar_span.is_some();
+            let prefix_skip = if has_nav { 2 } else { 1 };
+            for (col_idx, t) in row_texts.iter_mut().enumerate() {
+                let is_last_col = col_idx == num_cols.saturating_sub(1);
+                let base_w = widths.get(col_idx).copied().unwrap_or(0);
+                let target_w = if is_last_col {
+                    base_w + surplus
+                } else {
+                    base_w
+                } as usize;
+                let skip = if col_idx == target_prefix_col {
+                    prefix_skip
+                } else {
+                    0
+                };
+                apply_tier_underline(t, target_w, skip);
+            }
+        }
+
+        // push
+        let mut row = Row::new(row_texts).height(height);
+
+        if self.is_current(i) {
+            match self.config.row_connection {
+                RowConnectionStyle::Capped => row = row.style(self.config.inactive_current_style),
+                RowConnectionStyle::Full => row = row.style(self.config.current_style),
+                _ => {}
+            }
+        } else if is_selected {
+            row = row.style(Style::from(self.config.selected_style));
+        }
+
+        rows.push(row);
+        remaining_height
+    }
+
+    /// One item as stacked rows, one per column; returns the height left over.
+    fn push_stacked_row<'a, T: SSS>(
+        &self,
+        frame: &RowsFrame<'_>,
+        drain_iter: &mut RowsIter<'_, 'a, T>,
+        rows: &mut Vec<Row<'a>>,
+        row: Vec<ratatui::text::Text<'a>>,
+        row_ctx: RowCtx,
+        mut remaining_height: u16,
+    ) -> u16 {
+        let RowCtx {
+            i,
+            prefix,
+            icon_name_hz,
+            is_spinner,
+            spinner_col_idx: _,
+            is_yanked,
+            is_cut,
+            is_selected,
+            is_current_row: _,
+            is_pinned,
+            b_color,
+            nav_bar_span,
+        } = row_ctx;
+        let RowsFrame {
+            styler,
+            cwd,
+            is_underline_mode,
+            active_column,
+            ..
+        } = *frame;
+        let apply_tier_underline =
+            |t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize| {
+                styler.tier_underline(t, target_w, skip_spans)
+            };
+        let mut push = vec![];
+        let mut vscroll_to_skip = if self.is_current(i) && self.config.vscroll_current_only {
+            self.vscroll as usize
+        } else {
+            0
+        };
+
+        for (x, mut col) in row.into_iter().enumerate() {
+            if vscroll_to_skip > 0 {
+                let col_height = col.lines.len();
+                if vscroll_to_skip >= col_height {
+                    vscroll_to_skip -= col_height;
+                    continue;
+                } else {
+                    col.lines = col.lines.split_off(vscroll_to_skip);
+                    vscroll_to_skip = 0;
+                }
+            }
+
+            let mut height = col.height() as u16;
+
+            if remaining_height == 0 {
+                break;
+            } else if remaining_height < height {
+                height = remaining_height;
+                clip_text_lines(&mut col, remaining_height, self.reverse());
+            }
+            remaining_height -= height;
+
+            if let Some(color) = b_color {
+                apply_bookmark_text_style(&mut col, color);
+            }
+
+            let is_current_row = self.is_current(i);
+            prefix_span(
+                &mut col,
+                prefix.clone(),
+                self.active_prefix_style(&icon_name_hz, is_selected, is_spinner, cwd),
+                self.inactive_prefix_style(
+                    &icon_name_hz,
+                    is_selected && !is_current_row,
+                    is_spinner,
+                    cwd,
+                ),
+                is_current_row,
+                if !is_selected {
+                    nav_bar_span.clone()
+                } else {
+                    None
+                },
+                self.config.current_style,
+                self.config.current_nav_bar_style,
+            );
+            if self.config.icons && x == 0 {
+                insert_icon_span(
+                    &mut col,
+                    &icon_name_hz,
+                    !is_selected && nav_bar_span.is_some(),
+                    is_current_row,
+                    self.config.uncolor_current_icon,
+                    self.config.invert_current_icon,
+                    self.config.current_icon_style,
+                    is_pinned,
+                    is_yanked,
+                    is_cut,
+                    self.mode_index,
+                    &self.config,
+                    self.get_flash_op(&icon_name_hz, cwd),
+                );
+            }
+            if self.config.symlink.active && x == 0 {
+                maybe_append_symlink_target(
+                    &mut col,
+                    &icon_name_hz,
+                    self.config.symlink.style.into(),
+                    self.width,
+                );
+            }
+
+            let is_active_col = active_column == x;
+
+            match self.config.row_connection {
+                RowConnectionStyle::Disjoint => {
+                    if is_active_col {
+                        col = col.style(if is_current_row {
+                            self.config.current_style
+                        } else {
+                            self.config.style
+                        });
+                    } else {
+                        col = col.style(if is_current_row {
+                            self.config.inactive_current_style
+                        } else {
+                            self.config.inactive_style
+                        });
+                    }
+                }
+                RowConnectionStyle::Capped => {
+                    if is_active_col {
+                        col = col.style(if is_current_row {
+                            self.config.current_style
+                        } else {
+                            self.config.style
+                        });
+                    }
+                }
+                RowConnectionStyle::Full => {}
+            }
+
+            if is_underline_mode
+                && matches!(
+                    drain_iter.peek(),
+                    Some((Some(crate::nucleo::GroupHeader::TierSeparator), _, _))
+                )
+            {
+                let target_w = self.width as usize;
+                let has_nav = !is_selected && nav_bar_span.is_some();
+                let prefix_skip = if has_nav { 2 } else { 1 };
+                let skip = if x == 0 { prefix_skip } else { 0 };
+                apply_tier_underline(&mut col, target_w, skip);
+            }
+
+            // push
+            let mut row = Row::new(vec![col]).height(height);
+            if is_current_row {
+                match self.config.row_connection {
+                    RowConnectionStyle::Capped => {
+                        row = row.style(self.config.inactive_current_style)
+                    }
+                    RowConnectionStyle::Full => row = row.style(self.config.current_style),
+                    _ => {}
+                }
+            } else if is_selected {
+                row = row.style(Style::from(self.config.selected_style));
+            }
+            push.push(row);
+        }
+        rows.extend(push);
+        remaining_height
     }
 
     pub fn make_table<'a, T: SSS>(
@@ -1623,6 +1710,44 @@ fn nav_border_char(border_type: ratatui::widgets::BorderType) -> &'static str {
 
 /// What make_table needs, per frame, to style a row: copied out of the config so the row code
 /// can take it alongside `&mut self`.
+/// Values the same for every row of one table, read by both row layouts.
+#[derive(Clone, Copy)]
+struct RowsFrame<'f> {
+    styler: &'f RowStyler,
+    widths: &'f [u16],
+    cwd: &'f std::path::Path,
+    is_underline_mode: bool,
+    active_column: usize,
+}
+
+/// One item's values, computed once by `push_visible_rows` and read by both row layouts.
+struct RowCtx {
+    i: usize,
+    prefix: String,
+    icon_name_hz: String,
+    is_spinner: bool,
+    spinner_col_idx: usize,
+    is_yanked: bool,
+    is_cut: bool,
+    is_selected: bool,
+    is_current_row: bool,
+    is_pinned: bool,
+    b_color: Option<ratatui::style::Color>,
+    nav_bar_span: Option<ratatui::text::Span<'static>>,
+}
+
+/// The rest of a frame's results, peeked to see whether a tier separator follows a row.
+type RowsIter<'d, 'a, T> = std::iter::Peekable<
+    std::vec::Drain<
+        'd,
+        (
+            Option<crate::nucleo::GroupHeader>,
+            Vec<ratatui::text::Text<'a>>,
+            &'a T,
+        ),
+    >,
+>;
+
 struct RowStyler {
     nav_bar_style: Option<(ratatui::widgets::BorderType, Style)>,
     current_nav_bar: Option<ratatui::widgets::BorderType>,
