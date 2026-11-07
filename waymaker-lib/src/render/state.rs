@@ -76,8 +76,6 @@ pub struct State {
     pub(crate) focus_blink: bool,
     /// Tick counter driving the blink half-cycle.
     pub(crate) focus_tick: u8,
-    /// Pending key prefix for multi-character sequences in focus mode.
-    pub pending_nav_key: Option<char>,
     /// Whether the sort shortcut menu is active in the footer.
     pub sort_menu_active: bool,
     /// Template to execute when prompt input is confirmed.
@@ -187,7 +185,6 @@ impl State {
             col: None,
             focus_blink: true,
             focus_tick: 0,
-            pending_nav_key: None,
             sort_menu_active: false,
             prompt_input_template: None,
             prompt_input_stash_id: None,

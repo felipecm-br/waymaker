@@ -92,6 +92,10 @@ pub enum RenderCommand<A: ActionExt> {
     NoMatch,
     Empty,
     ReloadData(Vec<String>),
+    /// Sent by the event loop after the commands of one input event. The render loop publishes
+    /// the last fence it has fully applied, so the event loop can resolve the next key against
+    /// the state those commands left (see [`crate::input_state::InputState::render_caught_up`]).
+    Fence(u64),
 }
 
 impl<A: ActionExt> From<Action<A>> for RenderCommand<A> {

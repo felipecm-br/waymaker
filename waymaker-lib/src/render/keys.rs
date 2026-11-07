@@ -469,8 +469,7 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
 
 /// Pre-process `buffer` for navigation mode: simulate `ToggleFocus` events encountered in the
 /// batch and expand `Action::Char` events into `nav_binds` actions while focus is on results.
-#[inline]
-#[allow(dead_code)]
+#[cfg(test)]
 pub(super) fn apply_focus_binds<A: ActionExt>(
     buffer: &mut Vec<RenderCommand<A>>,
     initial_focus: Focus,
@@ -493,6 +492,7 @@ pub(super) fn apply_focus_binds<A: ActionExt>(
     );
 }
 
+#[cfg(test)]
 pub(super) fn apply_focus_binds_mode<A: ActionExt>(
     buffer: &mut Vec<RenderCommand<A>>,
     initial_focus: Focus,
@@ -538,11 +538,11 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
     *buffer = out;
 }
 
-/// Resolves navigation-mode keys one command at a time. It carries the state that spans
-/// commands: the simulated focus (focus actions in the same batch move it before the render
-/// loop applies them) and the last key a nav bind consumed (a global bind's further actions on
-/// that key are then dropped).
-pub(super) struct NavResolver<'b> {
+/// Resolves navigation-mode keys one command at a time; the event loop runs one per input
+/// event (`EventLoop::unit`). It carries the state that spans the event's commands: the
+/// simulated focus (a bind's focus action moves it before the render loop applies it) and the
+/// last key a nav bind consumed (a global bind's further actions on that key are then dropped).
+pub(crate) struct NavResolver<'b> {
     focus_binds: &'b super::nav_keymap::NavKeymap,
     preview_binds: &'b super::nav_keymap::NavKeymap,
     preview_fullscreen: bool,
@@ -552,7 +552,7 @@ pub(super) struct NavResolver<'b> {
 }
 
 impl<'b> NavResolver<'b> {
-    pub(super) fn new(
+    pub(crate) fn new(
         initial_focus: Focus,
         focus_binds: &'b super::nav_keymap::NavKeymap,
         preview_binds: &'b super::nav_keymap::NavKeymap,
@@ -574,7 +574,7 @@ impl<'b> NavResolver<'b> {
     }
 
     /// Resolves one command into `out`.
-    pub(super) fn feed<A: ActionExt>(
+    pub(crate) fn feed<A: ActionExt>(
         &mut self,
         cmd: RenderCommand<A>,
         pending_nav_key: &mut Option<char>,

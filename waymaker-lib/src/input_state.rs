@@ -8,7 +8,7 @@
 
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
 /// Shared handle to a picker's [`InputState`].
@@ -26,6 +26,26 @@ pub struct InputState {
     live_input: AtomicBool,
     /// In navigation mode, the filter has keyboard focus (else the results do).
     input_focused: AtomicBool,
+    /// What the render loop showed after its last batch; see [`RenderView`].
+    preview_fullscreen: AtomicBool,
+    preview_diagram: AtomicBool,
+    box_takes_keys: AtomicBool,
+    sort_menu: AtomicBool,
+    /// The last [`RenderCommand::Fence`](crate::message::RenderCommand::Fence) the render loop
+    /// has applied, published with the view it left.
+    fence_done: AtomicU64,
+    fence_notify: tokio::sync::Notify,
+}
+
+/// Render-loop state that decides how the event loop resolves a navigation-mode key.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct RenderView {
+    pub preview_fullscreen: bool,
+    pub preview_diagram: bool,
+    /// An input box (create, rename, ...) or an input overlay takes the keys.
+    pub box_takes_keys: bool,
+    /// The sort menu is open: the next key picks the order.
+    pub sort_menu: bool,
 }
 
 impl InputState {
@@ -80,6 +100,54 @@ impl InputState {
         self.input_focused
             .store(focus == crate::render::Focus::Input, Ordering::Relaxed);
     }
+
+    /// The view the render loop published last.
+    pub fn view(&self) -> RenderView {
+        RenderView {
+            preview_fullscreen: self.preview_fullscreen.load(Ordering::Relaxed),
+            preview_diagram: self.preview_diagram.load(Ordering::Relaxed),
+            box_takes_keys: self.box_takes_keys.load(Ordering::Relaxed),
+            sort_menu: self.sort_menu.load(Ordering::Relaxed),
+        }
+    }
+
+    /// Called by the render loop between batches: everything up to fence `fence` is applied and
+    /// left this view.
+    pub fn publish(&self, view: RenderView, fence: u64) {
+        self.preview_fullscreen
+            .store(view.preview_fullscreen, Ordering::Relaxed);
+        self.preview_diagram
+            .store(view.preview_diagram, Ordering::Relaxed);
+        self.box_takes_keys
+            .store(view.box_takes_keys, Ordering::Relaxed);
+        self.sort_menu.store(view.sort_menu, Ordering::Relaxed);
+        // Release: a reader that sees this fence also sees the view and the focus above.
+        if self.fence_done.fetch_max(fence, Ordering::Release) < fence {
+            self.fence_notify.notify_waiters();
+        }
+    }
+
+    pub fn fence_done(&self) -> u64 {
+        self.fence_done.load(Ordering::Acquire)
+    }
+
+    /// Waits until the render loop has applied fence `fence`, or `limit` has passed. Returns
+    /// whether it caught up.
+    pub async fn render_caught_up(&self, fence: u64, limit: std::time::Duration) -> bool {
+        let deadline = tokio::time::Instant::now() + limit;
+        loop {
+            let notified = self.fence_notify.notified();
+            tokio::pin!(notified);
+            // Register before checking, so a publish between the check and the wait is seen.
+            notified.as_mut().enable();
+            if self.fence_done() >= fence {
+                return true;
+            }
+            if tokio::time::timeout_at(deadline, notified).await.is_err() {
+                return self.fence_done() >= fence;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -115,5 +183,38 @@ mod tests {
         a.set_focus(Focus::Results);
         assert_eq!(b.focus(), Focus::Results);
         assert_eq!(InputState::shared().focus(), Focus::Results);
+    }
+
+    #[test]
+    fn publish_shares_the_view_and_keeps_the_highest_fence() {
+        let a = InputState::shared();
+        let view = RenderView {
+            preview_fullscreen: true,
+            preview_diagram: false,
+            box_takes_keys: true,
+            sort_menu: true,
+        };
+        a.publish(view, 3);
+        assert_eq!((a.view(), a.fence_done()), (view, 3));
+        // A fence the render loop dropped (while waiting for a pause ack) cannot move it back.
+        a.publish(RenderView::default(), 2);
+        assert_eq!((a.view(), a.fence_done()), (RenderView::default(), 3));
+    }
+
+    #[tokio::test]
+    async fn waiting_for_the_render_loop() {
+        use std::time::Duration;
+        let a = InputState::shared();
+        a.publish(RenderView::default(), 1);
+        assert!(a.render_caught_up(1, Duration::ZERO).await);
+        assert!(!a.render_caught_up(2, Duration::from_millis(10)).await);
+
+        let b = Arc::clone(&a);
+        let publisher = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            b.publish(RenderView::default(), 2);
+        });
+        assert!(a.render_caught_up(2, Duration::from_secs(5)).await);
+        publisher.await.unwrap();
     }
 }

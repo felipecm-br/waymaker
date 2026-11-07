@@ -267,6 +267,35 @@ fn nav_bind_resolves_custom_semantic_confirm_action() {
     assert_eq!(wm.finish().0, 130);
 }
 
+/// `,` in navigation mode opens the sort menu, and the next key picks the order.
+#[test]
+fn nav_comma_opens_the_sort_menu() {
+    let wm = Session::start(
+        FRUIT,
+        &["ui.nav.active=true", "ui.nav.focus_on_start=picker"],
+    );
+    wm.send(",");
+    wm.wait_for_screen(|s| s.contains("Alpha (rev)"));
+    wm.send("A"); // alphabetical, reversed
+    wm.wait_for_screen(|s| !s.contains("Alpha (rev)"));
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
+}
+
+/// Keys written at once still resolve in order: the event loop resolves `A` only after the
+/// render loop has opened the menu that `,` asked for.
+#[test]
+fn nav_keys_sent_together_see_the_state_the_earlier_key_left() {
+    let wm = Session::start(
+        FRUIT,
+        &["ui.nav.active=true", "ui.nav.focus_on_start=picker"],
+    );
+    wm.send_raw(",A");
+    wm.wait_until_idle();
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
+}
+
 #[test]
 fn preview_file_subcommand_previews_directory_text_and_image() {
     let bin = &wm_bin();

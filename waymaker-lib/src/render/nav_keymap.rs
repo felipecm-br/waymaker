@@ -3,8 +3,8 @@
 //! `[nav.binds]` keys are strings today, matched against the event loop's key names with
 //! special cases (case-insensitive names, `space` vs `" "`, `?` vs `shift-?`). Parsing them into
 //! normalized `KeyCombination`s makes equal keys equal, and strings such as `gg` that are not a
-//! key name become key sequences. Not wired into the render path yet: the differential test
-//! below checks it agrees with the string matching in `keys::get_nav_bind` first.
+//! key name become key sequences. The differential test below checks it agrees with the old
+//! string matching in `keys::get_nav_bind`.
 
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -15,7 +15,7 @@ use crate::action::{Actions, NullActionExt};
 
 /// A nav-bind key: one key, or a sequence such as `gg`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(super) enum NavKey {
+pub(crate) enum NavKey {
     Single(KeyCombination),
     Sequence(Vec<KeyCombination>),
 }
@@ -62,14 +62,14 @@ pub(super) fn parse_nav_key(s: &str) -> Option<NavKey> {
 
 /// `[nav.binds]` with parsed keys.
 #[derive(Debug, Default)]
-pub(super) struct NavKeymap {
+pub(crate) struct NavKeymap {
     binds: HashMap<NavKey, Actions<NullActionExt>>,
     /// The keys exactly as written, for checks that compare spellings.
     spellings: std::collections::HashSet<String>,
 }
 
 impl NavKeymap {
-    pub(super) fn from_strings(map: &HashMap<String, Actions<NullActionExt>>) -> Self {
+    pub(crate) fn from_strings(map: &HashMap<String, Actions<NullActionExt>>) -> Self {
         let binds = map
             .iter()
             .filter_map(|(k, v)| parse_nav_key(k).map(|key| (key, v.clone())))
@@ -82,7 +82,7 @@ impl NavKeymap {
 
     /// `defaults` with `overrides` on top: an override replaces the default for the same key,
     /// whatever its spelling.
-    pub(super) fn from_layers(
+    pub(crate) fn from_layers(
         defaults: &HashMap<String, Actions<NullActionExt>>,
         overrides: &HashMap<String, Actions<NullActionExt>>,
     ) -> Self {

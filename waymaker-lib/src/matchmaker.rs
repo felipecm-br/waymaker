@@ -517,6 +517,8 @@ impl<T: SSS, S: Selection> Matchmaker<T, S> {
             hidden_columns,
         );
 
+        event_loop.set_nav(&ui.config.nav);
+
         // Start event loop after UI initialization and terminal query complete
         let event_controller = event_loop.controller();
         let event_controller_ = event_controller.clone();

@@ -2,10 +2,10 @@ mod actions;
 mod draw;
 mod dynamic;
 mod frame;
-mod keys;
+pub(crate) mod keys;
 mod live_input;
 mod mouse;
-mod nav_keymap;
+pub(crate) mod nav_keymap;
 
 /// Whether two nav-bind keys name the same key (`Esc`/`esc`, `space`/`" "`, `shift-j`/`J`).
 /// Keys that do not parse compare as strings.
@@ -135,10 +135,36 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
     let mut buffer = Vec::with_capacity(256);
     let mut last_preview_poll = std::time::Instant::now();
 
-    while render_rx.recv_many(&mut buffer, 256).await > 0 {
+    // The last fence the event loop sent that this loop has taken in.
+    let mut fence = 0;
+    loop {
+        // Everything received so far is applied: tell the event loop what it left.
+        state.input_routing.publish(
+            crate::input_state::RenderView {
+                preview_fullscreen: state.preview_fullscreen,
+                preview_diagram: state.preview_diagram_mode,
+                // An input box (create, rename, ...) takes the keys; an info box such as
+                // "Undone ..." does not, so ctrl-r still reaches @redo after an undo.
+                box_takes_keys: (picker_ui.action_visible
+                    && state.input_routing.action_box_active())
+                    || overlay_ui.as_ref().is_some_and(|o| o.index().is_some()),
+                sort_menu: state.sort_menu_active,
+            },
+            fence,
+        );
+        if render_rx.recv_many(&mut buffer, 256).await == 0 {
+            break;
+        }
         while let Ok(cmd) = render_rx.try_recv() {
             buffer.push(cmd);
         }
+        buffer.retain(|cmd| match cmd {
+            RenderCommand::Fence(n) => {
+                fence = fence.max(*n);
+                false
+            }
+            _ => true,
+        });
         if state.iterations == 0 {
             log::debug!("Render loop started");
             state.needs_redraw = true;
@@ -198,23 +224,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
         } else if state.sort_menu_active {
             apply_sort_menu(&mut buffer, &mut state.sort_menu_active);
         } else if ui.config.nav.active {
-            if !ui.config.nav.passthrough {
-                apply_focus_binds_mode(
-                    &mut buffer,
-                    state.focus(),
-                    &ui.config.nav.binds,
-                    &ui.config.nav.preview_binds,
-                    // An input box (create, rename, ...) takes the keys; an info box such as
-                    // "Undone ..." does not, so ctrl-r still reaches @redo after an undo.
-                    (picker_ui.action_visible && state.input_routing.action_box_active())
-                        || overlay_ui.as_ref().is_some_and(|o| o.index().is_some()),
-                    &mut state.pending_nav_key,
-                    &mut state.sort_menu_active,
-                    state.preview_fullscreen,
-                    state.preview_diagram_mode,
-                );
-            }
-
+            // The event loop has resolved navigation-mode keys already (`EventLoop::set_nav`).
             if let Some(aliaser) = &mut ext_aliaser {
                 apply_aliases(
                     &mut buffer,

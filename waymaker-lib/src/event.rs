@@ -2,6 +2,8 @@ use crate::action::{Action, ActionExt, Actions, NullActionExt};
 use crate::binds::{BindMap, BindMapExt, SimpleMouseEvent, Trigger, TriggerKind};
 use crate::input_state::{InputState, SharedInputState};
 use crate::message::{BindDirective, Event, RenderCommand};
+use crate::render::keys::NavResolver;
+use crate::render::nav_keymap::NavKeymap;
 use anyhow::Result;
 use cba::bait::ResultExt;
 use cba::bath::PathExt;
@@ -44,7 +46,28 @@ pub struct EventLoop<A: ActionExt> {
     key_file: Option<PathBuf>,
     input: SharedInputState,
     current_task: Option<tokio::task::JoinHandle<Result<()>>>,
+
+    /// Navigation-mode binds, when nav mode is on (see [`EventLoop::set_nav`]).
+    nav: Option<NavKeys>,
+    /// The first key of a sequence such as `gg`, waiting for the next.
+    pending_nav_key: Option<char>,
+    /// While one input event is handled, the commands it sends, to be resolved as nav keys.
+    captured: std::cell::RefCell<Option<Vec<RenderCommand<A>>>>,
+    /// The last [`RenderCommand::Fence`] sent.
+    fence_sent: u64,
 }
+
+/// `[nav.binds]` and the preview binds, parsed once.
+#[derive(Debug)]
+struct NavKeys {
+    binds: NavKeymap,
+    preview: NavKeymap,
+}
+
+/// How long a key waits for the render loop to apply the commands of earlier keys before it is
+/// resolved against the state published so far. The render loop takes a few milliseconds per
+/// batch; this bounds the wait while it runs a reload or a command.
+const RENDER_CATCH_UP_LIMIT: time::Duration = time::Duration::from_millis(250);
 
 impl<A: ActionExt> Default for EventLoop<A> {
     fn default() -> Self {
@@ -77,6 +100,10 @@ impl<A: ActionExt> EventLoop<A> {
             key_file: None,
             input: InputState::shared(),
             current_task: None,
+            nav: None,
+            pending_nav_key: None,
+            captured: Default::default(),
+            fence_sent: 0,
 
             bind_rx,
             bind_tx,
@@ -103,6 +130,20 @@ impl<A: ActionExt> EventLoop<A> {
     pub fn with_tick_rate(mut self, tick_rate: u8) -> Self {
         self.tick_interval = time::Duration::from_secs_f64(1.0 / tick_rate as f64);
         self
+    }
+
+    /// Resolves navigation-mode keys in this loop, against `nav`'s binds, when nav mode is on
+    /// and not passthrough. The render loop reads the same config; call this before [`run`].
+    ///
+    /// [`run`]: EventLoop::run
+    pub fn set_nav(&mut self, nav: &crate::config::NavConfig) {
+        self.nav = (nav.active && !nav.passthrough).then(|| NavKeys {
+            binds: NavKeymap::from_strings(&nav.binds),
+            preview: NavKeymap::from_layers(
+                &crate::config::NavConfig::default_preview_binds(),
+                &nav.preview_binds,
+            ),
+        });
     }
 
     /// The input routing state this loop reads; the render loop must share it.
@@ -344,11 +385,11 @@ impl<A: ActionExt> EventLoop<A> {
                 }
 
                 Some(event) = self.rx.recv() => {
-                    self.handle_event(event)
+                    self.unit(|s| s.handle_event(event))
                 }
 
                 Some(directive) = self.bind_rx.recv() => {
-                    self.handle_rebind(directive)
+                    self.unit(|s| s.handle_rebind(directive))
                 }
 
                 // Input ready
@@ -366,79 +407,14 @@ impl<A: ActionExt> EventLoop<A> {
                             }
                             match event {
                                 CrosstermEvent::Key(k) => {
-                                        if let Some(key) = self.combiner.transform(k) {
-                                        info!("{key:?}");
-                                        let key = KeyCombination::normalized(key);
-                                        // When the action box or prompt input is active, plain character keys
-                                        // must always reach the input as Action::Char regardless
-                                        // of any shortcut bindings on that key.
-                                        let action_box_active = self.input.action_box_active();
-                                        let prompt_input_active = self.input.prompt_input_active();
-                                        let live_input_active = self.input.live_input_active();
-                                        if !action_box_active && !prompt_input_active && !live_input_active {
-                                            if let Some(actions) = self.get_bind(TriggerKind::Key(key)) {
-                                                self.record_key(key.to_string());
-                                                self.send_actions(actions, Some(key.to_string()));
-                                            } else if let Some(c) = key_code_as_letter(key) {
-                                                self.send(RenderCommand::KeyAction {
-                                                    key: c.to_string(),
-                                                    action: Action::Char(c),
-                                                });
-                                            } else {
-                                                self.dispatch_fallback_key(key);
-                                            }
-                                        } else if live_input_active {
-                                            if key == key!(esc) {
-                                                self.send_key_action(Action::Cancel, "esc".to_string());
-                                            } else if let Some(c) = key_code_as_letter(key) {
-                                                self.send(RenderCommand::KeyAction {
-                                                    key: c.to_string(),
-                                                    action: Action::Char(c),
-                                                });
-                                            } else {
-                                                let key_str = self.print_key(key);
-                                                match key {
-                                                    key!(enter) => self.send_key_action(Action::Accept, key_str),
-                                                    key!(backspace) => self.send_key_action(Action::DeleteChar, key_str),
-                                                    key!(up) => self.send_key_action(Action::Up(1), key_str),
-                                                    key!(down) => self.send_key_action(Action::Down(1), key_str),
-                                                    key!(left) => self.send_key_action(Action::BackwardChar, key_str),
-                                                    key!(right) => self.send_key_action(Action::ForwardChar, key_str),
-                                                    _ => {
-                                                        self.send(RenderCommand::KeyAction {
-                                                            key: key_str,
-                                                            action: Action::Redraw,
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                        } else if let Some(c) = key_code_as_letter(key) {
-                                            // Action box or Prompt input is active: plain chars always go to input.
-                                            // Non-char keys (ctrl-c, esc, enter, editing keys) still
-                                            // go through the normal bind/fallback path.
-                                            self.send(RenderCommand::KeyAction {
-                                                key: c.to_string(),
-                                                action: Action::Char(c),
-                                            });
-                                        } else if let Some(actions) = self.get_bind(TriggerKind::Key(key)) {
-                                            self.record_key(key.to_string());
-                                            self.send_actions(actions, Some(key.to_string()));
-                                        } else {
-                                            self.dispatch_fallback_key(key);
-                                        }
+                                    if let Some(key) = self.combiner.transform(k) {
+                                        self.catch_up_with_render().await;
+                                        self.unit(|s| s.on_key(key));
                                     }
                                 }
                                 CrosstermEvent::Mouse(mouse) => {
-                                    if let Some(actions) = self.get_bind(TriggerKind::Mouse(SimpleMouseEvent {
-                                        kind: mouse.kind,
-                                        modifiers: mouse.modifiers,
-                                    })) {
-                                        self.send_actions(actions, None);
-                                    } else if !matches!(mouse.kind, MouseEventKind::Moved) {
-                                        // mouse binds can be disabled by overriding with empty action
-                                        // preview scroll can be disabled by overriding scroll event with scroll action
-                                        self.send(RenderCommand::Mouse(mouse));
-                                    }
+                                    self.catch_up_with_render().await;
+                                    self.unit(|s| s.on_mouse(mouse));
                                 }
                                 CrosstermEvent::Resize(width, height) => {
                                     self.send(RenderCommand::Resize(Rect::new(0, 0, width, height)));
@@ -472,7 +448,165 @@ impl<A: ActionExt> EventLoop<A> {
         }
     }
 
+    /// Routes one key: to a text input that takes characters, else to its binds or a fallback.
+    fn on_key(&mut self, key: KeyCombination) {
+        info!("{key:?}");
+        let key = KeyCombination::normalized(key);
+        // When the action box or prompt input is active, plain character keys
+        // must always reach the input as Action::Char regardless
+        // of any shortcut bindings on that key.
+        let action_box_active = self.input.action_box_active();
+        let prompt_input_active = self.input.prompt_input_active();
+        let live_input_active = self.input.live_input_active();
+        if !action_box_active && !prompt_input_active && !live_input_active {
+            if let Some(actions) = self.get_bind(TriggerKind::Key(key)) {
+                self.record_key(key.to_string());
+                self.send_actions(actions, Some(key.to_string()));
+            } else if let Some(c) = key_code_as_letter(key) {
+                self.send(RenderCommand::KeyAction {
+                    key: c.to_string(),
+                    action: Action::Char(c),
+                });
+            } else {
+                self.dispatch_fallback_key(key);
+            }
+        } else if live_input_active {
+            if key == key!(esc) {
+                self.send_key_action(Action::Cancel, "esc".to_string());
+            } else if let Some(c) = key_code_as_letter(key) {
+                self.send(RenderCommand::KeyAction {
+                    key: c.to_string(),
+                    action: Action::Char(c),
+                });
+            } else {
+                let key_str = self.print_key(key);
+                match key {
+                    key!(enter) => self.send_key_action(Action::Accept, key_str),
+                    key!(backspace) => self.send_key_action(Action::DeleteChar, key_str),
+                    key!(up) => self.send_key_action(Action::Up(1), key_str),
+                    key!(down) => self.send_key_action(Action::Down(1), key_str),
+                    key!(left) => self.send_key_action(Action::BackwardChar, key_str),
+                    key!(right) => self.send_key_action(Action::ForwardChar, key_str),
+                    _ => {
+                        self.send(RenderCommand::KeyAction {
+                            key: key_str,
+                            action: Action::Redraw,
+                        });
+                    }
+                }
+            }
+        } else if let Some(c) = key_code_as_letter(key) {
+            // Action box or Prompt input is active: plain chars always go to input.
+            // Non-char keys (ctrl-c, esc, enter, editing keys) still
+            // go through the normal bind/fallback path.
+            self.send(RenderCommand::KeyAction {
+                key: c.to_string(),
+                action: Action::Char(c),
+            });
+        } else if let Some(actions) = self.get_bind(TriggerKind::Key(key)) {
+            self.record_key(key.to_string());
+            self.send_actions(actions, Some(key.to_string()));
+        } else {
+            self.dispatch_fallback_key(key);
+        }
+    }
+
+    fn on_mouse(&mut self, mouse: MouseEvent) {
+        if let Some(actions) = self.get_bind(TriggerKind::Mouse(SimpleMouseEvent {
+            kind: mouse.kind,
+            modifiers: mouse.modifiers,
+        })) {
+            self.send_actions(actions, None);
+        } else if !matches!(mouse.kind, MouseEventKind::Moved) {
+            // mouse binds can be disabled by overriding with empty action
+            // preview scroll can be disabled by overriding scroll event with scroll action
+            self.send(RenderCommand::Mouse(mouse));
+        }
+    }
+
+    /// Handles one input event with `f`. In navigation mode, the commands it sends are resolved
+    /// as nav keys first and followed by a fence.
+    fn unit(&mut self, f: impl FnOnce(&mut Self)) {
+        if self.nav.is_none() {
+            return f(self);
+        }
+        *self.captured.get_mut() = Some(Vec::new());
+        f(self);
+        let commands = self.captured.get_mut().take().unwrap_or_default();
+        if commands.is_empty() {
+            return;
+        }
+        for command in self.resolve_nav(commands) {
+            self.send_now(command);
+        }
+        self.fence_sent += 1;
+        self.send_now(RenderCommand::Fence(self.fence_sent));
+    }
+
+    /// Rewrites the commands of one input event for navigation mode, against the state the
+    /// render loop published. An input box, the sort menu, the prompt and live inputs take
+    /// the keys as they are.
+    fn resolve_nav(&mut self, commands: Vec<RenderCommand<A>>) -> Vec<RenderCommand<A>> {
+        let Some(nav) = &self.nav else {
+            return commands;
+        };
+        let view = self.input.view();
+        if view.box_takes_keys
+            || view.sort_menu
+            || self.input.prompt_input_active()
+            || self.input.live_input_active()
+        {
+            return commands;
+        }
+        let mut resolver = NavResolver::new(
+            self.input.focus(),
+            &nav.binds,
+            &nav.preview,
+            view.preview_fullscreen,
+            view.preview_diagram,
+        );
+        let mut out = Vec::with_capacity(commands.len());
+        // The render loop opens the menu when it applies the SortMenu this emits.
+        let mut sort_menu = false;
+        for command in commands {
+            resolver.feed(command, &mut self.pending_nav_key, &mut sort_menu, &mut out);
+        }
+        out
+    }
+
+    /// In navigation mode, waits until the render loop has applied the commands sent for
+    /// earlier input, so a key is resolved against the focus and preview they left. Handles
+    /// controller events meanwhile: the render loop waits for the ack of a pause.
+    async fn catch_up_with_render(&mut self) {
+        if self.nav.is_none() || self.input.fence_done() >= self.fence_sent {
+            return;
+        }
+        let input = self.input.clone();
+        let caught_up = input.render_caught_up(self.fence_sent, RENDER_CATCH_UP_LIMIT);
+        tokio::pin!(caught_up);
+        loop {
+            tokio::select! {
+                _ = &mut caught_up => return,
+                Some(event) = self.rx.recv() => {
+                    let pause = matches!(event, Event::Pause);
+                    self.unit(|s| s.handle_event(event));
+                    if pause {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     fn send(&self, action: RenderCommand<A>) {
+        if let Some(captured) = self.captured.borrow_mut().as_mut() {
+            captured.push(action);
+            return;
+        }
+        self.send_now(action);
+    }
+
+    fn send_now(&self, action: RenderCommand<A>) {
         for tx in &self.txs {
             tx.send(action.clone())
                 .unwrap_or_else(|_| debug!("Failed to send {action}"));
