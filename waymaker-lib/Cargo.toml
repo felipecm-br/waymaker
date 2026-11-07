@@ -57,7 +57,7 @@ tokio = { version = "1.48.0", default-features = false, features = ["rt-multi-th
 toml = "0.9.8"
 ratatui-image = { version = "11.0.2", default-features = false, features = ["crossterm"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
-mermaid-text = "0.57.0"
+mermaid-text = "0.58.0"
 pulldown-cmark = { version = "0.13", default-features = false }
 mermaid-rs-renderer = { version = "0.3.1", default-features = false, features = ["png"], optional = true }
 resvg = { version = "0.47", default-features = false, optional = true }

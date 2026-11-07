@@ -1771,6 +1771,19 @@ mod tests {
     }
 
     #[test]
+    fn class_diagram_with_non_ascii_names_does_not_panic() {
+        // Found by the `mermaid` fuzz target (mermaid-text 0.57 sliced inside a multi-byte
+        // character); with `panic = "abort"`, previewing such a file killed wm.
+        for src in [
+            "classDiagram\n    Usuário\n",
+            "classDiagram\n    class Ação\n",
+            "classDiagram\n ₔ│\n",
+        ] {
+            let _ = render_mermaid_ansi(src, &MermaidOptions::default());
+        }
+    }
+
+    #[test]
     fn test_render_ansi() {
         let src = "graph TD\n    A[NodeA] --> B[NodeB]";
         let opts = MermaidOptions::default();
