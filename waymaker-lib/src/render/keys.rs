@@ -469,15 +469,16 @@ pub(crate) fn process_results_nav_key<A: ActionExt>(
 
 /// Resolves navigation-mode keys one command at a time; the event loop runs one per input
 /// event (`EventLoop::unit`). It carries the state that spans the event's commands: the
-/// simulated focus (a bind's focus action moves it before the render loop applies it) and the
-/// last key a nav bind consumed (a global bind's further actions on that key are then dropped).
+/// simulated focus (a bind's focus action moves it before the render loop applies it) and
+/// whether a nav bind took the event's key (the global bind's further actions on that key are
+/// then dropped; every key command of one event carries the same key).
 pub(crate) struct NavResolver<'b> {
     focus_binds: &'b super::nav_keymap::NavKeymap,
     preview_binds: &'b super::nav_keymap::NavKeymap,
     preview_fullscreen: bool,
     preview_diagram_mode: bool,
     sim_focus: Focus,
-    last_consumed_nav_key: Option<String>,
+    key_taken: bool,
 }
 
 impl<'b> NavResolver<'b> {
@@ -498,7 +499,7 @@ impl<'b> NavResolver<'b> {
             } else {
                 initial_focus
             },
-            last_consumed_nav_key: None,
+            key_taken: false,
         }
     }
 
@@ -515,19 +516,19 @@ impl<'b> NavResolver<'b> {
         let (preview_fullscreen, preview_diagram_mode) =
             (self.preview_fullscreen, self.preview_diagram_mode);
         let mut sim_focus = self.sim_focus;
-        let mut last_consumed_nav_key = self.last_consumed_nav_key.take();
+        let mut key_taken = self.key_taken;
         'feed: {
             match cmd {
                 RenderCommand::Tick => {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     out.push(RenderCommand::Tick);
                 }
                 RenderCommand::Action(Action::Trace(t)) => {
-                    // Traces do not reset last_consumed_nav_key as they can wrap actions
+                    // Traces do not reset key_taken as they can wrap actions
                     out.push(RenderCommand::Action(Action::Trace(t)));
                 }
                 RenderCommand::Action(Action::ToggleFocus) => {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     if preview_fullscreen {
                         sim_focus = Focus::Input;
                         out.push(RenderCommand::Action(Action::CyclePreview));
@@ -548,17 +549,17 @@ impl<'b> NavResolver<'b> {
                     }
                 }
                 RenderCommand::Action(Action::FocusFilter) => {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     sim_focus = Focus::Input;
                     out.push(RenderCommand::Action(Action::FocusFilter));
                 }
                 RenderCommand::Action(Action::FocusNav) => {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     sim_focus = Focus::Results;
                     out.push(RenderCommand::Action(Action::FocusNav));
                 }
                 RenderCommand::Action(Action::ChDir(payload)) => {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     sim_focus = Focus::Results;
                     out.push(RenderCommand::Action(Action::ChDir(payload)));
                 }
@@ -567,7 +568,7 @@ impl<'b> NavResolver<'b> {
                         || preview_fullscreen
                         || preview_diagram_mode =>
                 {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     let key = c.to_string();
                     process_results_nav_key(
                         &key,
@@ -587,11 +588,7 @@ impl<'b> NavResolver<'b> {
                         || preview_fullscreen
                         || preview_diagram_mode =>
                 {
-                    if !preview_fullscreen
-                        && last_consumed_nav_key
-                            .as_deref()
-                            .is_some_and(|k| k.eq_ignore_ascii_case(&key))
-                    {
+                    if !preview_fullscreen && key_taken {
                         break 'feed;
                     }
                     process_results_nav_key(
@@ -607,14 +604,14 @@ impl<'b> NavResolver<'b> {
                         preview_diagram_mode,
                     );
                     if !preview_fullscreen && focus_binds.get(&key).is_some() {
-                        last_consumed_nav_key = Some(key);
+                        key_taken = true;
                     } else {
-                        last_consumed_nav_key = None;
+                        key_taken = false;
                     }
                 }
                 RenderCommand::KeyAction { key: _, action } => {
                     // sim_focus == Focus::Input
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     update_sim_focus(&action, &mut sim_focus);
                     out.push(RenderCommand::Action(action));
                 }
@@ -622,7 +619,7 @@ impl<'b> NavResolver<'b> {
                 RenderCommand::Action(
                     action @ (Action::DeleteChar | Action::BackwardChar | Action::ForwardChar),
                 ) if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode => {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     let key = match action {
                         Action::DeleteChar => "backspace",
                         Action::BackwardChar => "left",
@@ -645,7 +642,7 @@ impl<'b> NavResolver<'b> {
                 RenderCommand::Action(action @ (Action::Up(_) | Action::Down(_)))
                     if preview_fullscreen || preview_diagram_mode =>
                 {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     let key = if matches!(action, Action::Up(_)) {
                         "up"
                     } else {
@@ -665,13 +662,13 @@ impl<'b> NavResolver<'b> {
                     );
                 }
                 other => {
-                    last_consumed_nav_key = None;
+                    key_taken = false;
                     out.push(other);
                 }
             }
         }
         self.sim_focus = sim_focus;
-        self.last_consumed_nav_key = last_consumed_nav_key;
+        self.key_taken = key_taken;
     }
 }
 
