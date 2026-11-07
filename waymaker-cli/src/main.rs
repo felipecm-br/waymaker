@@ -8,6 +8,8 @@ pub mod formatter;
 mod logger;
 mod parse;
 mod paths;
+#[cfg(test)]
+mod proptests;
 mod subcommands;
 use subcommands::*;
 mod register;

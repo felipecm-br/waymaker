@@ -3823,6 +3823,7 @@ dependencies = [
  "memchr",
  "mimalloc",
  "portable-pty",
+ "proptest",
  "ratatui",
  "regex",
  "serde",
