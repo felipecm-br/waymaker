@@ -603,11 +603,7 @@ impl<'b> NavResolver<'b> {
                         preview_fullscreen,
                         preview_diagram_mode,
                     );
-                    if !preview_fullscreen && focus_binds.get(&key).is_some() {
-                        key_taken = true;
-                    } else {
-                        key_taken = false;
-                    }
+                    key_taken = !preview_fullscreen && focus_binds.get(&key).is_some();
                 }
                 RenderCommand::KeyAction { key: _, action } => {
                     // sim_focus == Focus::Input
