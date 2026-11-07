@@ -21,61 +21,11 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
             state.needs_redraw = true;
         }
         MMAction::FmRemoveYankPaths(raw) => {
-            let cwd = std::env::current_dir().unwrap_or_default();
-            let to_remove: Vec<String> = raw
-                .split('\n')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-            state.picker_ui.results.yank_paths.retain(|item| {
-                !to_remove.iter().any(|rem| {
-                    let rem_trimmed = rem.trim_end_matches('/').trim_end_matches('\\');
-                    let item_trimmed = item.trim_end_matches('/').trim_end_matches('\\');
-                    if rem_trimmed == item_trimmed {
-                        return true;
-                    }
-                    let rem_abs = if std::path::Path::new(rem_trimmed).is_absolute() {
-                        rem_trimmed.to_string()
-                    } else {
-                        cwd.join(rem_trimmed).to_string_lossy().to_string()
-                    };
-                    let item_abs = if std::path::Path::new(item_trimmed).is_absolute() {
-                        item_trimmed.to_string()
-                    } else {
-                        cwd.join(item_trimmed).to_string_lossy().to_string()
-                    };
-                    rem_abs == item_abs
-                })
-            });
+            remove_paths(&mut state.picker_ui.results.yank_paths, &raw);
             state.needs_redraw = true;
         }
         MMAction::FmRemoveCutPaths(raw) => {
-            let cwd = std::env::current_dir().unwrap_or_default();
-            let to_remove: Vec<String> = raw
-                .split('\n')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-            state.picker_ui.results.cut_paths.retain(|item| {
-                !to_remove.iter().any(|rem| {
-                    let rem_trimmed = rem.trim_end_matches('/').trim_end_matches('\\');
-                    let item_trimmed = item.trim_end_matches('/').trim_end_matches('\\');
-                    if rem_trimmed == item_trimmed {
-                        return true;
-                    }
-                    let rem_abs = if std::path::Path::new(rem_trimmed).is_absolute() {
-                        rem_trimmed.to_string()
-                    } else {
-                        cwd.join(rem_trimmed).to_string_lossy().to_string()
-                    };
-                    let item_abs = if std::path::Path::new(item_trimmed).is_absolute() {
-                        item_trimmed.to_string()
-                    } else {
-                        cwd.join(item_trimmed).to_string_lossy().to_string()
-                    };
-                    rem_abs == item_abs
-                })
-            });
+            remove_paths(&mut state.picker_ui.results.cut_paths, &raw);
             state.needs_redraw = true;
         }
         MMAction::FmSetCutPaths(raw) => {
@@ -157,40 +107,8 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
             }
         }
         MMAction::FmYank => fm_yank(state, render_tx, clipboard, fm_notify),
-        MMAction::FmUnyank => {
-            let items = fm_current_items(state);
-            if !items.is_empty() {
-                // If it's in the clipboard, do we remove it?
-                // For simplicity, we just remove it from yank_paths visually.
-                // Or we can remove it from the clipboard if the clipboard exactly matches?
-                // The primary goal is visual unyanking.
-                let _ = render_tx.send(RenderCommand::Action(Action::Custom(
-                    MMAction::FmRemoveYankPaths(items.join("\n")),
-                )));
-                let _ = render_tx.send(RenderCommand::Action(Action::Custom(
-                    MMAction::FmRemoveCutPaths(items.join("\n")),
-                )));
-                if *fm_notify {
-                    let msg = fm_notify_msg("Un-yanked", &items, "yellow");
-                    show_styled_info_box(state, &msg);
-                }
-            }
-        }
-        MMAction::FmUncut => {
-            let items = fm_current_items(state);
-            if !items.is_empty() {
-                let _ = render_tx.send(RenderCommand::Action(Action::Custom(
-                    MMAction::FmRemoveYankPaths(items.join("\n")),
-                )));
-                let _ = render_tx.send(RenderCommand::Action(Action::Custom(
-                    MMAction::FmRemoveCutPaths(items.join("\n")),
-                )));
-                if *fm_notify {
-                    let msg = fm_notify_msg("Un-cut", &items, "red");
-                    show_styled_info_box(state, &msg);
-                }
-            }
-        }
+        MMAction::FmUnyank => fm_unmark(state, render_tx, *fm_notify, "Un-yanked", "yellow"),
+        MMAction::FmUncut => fm_unmark(state, render_tx, *fm_notify, "Un-cut", "red"),
         MMAction::FmCut => fm_cut(state, render_tx, clipboard, fm_notify),
         MMAction::FmPaste => fm_paste(state, render_tx, clipboard, fm_notify, undo_stack),
         MMAction::FmPasteInto => fm_paste_into(state, render_tx, clipboard, undo_stack, nav),
@@ -211,6 +129,62 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
         MMAction::FmTogglePin => fm_toggle_pin(state, render_tx),
         _ => unreachable!("handle_fm got a non-fm action"),
     }
+}
+
+/// Unyank/uncut: clears both the yank and the cut mark of the current items (or selection),
+/// and notifies with `verb` in `color` when `fm_notify` is on.
+fn fm_unmark(
+    state: &mut MMState<'_, '_>,
+    render_tx: &waymaker::event::RenderSender<MMAction>,
+    fm_notify: bool,
+    verb: &str,
+    color: &str,
+) {
+    let items = fm_current_items(state);
+    if !items.is_empty() {
+        let _ = render_tx.send(RenderCommand::Action(Action::Custom(
+            MMAction::FmRemoveYankPaths(items.join("\n")),
+        )));
+        let _ = render_tx.send(RenderCommand::Action(Action::Custom(
+            MMAction::FmRemoveCutPaths(items.join("\n")),
+        )));
+        if fm_notify {
+            let msg = fm_notify_msg(verb, &items, color);
+            show_styled_info_box(state, &msg);
+        }
+    }
+}
+
+/// Removes from `set` the newline-separated paths in `raw`. A path matches with or without a
+/// trailing separator, and relative and absolute spellings (against the current directory)
+/// of the same path match each other.
+fn remove_paths(set: &mut std::collections::HashSet<String>, raw: &str) {
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let to_remove: Vec<String> = raw
+        .split('\n')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    set.retain(|item| {
+        !to_remove.iter().any(|rem| {
+            let rem_trimmed = rem.trim_end_matches('/').trim_end_matches('\\');
+            let item_trimmed = item.trim_end_matches('/').trim_end_matches('\\');
+            if rem_trimmed == item_trimmed {
+                return true;
+            }
+            let rem_abs = if std::path::Path::new(rem_trimmed).is_absolute() {
+                rem_trimmed.to_string()
+            } else {
+                cwd.join(rem_trimmed).to_string_lossy().to_string()
+            };
+            let item_abs = if std::path::Path::new(item_trimmed).is_absolute() {
+                item_trimmed.to_string()
+            } else {
+                cwd.join(item_trimmed).to_string_lossy().to_string()
+            };
+            rem_abs == item_abs
+        })
+    });
 }
 
 pub(super) fn show_action_box(state: &mut MMState<'_, '_>, prompt: &str, initial: &str) {
@@ -306,62 +280,8 @@ pub(super) fn commit_fm_action(
     };
 
     match mode {
-        FmActionMode::Create => {
-            if !input.is_empty() {
-                let result = if input.ends_with('/') {
-                    std::fs::create_dir_all(&input)
-                } else {
-                    if let Some(parent) = std::path::Path::new(&input).parent()
-                        && !parent.as_os_str().is_empty()
-                    {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                    std::fs::File::create(&input).map(|_| ())
-                };
-                close_action_box(state, fm_action);
-                if let Err(e) = result {
-                    error!("fm create '{input}': {e}");
-                } else {
-                    if let Ok(mut stack) = undo_stack.lock() {
-                        stack.push(crate::fm::UndoAction::CreatedFile {
-                            path: PathBuf::from(&input),
-                        });
-                    }
-                    if fm_notify {
-                        let msg = format!("{{green:Created:}} {}", input);
-                        show_styled_info_box(state, &msg);
-                    }
-                }
-            } else {
-                close_action_box(state, fm_action);
-            }
-        }
-        FmActionMode::Delete { paths } => {
-            let mut deleted_items = Vec::new();
-            let mut deleted_names = Vec::new();
-            for path in &paths {
-                let path_buf = PathBuf::from(path);
-                match crate::fm::move_to_trash(&path_buf) {
-                    Ok(backup) => {
-                        deleted_names.push(path.clone());
-                        deleted_items.push((path_buf, backup));
-                    }
-                    Err(e) => error!("fm delete '{}': {e}", path),
-                }
-            }
-            if !deleted_items.is_empty()
-                && let Ok(mut stack) = undo_stack.lock()
-            {
-                stack.push(crate::fm::UndoAction::DeletedFiles {
-                    items: deleted_items,
-                });
-            }
-            close_action_box(state, fm_action);
-            if fm_notify && !deleted_names.is_empty() {
-                let msg = fm_notify_msg("Deleted", &deleted_names, "red");
-                show_styled_info_box(state, &msg);
-            }
-        }
+        FmActionMode::Create => fm_create(state, input, undo_stack, fm_action, fm_notify),
+        FmActionMode::Delete { paths } => fm_delete(state, paths, undo_stack, fm_action, fm_notify),
         FmActionMode::Rename { from, remaining } => {
             if !input.is_empty() && input != from {
                 if let Err(e) =
@@ -993,5 +913,92 @@ fn fm_yank(
             let msg = fm_notify_msg("Copied", &items, "yellow");
             show_styled_info_box(state, &msg);
         }
+    }
+}
+
+/// Delete box confirmed: moves each path to the trash, records one undo entry, notifies.
+fn fm_delete(
+    state: &mut MMState<'_, '_>,
+    paths: Vec<String>,
+    undo_stack: &crate::fm::UndoStack,
+    fm_action: &mut Option<FmActionMode>,
+    fm_notify: bool,
+) {
+    let mut deleted_items = Vec::new();
+    let mut deleted_names = Vec::new();
+    for path in &paths {
+        let path_buf = PathBuf::from(path);
+        match crate::fm::move_to_trash(&path_buf) {
+            Ok(backup) => {
+                deleted_names.push(path.clone());
+                deleted_items.push((path_buf, backup));
+            }
+            Err(e) => error!("fm delete '{}': {e}", path),
+        }
+    }
+    if !deleted_items.is_empty()
+        && let Ok(mut stack) = undo_stack.lock()
+    {
+        stack.push(crate::fm::UndoAction::DeletedFiles {
+            items: deleted_items,
+        });
+    }
+    close_action_box(state, fm_action);
+    if fm_notify && !deleted_names.is_empty() {
+        let msg = fm_notify_msg("Deleted", &deleted_names, "red");
+        show_styled_info_box(state, &msg);
+    }
+}
+
+/// Create box confirmed: a name ending in `/` makes a directory, anything else an empty file (with its parents); records the undo entry and notifies.
+fn fm_create(
+    state: &mut MMState<'_, '_>,
+    input: String,
+    undo_stack: &crate::fm::UndoStack,
+    fm_action: &mut Option<FmActionMode>,
+    fm_notify: bool,
+) {
+    if !input.is_empty() {
+        let result = if input.ends_with('/') {
+            std::fs::create_dir_all(&input)
+        } else {
+            if let Some(parent) = std::path::Path::new(&input).parent()
+                && !parent.as_os_str().is_empty()
+            {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            std::fs::File::create(&input).map(|_| ())
+        };
+        close_action_box(state, fm_action);
+        if let Err(e) = result {
+            error!("fm create '{input}': {e}");
+        } else {
+            if let Ok(mut stack) = undo_stack.lock() {
+                stack.push(crate::fm::UndoAction::CreatedFile {
+                    path: PathBuf::from(&input),
+                });
+            }
+            if fm_notify {
+                let msg = format!("{{green:Created:}} {}", input);
+                show_styled_info_box(state, &msg);
+            }
+        }
+    } else {
+        close_action_box(state, fm_action);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::remove_paths;
+    use std::collections::HashSet;
+
+    #[test]
+    fn remove_paths_matches_trailing_slash_and_absolute_spellings() {
+        let cwd = std::env::current_dir().unwrap();
+        let abs_b = cwd.join("b").to_string_lossy().to_string();
+        let mut set: HashSet<String> = ["a/", "b", "c", "keep"].map(String::from).into();
+        remove_paths(&mut set, &format!("a\n{abs_b}\n\n  c/  \n"));
+        assert_eq!(set, HashSet::from(["keep".to_string()]));
     }
 }
