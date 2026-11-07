@@ -219,13 +219,11 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
         let mut constraints = [
             Constraint::Length(if breadcrumb_config.show { 1 } else { 0 }), // breadcrumb
             Constraint::Length(action_height), // action (input + preview)
-            Constraint::Length(
-                if query.config.show || input_open {
-                    1 + query.config.border.height()
-                } else {
-                    0
-                },
-            ), // filter input
+            Constraint::Length(if query.config.show || input_open {
+                1 + query.config.border.height()
+            } else {
+                0
+            }), // filter input
             Constraint::Length(if query.config.status_inline {
                 0
             } else {

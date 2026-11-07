@@ -195,8 +195,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     &ui.config.nav.binds,
                     // An input box (create, rename, ...) takes the keys; an info box such as
                     // "Undone ..." does not, so ctrl-r still reaches @redo after an undo.
-                    (picker_ui.action_visible
-                        && state.input_routing.action_box_active())
+                    (picker_ui.action_visible && state.input_routing.action_box_active())
                         || overlay_ui.as_ref().is_some_and(|o| o.index().is_some()),
                     &mut state.pending_nav_key,
                     &mut state.sort_menu_active,

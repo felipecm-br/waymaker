@@ -40,4 +40,3 @@ pub mod noninteractive;
 
 #[cfg(test)]
 mod proptests;
-
