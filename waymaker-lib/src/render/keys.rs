@@ -533,161 +533,217 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
     }
 
     let mut out = Vec::with_capacity(buffer.len());
-    let mut sim_focus = if preview_fullscreen {
-        Focus::Results
-    } else {
-        initial_focus
-    };
-    let mut last_consumed_nav_key: Option<String> = None;
-
+    let mut resolver = NavResolver::new(
+        initial_focus,
+        focus_binds,
+        preview_fullscreen,
+        preview_diagram_mode,
+    );
     for cmd in buffer.drain(..) {
-        match cmd {
-            RenderCommand::Tick => {
-                last_consumed_nav_key = None;
-                out.push(RenderCommand::Tick);
-            }
-            RenderCommand::Action(Action::Trace(t)) => {
-                // Traces do not reset last_consumed_nav_key as they can wrap actions
-                out.push(RenderCommand::Action(Action::Trace(t)));
-            }
-            RenderCommand::Action(Action::ToggleFocus) => {
-                last_consumed_nav_key = None;
-                if preview_fullscreen {
-                    sim_focus = Focus::Input;
-                    out.push(RenderCommand::Action(Action::CyclePreview));
-                    continue;
-                }
-                if sim_focus == Focus::Results {
-                    if let Some(actions) = get_nav_bind(focus_binds, "esc") {
-                        push_nav_actions(actions, &mut sim_focus, &mut out);
-                    } else {
-                        out.push(RenderCommand::Action(Action::Quit(130)));
-                    }
-                } else {
-                    sim_focus = match sim_focus {
-                        Focus::Input => Focus::Results,
-                        Focus::Results => Focus::Input,
-                    };
-                    out.push(RenderCommand::Action(Action::ToggleFocus));
-                }
-            }
-            RenderCommand::Action(Action::FocusFilter) => {
-                last_consumed_nav_key = None;
-                sim_focus = Focus::Input;
-                out.push(RenderCommand::Action(Action::FocusFilter));
-            }
-            RenderCommand::Action(Action::FocusNav) => {
-                last_consumed_nav_key = None;
-                sim_focus = Focus::Results;
-                out.push(RenderCommand::Action(Action::FocusNav));
-            }
-            RenderCommand::Action(Action::ChDir(payload)) => {
-                last_consumed_nav_key = None;
-                sim_focus = Focus::Results;
-                out.push(RenderCommand::Action(Action::ChDir(payload)));
-            }
-            RenderCommand::Action(Action::Char(c))
-                if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode =>
-            {
-                last_consumed_nav_key = None;
-                let key = c.to_string();
-                process_results_nav_key(
-                    &key,
-                    Some(Action::Char(c)),
-                    focus_binds,
-                    pending_nav_key,
-                    sort_menu_active,
-                    &mut sim_focus,
-                    &mut out,
-                    preview_fullscreen,
-                    preview_diagram_mode,
-                );
-            }
-            RenderCommand::KeyAction { key, action }
-                if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode =>
-            {
-                if !preview_fullscreen
-                    && last_consumed_nav_key
-                        .as_deref()
-                        .is_some_and(|k| k.eq_ignore_ascii_case(&key))
-                {
-                    continue;
-                }
-                process_results_nav_key(
-                    &key,
-                    Some(action),
-                    focus_binds,
-                    pending_nav_key,
-                    sort_menu_active,
-                    &mut sim_focus,
-                    &mut out,
-                    preview_fullscreen,
-                    preview_diagram_mode,
-                );
-                if !preview_fullscreen && get_nav_bind(focus_binds, &key).is_some() {
-                    last_consumed_nav_key = Some(key);
-                } else {
-                    last_consumed_nav_key = None;
-                }
-            }
-            RenderCommand::KeyAction { key: _, action } => {
-                // sim_focus == Focus::Input
-                last_consumed_nav_key = None;
-                update_sim_focus(&action, &mut sim_focus);
-                out.push(RenderCommand::Action(action));
-            }
-            // Editing actions read as navigation keys in the results or a full preview.
-            RenderCommand::Action(
-                action @ (Action::DeleteChar | Action::BackwardChar | Action::ForwardChar),
-            ) if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode => {
-                last_consumed_nav_key = None;
-                let key = match action {
-                    Action::DeleteChar => "backspace",
-                    Action::BackwardChar => "left",
-                    _ => "right",
-                };
-                process_results_nav_key(
-                    key,
-                    Some(action),
-                    focus_binds,
-                    pending_nav_key,
-                    sort_menu_active,
-                    &mut sim_focus,
-                    &mut out,
-                    preview_fullscreen,
-                    preview_diagram_mode,
-                );
-            }
-            // Up/Down scroll a fullscreen or diagram preview.
-            RenderCommand::Action(action @ (Action::Up(_) | Action::Down(_)))
-                if preview_fullscreen || preview_diagram_mode =>
-            {
-                last_consumed_nav_key = None;
-                let key = if matches!(action, Action::Up(_)) {
-                    "up"
-                } else {
-                    "down"
-                };
-                process_results_nav_key(
-                    key,
-                    Some(action),
-                    focus_binds,
-                    pending_nav_key,
-                    sort_menu_active,
-                    &mut sim_focus,
-                    &mut out,
-                    preview_fullscreen,
-                    preview_diagram_mode,
-                );
-            }
-            other => {
-                last_consumed_nav_key = None;
-                out.push(other);
-            }
-        }
+        resolver.feed(cmd, pending_nav_key, sort_menu_active, &mut out);
     }
 
     *buffer = out;
+}
+
+/// Resolves navigation-mode keys one command at a time. It carries the state that spans
+/// commands: the simulated focus (focus actions in the same batch move it before the render
+/// loop applies them) and the last key a nav bind consumed (a global bind's further actions on
+/// that key are then dropped).
+pub(super) struct NavResolver<'b> {
+    focus_binds: &'b std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
+    preview_fullscreen: bool,
+    preview_diagram_mode: bool,
+    sim_focus: Focus,
+    last_consumed_nav_key: Option<String>,
+}
+
+impl<'b> NavResolver<'b> {
+    pub(super) fn new(
+        initial_focus: Focus,
+        focus_binds: &'b std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
+        preview_fullscreen: bool,
+        preview_diagram_mode: bool,
+    ) -> Self {
+        Self {
+            focus_binds,
+            preview_fullscreen,
+            preview_diagram_mode,
+            sim_focus: if preview_fullscreen {
+                Focus::Results
+            } else {
+                initial_focus
+            },
+            last_consumed_nav_key: None,
+        }
+    }
+
+    /// Resolves one command into `out`.
+    pub(super) fn feed<A: ActionExt>(
+        &mut self,
+        cmd: RenderCommand<A>,
+        pending_nav_key: &mut Option<char>,
+        sort_menu_active: &mut bool,
+        out: &mut Vec<RenderCommand<A>>,
+    ) {
+        let focus_binds = self.focus_binds;
+        let (preview_fullscreen, preview_diagram_mode) =
+            (self.preview_fullscreen, self.preview_diagram_mode);
+        let mut sim_focus = self.sim_focus;
+        let mut last_consumed_nav_key = self.last_consumed_nav_key.take();
+        'feed: {
+            match cmd {
+                RenderCommand::Tick => {
+                    last_consumed_nav_key = None;
+                    out.push(RenderCommand::Tick);
+                }
+                RenderCommand::Action(Action::Trace(t)) => {
+                    // Traces do not reset last_consumed_nav_key as they can wrap actions
+                    out.push(RenderCommand::Action(Action::Trace(t)));
+                }
+                RenderCommand::Action(Action::ToggleFocus) => {
+                    last_consumed_nav_key = None;
+                    if preview_fullscreen {
+                        sim_focus = Focus::Input;
+                        out.push(RenderCommand::Action(Action::CyclePreview));
+                        break 'feed;
+                    }
+                    if sim_focus == Focus::Results {
+                        if let Some(actions) = get_nav_bind(focus_binds, "esc") {
+                            push_nav_actions(actions, &mut sim_focus, out);
+                        } else {
+                            out.push(RenderCommand::Action(Action::Quit(130)));
+                        }
+                    } else {
+                        sim_focus = match sim_focus {
+                            Focus::Input => Focus::Results,
+                            Focus::Results => Focus::Input,
+                        };
+                        out.push(RenderCommand::Action(Action::ToggleFocus));
+                    }
+                }
+                RenderCommand::Action(Action::FocusFilter) => {
+                    last_consumed_nav_key = None;
+                    sim_focus = Focus::Input;
+                    out.push(RenderCommand::Action(Action::FocusFilter));
+                }
+                RenderCommand::Action(Action::FocusNav) => {
+                    last_consumed_nav_key = None;
+                    sim_focus = Focus::Results;
+                    out.push(RenderCommand::Action(Action::FocusNav));
+                }
+                RenderCommand::Action(Action::ChDir(payload)) => {
+                    last_consumed_nav_key = None;
+                    sim_focus = Focus::Results;
+                    out.push(RenderCommand::Action(Action::ChDir(payload)));
+                }
+                RenderCommand::Action(Action::Char(c))
+                    if sim_focus == Focus::Results
+                        || preview_fullscreen
+                        || preview_diagram_mode =>
+                {
+                    last_consumed_nav_key = None;
+                    let key = c.to_string();
+                    process_results_nav_key(
+                        &key,
+                        Some(Action::Char(c)),
+                        focus_binds,
+                        pending_nav_key,
+                        sort_menu_active,
+                        &mut sim_focus,
+                        out,
+                        preview_fullscreen,
+                        preview_diagram_mode,
+                    );
+                }
+                RenderCommand::KeyAction { key, action }
+                    if sim_focus == Focus::Results
+                        || preview_fullscreen
+                        || preview_diagram_mode =>
+                {
+                    if !preview_fullscreen
+                        && last_consumed_nav_key
+                            .as_deref()
+                            .is_some_and(|k| k.eq_ignore_ascii_case(&key))
+                    {
+                        break 'feed;
+                    }
+                    process_results_nav_key(
+                        &key,
+                        Some(action),
+                        focus_binds,
+                        pending_nav_key,
+                        sort_menu_active,
+                        &mut sim_focus,
+                        out,
+                        preview_fullscreen,
+                        preview_diagram_mode,
+                    );
+                    if !preview_fullscreen && get_nav_bind(focus_binds, &key).is_some() {
+                        last_consumed_nav_key = Some(key);
+                    } else {
+                        last_consumed_nav_key = None;
+                    }
+                }
+                RenderCommand::KeyAction { key: _, action } => {
+                    // sim_focus == Focus::Input
+                    last_consumed_nav_key = None;
+                    update_sim_focus(&action, &mut sim_focus);
+                    out.push(RenderCommand::Action(action));
+                }
+                // Editing actions read as navigation keys in the results or a full preview.
+                RenderCommand::Action(
+                    action @ (Action::DeleteChar | Action::BackwardChar | Action::ForwardChar),
+                ) if sim_focus == Focus::Results || preview_fullscreen || preview_diagram_mode => {
+                    last_consumed_nav_key = None;
+                    let key = match action {
+                        Action::DeleteChar => "backspace",
+                        Action::BackwardChar => "left",
+                        _ => "right",
+                    };
+                    process_results_nav_key(
+                        key,
+                        Some(action),
+                        focus_binds,
+                        pending_nav_key,
+                        sort_menu_active,
+                        &mut sim_focus,
+                        out,
+                        preview_fullscreen,
+                        preview_diagram_mode,
+                    );
+                }
+                // Up/Down scroll a fullscreen or diagram preview.
+                RenderCommand::Action(action @ (Action::Up(_) | Action::Down(_)))
+                    if preview_fullscreen || preview_diagram_mode =>
+                {
+                    last_consumed_nav_key = None;
+                    let key = if matches!(action, Action::Up(_)) {
+                        "up"
+                    } else {
+                        "down"
+                    };
+                    process_results_nav_key(
+                        key,
+                        Some(action),
+                        focus_binds,
+                        pending_nav_key,
+                        sort_menu_active,
+                        &mut sim_focus,
+                        out,
+                        preview_fullscreen,
+                        preview_diagram_mode,
+                    );
+                }
+                other => {
+                    last_consumed_nav_key = None;
+                    out.push(other);
+                }
+            }
+        }
+        self.sim_focus = sim_focus;
+        self.last_consumed_nav_key = last_consumed_nav_key;
+    }
 }
 
 pub(super) fn apply_aliases<T: SSS, S: Selection, A: ActionExt>(
