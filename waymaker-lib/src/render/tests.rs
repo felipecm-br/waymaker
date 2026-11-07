@@ -1664,6 +1664,16 @@ fn test_nav_preview_fallbacks_yield_to_user_binds() {
     }
 }
 
+/// In a fullscreen preview, h/l and H/L scroll sideways by 6 and 18 columns.
+#[test]
+fn test_nav_fullscreen_horizontal_scroll() {
+    let none = HashMap::new();
+    for (key, cols) in [("h", -6), ("l", 6), ("H", -18), ("L", 18)] {
+        let (out, _) = nav_key(key, &none, true, false);
+        assert_eq!(out, vec![Action::PreviewHScroll(cols)], "{key}");
+    }
+}
+
 /// Esc (any case) leaves fullscreen or diagram preview; Enter leaves only fullscreen, and other
 /// keys never do.
 #[test]
