@@ -330,6 +330,16 @@ where
         input_separator,
         nav,
     } = deps;
+    let reloader = Reloader {
+        reload_render_tx,
+        splitter,
+        preprocess,
+        group_prefix,
+        spec_cache_reload,
+        walker_config_reload,
+        separator,
+        input_separator,
+    };
     move |state| {
         let current_dir = std::env::current_dir().unwrap_or_default();
         let just_chdir = std::mem::take(&mut nav.lock().unwrap().chdir_new_dir);
@@ -364,195 +374,152 @@ where
                 || cmd.contains("frecency"));
 
         if is_bookmarks {
-            state.picker_ui.worker.set_mode_index(2);
-            state.picker_ui.worker.restart(false);
-            state.reloading = true;
-
-            let injector = state.injector();
-            let injector = IndexedInjector::new_globally_indexed(injector);
-            let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess);
-
-            let mut push_fn = inject_line(
-                state.picker_ui.header.config.header_lines,
-                reload_render_tx.clone(),
-                injector,
-                group_prefix.clone(),
-            );
-
-            state.picker_ui.selector.clear();
-            let store = waymaker::frecency::FrecencyStore::open();
-            let pins = store.list_pins();
-            for pin in pins {
-                let _ = push_fn(pin.into());
-            }
-
-            let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-            ));
+            reloader.pins(state);
         } else if is_dirs {
-            state.picker_ui.worker.set_mode_index(1);
-            state.picker_ui.worker.restart(false);
-            state.reloading = true;
+            reloader.frecency_dirs(state);
+        } else if is_default_file_walker_command(&cmd) {
+            reloader.walk(state, current_dir);
+        } else if !cmd.is_empty() {
+            reloader.command(state, cmd, current_dir);
+        }
+    }
+}
 
-            let injector = state.injector();
-            let injector = IndexedInjector::new_globally_indexed(injector);
-            let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess);
+/// What a reload needs to refill the list, captured once by [`reload_handler`].
+struct Reloader {
+    reload_render_tx: RenderSender<MMAction>,
+    splitter: waymaker::nucleo::injector::SplitterFn<
+        Either<Arc<str>, Box<waymaker::nucleo::Text<'static>>>,
+    >,
+    preprocess: waymaker::nucleo::injector::PreprocessOptions,
+    group_prefix: Option<String>,
+    spec_cache_reload: SpecCache,
+    walker_config_reload: WalkerConfig,
+    separator: Option<char>,
+    input_separator: Option<char>,
+}
 
-            let mut push_fn = inject_line(
-                state.picker_ui.header.config.header_lines,
-                reload_render_tx.clone(),
-                injector,
-                group_prefix.clone(),
-            );
+impl Reloader {
+    /// Pins mode: the pinned paths.
+    fn pins(&self, state: &mut CliState<'_, '_>) {
+        let Reloader {
+            reload_render_tx,
+            splitter,
+            group_prefix,
+            ..
+        } = self;
+        let preprocess = self.preprocess;
+        state.picker_ui.worker.set_mode_index(2);
+        state.picker_ui.worker.restart(false);
+        state.reloading = true;
 
-            state.picker_ui.selector.clear();
-            let store = waymaker::frecency::FrecencyStore::open();
-            if let Ok(cwd) = std::env::current_dir() {
-                let _ = store.add(&cwd.to_string_lossy());
-            }
-            let pinned_paths = store.list_pins();
-            let pins_set: std::collections::HashSet<String> =
-                pinned_paths.iter().cloned().collect();
+        let injector = state.injector();
+        let injector = IndexedInjector::new_globally_indexed(injector);
+        let injector = SegmentedInjector::new(injector, splitter.clone());
+        let injector = AnsiInjector::new(injector, preprocess);
 
-            for path in pinned_paths {
-                if std::path::Path::new(&path).is_dir() {
-                    let _ = push_fn(path.into());
-                }
-            }
+        let mut push_fn = inject_line(
+            state.picker_ui.header.config.header_lines,
+            reload_render_tx.clone(),
+            injector,
+            group_prefix.clone(),
+        );
 
-            let snapshot = store.get_snapshot();
-            let mut items: Vec<(String, u32, usize)> = Vec::new();
-            for (path, score) in snapshot.scores {
-                if pins_set.contains(&path) {
-                    continue;
-                }
-                let p = std::path::Path::new(&path);
-                if p.is_dir() {
-                    let depth = p.components().count();
-                    items.push((path, score, depth));
-                }
-            }
-            items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
-            for (path, _, _) in items {
+        state.picker_ui.selector.clear();
+        let store = waymaker::frecency::FrecencyStore::open();
+        let pins = store.list_pins();
+        for pin in pins {
+            let _ = push_fn(pin.into());
+        }
+
+        let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
+            waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
+        ));
+    }
+
+    /// Directories mode: pinned directories, then visited ones by frecency score and depth.
+    fn frecency_dirs(&self, state: &mut CliState<'_, '_>) {
+        let Reloader {
+            reload_render_tx,
+            splitter,
+            group_prefix,
+            ..
+        } = self;
+        let preprocess = self.preprocess;
+        state.picker_ui.worker.set_mode_index(1);
+        state.picker_ui.worker.restart(false);
+        state.reloading = true;
+
+        let injector = state.injector();
+        let injector = IndexedInjector::new_globally_indexed(injector);
+        let injector = SegmentedInjector::new(injector, splitter.clone());
+        let injector = AnsiInjector::new(injector, preprocess);
+
+        let mut push_fn = inject_line(
+            state.picker_ui.header.config.header_lines,
+            reload_render_tx.clone(),
+            injector,
+            group_prefix.clone(),
+        );
+
+        state.picker_ui.selector.clear();
+        let store = waymaker::frecency::FrecencyStore::open();
+        if let Ok(cwd) = std::env::current_dir() {
+            let _ = store.add(&cwd.to_string_lossy());
+        }
+        let pinned_paths = store.list_pins();
+        let pins_set: std::collections::HashSet<String> = pinned_paths.iter().cloned().collect();
+
+        for path in pinned_paths {
+            if std::path::Path::new(&path).is_dir() {
                 let _ = push_fn(path.into());
             }
+        }
 
-            let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-            ));
-        } else if is_default_file_walker_command(&cmd) {
-            state.picker_ui.worker.set_mode_index(0);
-            let cwd_str = current_dir.to_string_lossy().to_string();
-
-            if state.payload().is_empty()
-                && let Ok(mut cache) = spec_cache_reload.lock()
-                && let Some(lines) = cache.remove(&current_dir)
-            {
-                debug!("Speculative Cache HIT for {current_dir:?}");
-                state.picker_ui.worker.restart(false);
-                state.reloading = true;
-
-                let injector = state.injector();
-                let injector = IndexedInjector::new_globally_indexed(injector);
-                let injector = SegmentedInjector::new(injector, splitter.clone());
-                let injector = AnsiInjector::new(injector, preprocess);
-
-                let mut push_fn = inject_line(
-                    state.picker_ui.header.config.header_lines,
-                    reload_render_tx.clone(),
-                    injector,
-                    group_prefix.clone(),
-                );
-
-                state.picker_ui.selector.clear();
-                for line in lines {
-                    let _ = push_fn(line.into());
-                }
-
-                let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                    waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-                ));
-                return;
+        let snapshot = store.get_snapshot();
+        let mut items: Vec<(String, u32, usize)> = Vec::new();
+        for (path, score) in snapshot.scores {
+            if pins_set.contains(&path) {
+                continue;
             }
-
-            let ignored_set: std::collections::HashSet<String> = walker_config_reload
-                .effective_ignore()
-                .into_iter()
-                .collect();
-            let is_ignored_item = |item: &str| -> bool {
-                let s = item.strip_prefix("./").unwrap_or(item);
-                let s = s.strip_prefix('/').unwrap_or(s);
-                let first = s.split(['/', '\\']).next().unwrap_or("");
-                let clean_first = first.trim_end_matches(['/', '\\']);
-                !clean_first.is_empty() && ignored_set.contains(clean_first)
-            };
-
-            let cache_store = waymaker::cache::DirCacheStore::open();
-
-            if let Some(cached_rec) = cache_store.get_valid(&cwd_str)
-                && !cached_rec.items.is_empty()
-            {
-                debug!("DirCacheStore HIT for {cwd_str}");
-                state.picker_ui.worker.restart(false);
-                state.reloading = true;
-
-                let injector = state.injector();
-                let injector = IndexedInjector::new_globally_indexed(injector);
-                let injector = SegmentedInjector::new(injector, splitter.clone());
-                let injector = AnsiInjector::new(injector, preprocess);
-
-                let mut push_fn = inject_line(
-                    state.picker_ui.header.config.header_lines,
-                    reload_render_tx.clone(),
-                    injector,
-                    group_prefix.clone(),
-                );
-
-                state.picker_ui.selector.clear();
-                for item in cached_rec.items {
-                    if is_ignored_item(&item) {
-                        continue;
-                    }
-                    let _ = push_fn(item.into());
-                }
-
-                let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                    waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-                ));
-
-                // Background async walk to refresh disk cache if needed
-                let cwd_clone = cwd_str.clone();
-                let walker_opts = walker_config_reload.to_options(&cwd_clone);
-                tokio::spawn(async move {
-                    let (collect_tx, collect_rx) = std::sync::mpsc::channel();
-                    let walker = waymaker::walker::AsyncWalker::new(walker_opts);
-                    let handle = walker.spawn_walk(move |line| {
-                        let _ = collect_tx.send(line);
-                        Ok(())
-                    });
-                    let _ = handle.await;
-
-                    let mut fresh_items: Vec<String> = collect_rx.into_iter().collect();
-                    if !fresh_items.is_empty() {
-                        fresh_items.sort_by_key(|item| {
-                            let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
-                            (slashes, item.clone())
-                        });
-                        let cache_store = waymaker::cache::DirCacheStore::open();
-                        let _ = cache_store.put(&cwd_clone, fresh_items);
-                    }
-                });
-                return;
+            let p = std::path::Path::new(&path);
+            if p.is_dir() {
+                let depth = p.components().count();
+                items.push((path, score, depth));
             }
+        }
+        items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+        for (path, _, _) in items {
+            let _ = push_fn(path.into());
+        }
 
+        let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
+            waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
+        ));
+    }
+
+    /// The built-in file walker: the speculative cache, else the disk cache (refreshed in the
+    /// background), else a fresh walk that also refills the disk cache.
+    fn walk(&self, state: &mut CliState<'_, '_>, current_dir: PathBuf) {
+        let Reloader {
+            reload_render_tx,
+            splitter,
+            group_prefix,
+            spec_cache_reload,
+            walker_config_reload,
+            ..
+        } = self;
+        let preprocess = self.preprocess;
+        state.picker_ui.worker.set_mode_index(0);
+        let cwd_str = current_dir.to_string_lossy().to_string();
+
+        if state.payload().is_empty()
+            && let Ok(mut cache) = spec_cache_reload.lock()
+            && let Some(lines) = cache.remove(&current_dir)
+        {
+            debug!("Speculative Cache HIT for {current_dir:?}");
             state.picker_ui.worker.restart(false);
             state.reloading = true;
-
-            if let Ok(mut c) = spec_cache_reload.lock() {
-                c.clear();
-            }
 
             let injector = state.injector();
             let injector = IndexedInjector::new_globally_indexed(injector);
@@ -567,28 +534,72 @@ where
             );
 
             state.picker_ui.selector.clear();
-            let reload_render_tx = reload_render_tx.clone();
-            let reload_render_tx_ready = reload_render_tx.clone();
-            let walker_opts = walker_config_reload.to_options(".");
-            tokio::task::spawn_blocking(move || {
+            for line in lines {
+                let _ = push_fn(line.into());
+            }
+
+            let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
+                waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
+            ));
+            return;
+        }
+
+        let ignored_set: std::collections::HashSet<String> = walker_config_reload
+            .effective_ignore()
+            .into_iter()
+            .collect();
+        let is_ignored_item = |item: &str| -> bool {
+            let s = item.strip_prefix("./").unwrap_or(item);
+            let s = s.strip_prefix('/').unwrap_or(s);
+            let first = s.split(['/', '\\']).next().unwrap_or("");
+            let clean_first = first.trim_end_matches(['/', '\\']);
+            !clean_first.is_empty() && ignored_set.contains(clean_first)
+        };
+
+        let cache_store = waymaker::cache::DirCacheStore::open();
+
+        if let Some(cached_rec) = cache_store.get_valid(&cwd_str)
+            && !cached_rec.items.is_empty()
+        {
+            debug!("DirCacheStore HIT for {cwd_str}");
+            state.picker_ui.worker.restart(false);
+            state.reloading = true;
+
+            let injector = state.injector();
+            let injector = IndexedInjector::new_globally_indexed(injector);
+            let injector = SegmentedInjector::new(injector, splitter.clone());
+            let injector = AnsiInjector::new(injector, preprocess);
+
+            let mut push_fn = inject_line(
+                state.picker_ui.header.config.header_lines,
+                reload_render_tx.clone(),
+                injector,
+                group_prefix.clone(),
+            );
+
+            state.picker_ui.selector.clear();
+            for item in cached_rec.items {
+                if is_ignored_item(&item) {
+                    continue;
+                }
+                let _ = push_fn(item.into());
+            }
+
+            let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
+                waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
+            ));
+
+            // Background async walk to refresh disk cache if needed
+            let cwd_clone = cwd_str.clone();
+            let walker_opts = walker_config_reload.to_options(&cwd_clone);
+            tokio::spawn(async move {
                 let (collect_tx, collect_rx) = std::sync::mpsc::channel();
                 let walker = waymaker::walker::AsyncWalker::new(walker_opts);
-                let mut first = true;
                 let handle = walker.spawn_walk(move |line| {
-                    let _ = collect_tx.send(line.clone());
-                    let res = push_fn(line.into());
-                    if first {
-                        first = false;
-                        let _ =
-                            reload_render_tx_ready.send(waymaker::message::RenderCommand::Action(
-                                waymaker::action::Action::Custom(
-                                    crate::action::MMAction::ReloadReady(vec![]),
-                                ),
-                            ));
-                    }
-                    res
+                    let _ = collect_tx.send(line);
+                    Ok(())
                 });
-                let _ = tokio::runtime::Handle::current().block_on(handle);
+                let _ = handle.await;
 
                 let mut fresh_items: Vec<String> = collect_rx.into_iter().collect();
                 if !fresh_items.is_empty() {
@@ -596,70 +607,133 @@ where
                         let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
                         (slashes, item.clone())
                     });
-                    let cwd_str = std::env::current_dir()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_default();
                     let cache_store = waymaker::cache::DirCacheStore::open();
-                    let _ = cache_store.put(&cwd_str, fresh_items);
+                    let _ = cache_store.put(&cwd_clone, fresh_items);
                 }
+            });
+            return;
+        }
 
+        state.picker_ui.worker.restart(false);
+        state.reloading = true;
+
+        if let Ok(mut c) = spec_cache_reload.lock() {
+            c.clear();
+        }
+
+        let injector = state.injector();
+        let injector = IndexedInjector::new_globally_indexed(injector);
+        let injector = SegmentedInjector::new(injector, splitter.clone());
+        let injector = AnsiInjector::new(injector, preprocess);
+
+        let mut push_fn = inject_line(
+            state.picker_ui.header.config.header_lines,
+            reload_render_tx.clone(),
+            injector,
+            group_prefix.clone(),
+        );
+
+        state.picker_ui.selector.clear();
+        let reload_render_tx = reload_render_tx.clone();
+        let reload_render_tx_ready = reload_render_tx.clone();
+        let walker_opts = walker_config_reload.to_options(".");
+        tokio::task::spawn_blocking(move || {
+            let (collect_tx, collect_rx) = std::sync::mpsc::channel();
+            let walker = waymaker::walker::AsyncWalker::new(walker_opts);
+            let mut first = true;
+            let handle = walker.spawn_walk(move |line| {
+                let _ = collect_tx.send(line.clone());
+                let res = push_fn(line.into());
                 if first {
-                    let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
+                    first = false;
+                    let _ = reload_render_tx_ready.send(waymaker::message::RenderCommand::Action(
                         waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(
                             vec![],
                         )),
                     ));
                 }
+                res
             });
-        } else if !cmd.is_empty() {
-            state.picker_ui.worker.restart(false);
-            state.reloading = true;
+            let _ = tokio::runtime::Handle::current().block_on(handle);
 
-            let injector = state.injector();
-            let injector = IndexedInjector::new_globally_indexed(injector);
-            let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess);
+            let mut fresh_items: Vec<String> = collect_rx.into_iter().collect();
+            if !fresh_items.is_empty() {
+                fresh_items.sort_by_key(|item| {
+                    let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
+                    (slashes, item.clone())
+                });
+                let cwd_str = std::env::current_dir()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let cache_store = waymaker::cache::DirCacheStore::open();
+                let _ = cache_store.put(&cwd_str, fresh_items);
+            }
 
-            let push_fn = inject_line(
-                state.picker_ui.header.config.header_lines,
-                reload_render_tx.clone(),
-                injector,
-                group_prefix.clone(),
-            );
-
-            let vars = state.make_env_vars();
-            debug!("Reloading: {cmd} in {current_dir:?}");
-            state.picker_ui.selector.clear();
-
-            let separator = separator.or(input_separator).unwrap_or('\n');
-            let reload_render_tx = reload_render_tx.clone();
-            let cmd = cmd.clone();
-            let current_dir = current_dir.clone();
-            tokio::task::spawn_blocking(move || {
-                if let Some(out) = Command::from_script(&cmd)
-                    .current_dir(&current_dir)
-                    .envs(vars)
-                    .stdin(Stdio::null())
-                    .args(&*COMMAND_ARGS.lock().unwrap())
-                    .output()
-                    ._elog()
-                {
-                    let text = String::from_utf8_lossy(&out.stdout);
-                    let mut lines: Vec<&str> = text.split(separator).collect();
-                    if lines.last() == Some(&"") {
-                        lines.pop();
-                    }
-                    let mut push_fn = push_fn;
-                    for line in lines {
-                        let _ = push_fn(line.into());
-                    }
-                }
-
+            if first {
                 let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
                     waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
                 ));
-            });
-        }
+            }
+        });
+    }
+
+    /// A shell command's output, split on the input separator.
+    fn command(&self, state: &mut CliState<'_, '_>, cmd: String, current_dir: PathBuf) {
+        let Reloader {
+            reload_render_tx,
+            splitter,
+            group_prefix,
+            ..
+        } = self;
+        let preprocess = self.preprocess;
+        let (separator, input_separator) = (self.separator, self.input_separator);
+        state.picker_ui.worker.restart(false);
+        state.reloading = true;
+
+        let injector = state.injector();
+        let injector = IndexedInjector::new_globally_indexed(injector);
+        let injector = SegmentedInjector::new(injector, splitter.clone());
+        let injector = AnsiInjector::new(injector, preprocess);
+
+        let push_fn = inject_line(
+            state.picker_ui.header.config.header_lines,
+            reload_render_tx.clone(),
+            injector,
+            group_prefix.clone(),
+        );
+
+        let vars = state.make_env_vars();
+        debug!("Reloading: {cmd} in {current_dir:?}");
+        state.picker_ui.selector.clear();
+
+        let separator = separator.or(input_separator).unwrap_or('\n');
+        let reload_render_tx = reload_render_tx.clone();
+        let cmd = cmd.clone();
+        let current_dir = current_dir.clone();
+        tokio::task::spawn_blocking(move || {
+            if let Some(out) = Command::from_script(&cmd)
+                .current_dir(&current_dir)
+                .envs(vars)
+                .stdin(Stdio::null())
+                .args(&*COMMAND_ARGS.lock().unwrap())
+                .output()
+                ._elog()
+            {
+                let text = String::from_utf8_lossy(&out.stdout);
+                let mut lines: Vec<&str> = text.split(separator).collect();
+                if lines.last() == Some(&"") {
+                    lines.pop();
+                }
+                let mut push_fn = push_fn;
+                for line in lines {
+                    let _ = push_fn(line.into());
+                }
+            }
+
+            let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
+                waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
+            ));
+        });
     }
 }
 

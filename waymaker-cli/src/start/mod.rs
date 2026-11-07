@@ -56,34 +56,10 @@ pub use benchmark::*;
 mod handlers;
 use handlers::*;
 
-pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
-    if cli.test_keys {
-        super::crokey::main();
-        exit(0);
-    }
-
-    let cfg_path = if let Some(p) = &cli.config {
-        Path::new(p)
-    } else {
-        default_config_path()
-    };
-
-    if cli.dump_config && std::io::stdout().is_terminal() {
-        // if stdout: dump the default cfg with comments
-        write_str(cfg_path, crate::config::DEFAULT_CONFIG)?;
-        ibog!("Config written to {cfg_path:?}");
-        exit(0)
-    }
-
-    if crate::paths::dev_mode() && cli.config.is_none() {
-        #[cfg(target_os = "windows")]
-        write_str(cfg_path, include_str!("../../assets/win.dev.toml")).unwrap();
-
-        #[cfg(not(target_os = "windows"))]
-        write_str(cfg_path, include_str!("../../assets/dev.toml")).unwrap();
-    }
-
-    let mut config: Config = if cli.config.is_some() {
+/// The config before overrides: an explicit `--config` file as is, else the user's file layered
+/// over the built-in defaults, else the defaults.
+fn load_base_config(cli: &Cli, cfg_path: &Path) -> Config {
+    if cli.config.is_some() {
         // Explicit --config: load file verbatim, no default layering.
         load_type(cfg_path, |s| parse_warn(s, cfg_path))
             ._ebog()
@@ -100,18 +76,16 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         base
     } else {
         Config::default()
-    };
-    // check config
-    if config.source.is_some() {
-        wbog!("'source' field is not supported in the main config.");
     }
+}
 
-    if config.render.status.template.is_empty() {
-        config.render.status.template = r#"\m/\t"#.to_string();
-    }
-
-    // apply overrides
-    for mut p in cli.r#override {
+/// Applies each `-o` override in order: a preset name (installed, else built in) or a file, plus
+/// the file its `source` names. Sets `WM_OVERRIDE`/`MM_OVERRIDE` to the last one.
+fn apply_overrides(
+    mut config: Config,
+    overrides: Vec<std::path::PathBuf>,
+) -> anyhow::Result<Config> {
+    for mut p in overrides {
         let mut embedded = None;
         if p.is_relative() && p.extension().is_none() {
             let name = p.to_string_lossy().into_owned();
@@ -156,52 +130,12 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
             EnvValue::new(p.to_string_lossy().to_string()),
         );
     }
+    Ok(config)
+}
 
-    warn_config_pitfalls(&config);
-
-    if config.start.command.default.base_command.is_none() {
-        config.start.command.default.base_command =
-            Some(config.start.command.default.command.clone());
-    }
-
-    apply_path_rules(&mut config);
-
-    if crate::paths::dev_mode() {
-        config.tui.clear_on_exit = false;
-    }
-    apply_border_gradient_env(&mut config.render.ui.border);
-    config.apply(partial); // resolve config.exit first
-    config.resolve();
-
-    if !cli.args.is_empty() {
-        if !std::io::stdin().is_terminal() && !cli.no_read {
-            eprintln!(
-                "warning: trailing arguments provided but input is piped. ignoring trailing arguments."
-            );
-        }
-        *COMMAND_ARGS.lock().unwrap() = cli.args;
-    }
-
-    // dispatch subcommands
-    if cli.last_key {
-        let path = config
-            .exit
-            .last_key_path
-            .as_deref()
-            .unwrap_or(last_key_path());
-
-        let content = std::fs::read_to_string(path)._elog();
-        if let Some(s) = content
-            && let s = s.trim()
-            && !s.is_empty()
-        {
-            prints!(s);
-            exit(0);
-        } else {
-            exit(1)
-        }
-    }
-
+/// Applies the CLI flags that set config values (`--fullscreen`, `--sort`, `--icons`, media,
+/// colours, nav, ...), and copies the preview's media and diagram settings to the previewer.
+fn apply_cli_flags(cli: &Cli, mut config: Config) -> Config {
     if cli.fullscreen {
         config.tui.layout = None;
     }
@@ -265,7 +199,12 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     if cli.status_inline {
         config.render.query.status_inline = true;
     }
+    config
+}
 
+/// Adds the `--nav-bind` binds, then the nav profile's default binds and, for the `fm` profile,
+/// its file-manager keys, without replacing binds the user set.
+fn apply_nav_binds(cli: &Cli, mut config: Config) -> Config {
     for nb in &cli.nav_bind {
         if let Some(colon) = nb.find(':') {
             let key = nb[..colon].to_string();
@@ -359,6 +298,97 @@ pub fn enter(cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
         nb("b", waymaker::acs![Action::Semantic("pins".into())]);
         nb("*", waymaker::acs![Action::Semantic("pin".into())]);
     }
+    config
+}
+
+pub fn enter(mut cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
+    if cli.test_keys {
+        super::crokey::main();
+        exit(0);
+    }
+
+    let cfg_path = if let Some(p) = &cli.config {
+        Path::new(p)
+    } else {
+        default_config_path()
+    };
+
+    if cli.dump_config && std::io::stdout().is_terminal() {
+        // if stdout: dump the default cfg with comments
+        write_str(cfg_path, crate::config::DEFAULT_CONFIG)?;
+        ibog!("Config written to {cfg_path:?}");
+        exit(0)
+    }
+
+    if crate::paths::dev_mode() && cli.config.is_none() {
+        #[cfg(target_os = "windows")]
+        write_str(cfg_path, include_str!("../../assets/win.dev.toml")).unwrap();
+
+        #[cfg(not(target_os = "windows"))]
+        write_str(cfg_path, include_str!("../../assets/dev.toml")).unwrap();
+    }
+
+    let mut config: Config = load_base_config(&cli, cfg_path);
+    // check config
+    if config.source.is_some() {
+        wbog!("'source' field is not supported in the main config.");
+    }
+
+    if config.render.status.template.is_empty() {
+        config.render.status.template = r#"\m/\t"#.to_string();
+    }
+
+    // apply overrides
+    config = apply_overrides(config, std::mem::take(&mut cli.r#override))?;
+
+    warn_config_pitfalls(&config);
+
+    if config.start.command.default.base_command.is_none() {
+        config.start.command.default.base_command =
+            Some(config.start.command.default.command.clone());
+    }
+
+    apply_path_rules(&mut config);
+
+    if crate::paths::dev_mode() {
+        config.tui.clear_on_exit = false;
+    }
+    apply_border_gradient_env(&mut config.render.ui.border);
+    config.apply(partial); // resolve config.exit first
+    config.resolve();
+
+    if !cli.args.is_empty() {
+        if !std::io::stdin().is_terminal() && !cli.no_read {
+            eprintln!(
+                "warning: trailing arguments provided but input is piped. ignoring trailing arguments."
+            );
+        }
+        *COMMAND_ARGS.lock().unwrap() = std::mem::take(&mut cli.args);
+    }
+
+    // dispatch subcommands
+    if cli.last_key {
+        let path = config
+            .exit
+            .last_key_path
+            .as_deref()
+            .unwrap_or(last_key_path());
+
+        let content = std::fs::read_to_string(path)._elog();
+        if let Some(s) = content
+            && let s = s.trim()
+            && !s.is_empty()
+        {
+            prints!(s);
+            exit(0);
+        } else {
+            exit(1)
+        }
+    }
+
+    config = apply_cli_flags(&cli, config);
+
+    config = apply_nav_binds(&cli, config);
 
     if cli.dump_config {
         let contents = toml::to_string_pretty(&config).expect("failed to serialize to TOML");
@@ -692,6 +722,292 @@ pub fn process_envs(mut envs: HashMap<String, EnvValue>) -> HashMap<String, Stri
     processed_envs
 }
 
+/// The start command to begin with: `WM_INDEX` (or legacy `MM_INDEX`) when it names one of
+/// several commands, else the first.
+fn initial_mode_index(additional_commands: &[String]) -> usize {
+    let mut initial_index = 0;
+    if additional_commands.len() > 1
+        && let Ok(index_str) = std::env::var("WM_INDEX").or_else(|_| std::env::var("MM_INDEX"))
+        && let Ok(index) = index_str.parse::<usize>()
+        && index < additional_commands.len()
+    {
+        initial_index = index;
+    }
+    initial_index
+}
+
+/// The bind mode: the configured one, else from whether a start command runs and whether stdout
+/// is a terminal (`tty`, `t0`, `piped`, `t1`).
+fn bind_mode(mode: Option<String>, initial_cmd: &str) -> String {
+    if let Some(m) = mode {
+        m
+    } else {
+        match (
+            !initial_cmd.is_empty(), // has command => t0
+            std::io::stdout().is_terminal(),
+        ) {
+            (true, true) => "tty",
+            (true, false) => "t0",
+            (false, true) => "piped",
+            (false, false) => "t1",
+        }
+        .to_string()
+    }
+}
+
+/// Sends `Reload` every `interval` ms (`reload_interval`) until the picker is gone.
+fn spawn_reload_ticker(interval: u64, render_tx: &RenderSender<MMAction>) {
+    let render_tx = render_tx.clone();
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_millis(interval));
+        ticker.tick().await; // skip first immediate tick
+        loop {
+            ticker.tick().await;
+            if render_tx
+                .send(waymaker::message::RenderCommand::Action(
+                    waymaker::action::Action::Reload("".to_string()),
+                ))
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+}
+
+/// Where the items come from and how they are split.
+struct InputSource {
+    sort: bool,
+    no_read: bool,
+    command: String,
+    shell: Option<Vec<String>>,
+    separator: Option<char>,
+    input_separator: Option<char>,
+    abort_empty: bool,
+    envs: HashMap<String, String>,
+}
+
+/// Starts feeding items to the picker: all input sorted (`sort`), else stdin when piped, else
+/// the built-in file walker, else the start command's output. Exits 99 when there is no input.
+fn spawn_input_reader(
+    source: InputSource,
+    push_fn: impl FnMut(Arc<str>) -> Result<(), waymaker::nucleo::WorkerError> + SSS,
+    walker_config: waymaker::config::WalkerConfig,
+    render_tx: RenderSender<MMAction>,
+) -> tokio::task::JoinHandle<Result<usize, MapReaderError<waymaker::nucleo::WorkerError>>> {
+    let InputSource {
+        sort,
+        no_read,
+        command,
+        shell,
+        separator,
+        input_separator,
+        abort_empty,
+        envs,
+    } = source;
+    if sort {
+        // Collect all input, sort alphabetically, then inject in sorted order.
+        let sep = separator.or(input_separator).unwrap_or('\n');
+        let raw: Vec<u8> = read_all_input(no_read, &command, &walker_config, envs);
+
+        let text = String::from_utf8_lossy(&raw);
+        let mut lines: Vec<&str> = text.split(sep).collect();
+        if lines.last() == Some(&"") {
+            lines.pop();
+        }
+        lines.sort_unstable();
+        let sorted = lines.join("\n");
+        drop(lines);
+
+        map_reader(
+            std::io::Cursor::new(sorted),
+            push_fn,
+            None, // already newline-separated after join
+            abort_empty.then_some(render_tx),
+        )
+    } else if !std::io::stdin().is_terminal() && !no_read {
+        let stdin = std::io::stdin();
+        map_reader(
+            stdin,
+            push_fn,
+            input_separator,
+            abort_empty.then_some(render_tx),
+        )
+    } else if is_default_file_walker_command(&command) {
+        ingest_walk(push_fn, &walker_config)
+    } else if !command.is_empty() {
+        let mut cmd_builder = if let Some(sh) = shell.as_ref()
+            && !sh.is_empty()
+        {
+            let mut iter = sh.iter();
+            let mut program = Command::new(iter.next().unwrap());
+            program.args(iter).arg(&command);
+            program
+        } else {
+            Command::from_script(&command)
+        };
+        if let Some((mut _child, stdout)) = cmd_builder
+            .envs(envs)
+            .args(&*COMMAND_ARGS.lock().unwrap())
+            .spawn_piped()
+            ._ebog()
+        {
+            map_reader(
+                stdout,
+                push_fn,
+                separator.or(input_separator),
+                abort_empty.then_some(render_tx),
+            )
+        } else {
+            eprintln!("error: no input detected.");
+            std::process::exit(99)
+        }
+    } else {
+        eprintln!("error: no input detected.");
+        std::process::exit(99)
+    }
+}
+
+/// What the CLI's handlers capture, besides the matchmaker they are registered on.
+struct HandlerDeps {
+    cli_formatter: CliFormatter,
+    print_handle: AppendOnly<String>,
+    output_separator: String,
+    copy_trailing_newline: bool,
+    render_tx: RenderSender<MMAction>,
+    all_rules: Vec<crate::config::PathRule>,
+    default_base_cmd: String,
+    walker_config: waymaker::config::WalkerConfig,
+    separator: Option<char>,
+    input_separator: Option<char>,
+    splitter: waymaker::nucleo::injector::SplitterFn<
+        Either<Arc<str>, Box<waymaker::nucleo::Text<'static>>>,
+    >,
+    preprocess: waymaker::nucleo::injector::PreprocessOptions,
+    group_prefix: Option<String>,
+}
+
+/// Registers the CLI's interrupt and event handlers: print, execute, copy, become, `ChDir`,
+/// `Synced`, cursor prefetch and `Reload`. Returns the cursor memory they share with the actions.
+fn register_handlers(mm: &mut waymaker::ConfigMatchmaker, deps: HandlerDeps) -> SharedNav {
+    let HandlerDeps {
+        cli_formatter,
+        print_handle,
+        output_separator,
+        copy_trailing_newline,
+        render_tx,
+        all_rules,
+        default_base_cmd,
+        walker_config,
+        separator,
+        input_separator,
+        splitter,
+        preprocess,
+        group_prefix,
+    } = deps;
+    // print handler (no quoting)
+    mm._register_print_handler(
+        print_handle.clone(),
+        output_separator.clone(),
+        cli_formatter.clone(),
+    );
+
+    // execute handlers
+    mm.register_execute_handler(cli_formatter.clone());
+    mm._register_execute_async_handler(cli_formatter.clone());
+    mm._register_live_input_handler(cli_formatter.clone());
+    mm.register_copy(
+        cli_formatter.clone(),
+        copy_trailing_newline,
+        Some(render_tx.clone()),
+    );
+    mm._register_become_handler(cli_formatter.clone());
+    // Speculative directory cache & background scanning
+    let speculative_cache: Arc<Mutex<HashMap<std::path::PathBuf, Vec<String>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+    let nav = NavMemory::shared_from_env();
+
+    mm.register_interrupt_handler(
+        Interrupt::ChDir,
+        chdir_handler(
+            cli_formatter.clone(),
+            speculative_cache.clone(),
+            render_tx.clone(),
+            nav.clone(),
+        ),
+    );
+
+    mm.register_event_handler(
+        Event::Synced | Event::Resynced,
+        synced_handler(render_tx.clone(), nav.clone()),
+    );
+
+    let reload_rules_spec = all_rules.clone();
+    let default_base_cmd_spec = default_base_cmd;
+    let get_active_cmd = move |dir: &std::path::Path| -> String {
+        active_command(&reload_rules_spec, &default_base_cmd_spec, dir)
+    };
+
+    mm.register_event_handler(
+        Event::CursorChange,
+        cursor_prefetch_handler(
+            cli_formatter.clone(),
+            speculative_cache.clone(),
+            get_active_cmd.clone(),
+            walker_config.clone(),
+            separator.or(input_separator).unwrap_or('\n'),
+        ),
+    );
+
+    mm.register_interrupt_handler(
+        Interrupt::Reload,
+        reload_handler(ReloadDeps {
+            reload_formatter: cli_formatter.clone(),
+            reload_render_tx: render_tx.clone(),
+            get_active_cmd,
+            spec_cache_reload: speculative_cache.clone(),
+            walker_config_reload: walker_config.clone(),
+            splitter,
+            preprocess,
+            group_prefix,
+            separator,
+            input_separator,
+            nav: nav.clone(),
+        }),
+    );
+    nav
+}
+
+/// The picker's environment: `WM_INDEX`/`MM_INDEX` when there are several start commands, then
+/// the processed `[envs]`. Also records the launch directory in frecency and enters the start
+/// directory.
+fn prepare_environment(
+    mut envs: HashMap<String, EnvValue>,
+    additional_commands: &[String],
+    initial_index: usize,
+    directory: EnvValue,
+) -> HashMap<String, String> {
+    if !additional_commands.is_empty() {
+        envs.insert(
+            "WM_INDEX".to_string(),
+            EnvValue::new(initial_index.to_string()),
+        );
+        envs.insert(
+            "MM_INDEX".to_string(),
+            EnvValue::new(initial_index.to_string()),
+        );
+    }
+    let envs = process_envs(envs);
+
+    if let Ok(cwd) = std::env::current_dir() {
+        let store = waymaker::frecency::FrecencyStore::open();
+        let _ = store.add(&cwd.to_string_lossy());
+    }
+
+    enter_start_directory(directory, &envs);
+    envs
+}
+
 pub async fn start(
     config: Config,
     no_read: bool,
@@ -737,7 +1053,7 @@ pub async fn start(
             },
         walker: walker_config,
         mut exit,
-        mut envs,
+        envs,
         source: _,
         rule: all_rules,
         ..
@@ -761,14 +1077,7 @@ pub async fn start(
     }
     let additional_commands = additional_commands;
 
-    let mut initial_index = 0;
-    if additional_commands.len() > 1
-        && let Ok(index_str) = std::env::var("WM_INDEX").or_else(|_| std::env::var("MM_INDEX"))
-        && let Ok(index) = index_str.parse::<usize>()
-        && index < additional_commands.len()
-    {
-        initial_index = index;
-    }
+    let initial_index = initial_mode_index(&additional_commands);
 
     let command = if initial_index > 0 {
         additional_commands[initial_index].clone()
@@ -783,24 +1092,7 @@ pub async fn start(
     };
 
     // -------- set envs/directory -----------
-    if !additional_commands.is_empty() {
-        envs.insert(
-            "WM_INDEX".to_string(),
-            EnvValue::new(initial_index.to_string()),
-        );
-        envs.insert(
-            "MM_INDEX".to_string(),
-            EnvValue::new(initial_index.to_string()),
-        );
-    }
-    let envs = process_envs(envs);
-
-    if let Ok(cwd) = std::env::current_dir() {
-        let store = waymaker::frecency::FrecencyStore::open();
-        let _ = store.add(&cwd.to_string_lossy());
-    }
-
-    enter_start_directory(directory, &envs);
+    let envs = prepare_environment(envs, &additional_commands, initial_index, directory);
 
     // ---------------------------------
 
@@ -817,20 +1109,7 @@ pub async fn start(
     let event_loop = EventLoop::with_binds(binds).with_tick_rate(render.tick_rate());
 
     // set event loop mode
-    let mode = if let Some(m) = mode {
-        m
-    } else {
-        match (
-            !initial_cmd.is_empty(), // has command => t0
-            std::io::stdout().is_terminal(),
-        ) {
-            (true, true) => "tty",
-            (true, false) => "t0",
-            (false, true) => "piped",
-            (false, false) => "t1",
-        }
-        .to_string()
-    };
+    let mode = bind_mode(mode, &initial_cmd);
     log::trace!("mode: {}", mode);
     event_loop.input_state().set_mode(mode);
 
@@ -902,94 +1181,27 @@ pub async fn start(
     );
 
     if let Some(interval) = reload_interval {
-        let render_tx = render_tx.clone();
-        tokio::spawn(async move {
-            let mut ticker = tokio::time::interval(std::time::Duration::from_millis(interval));
-            ticker.tick().await; // skip first immediate tick
-            loop {
-                ticker.tick().await;
-                if render_tx
-                    .send(waymaker::message::RenderCommand::Action(
-                        waymaker::action::Action::Reload("".to_string()),
-                    ))
-                    .is_err()
-                {
-                    break;
-                }
-            }
-        });
+        spawn_reload_ticker(interval, &render_tx);
     }
 
     // ---------------------- register handlers ---------------------------
-    // print handler (no quoting)
-    mm._register_print_handler(
-        print_handle.clone(),
-        output_separator.clone(),
-        cli_formatter.clone(),
-    );
-
-    // execute handlers
-    mm.register_execute_handler(cli_formatter.clone());
-    mm._register_execute_async_handler(cli_formatter.clone());
-    mm._register_live_input_handler(cli_formatter.clone());
-    mm.register_copy(
-        cli_formatter.clone(),
-        copy_trailing_newline,
-        Some(render_tx.clone()),
-    );
-    mm._register_become_handler(cli_formatter.clone());
-    // Speculative directory cache & background scanning
-    let speculative_cache: Arc<Mutex<HashMap<std::path::PathBuf, Vec<String>>>> =
-        Arc::new(Mutex::new(HashMap::new()));
-    let nav = NavMemory::shared_from_env();
-
-    mm.register_interrupt_handler(
-        Interrupt::ChDir,
-        chdir_handler(
-            cli_formatter.clone(),
-            speculative_cache.clone(),
-            render_tx.clone(),
-            nav.clone(),
-        ),
-    );
-
-    mm.register_event_handler(
-        Event::Synced | Event::Resynced,
-        synced_handler(render_tx.clone(), nav.clone()),
-    );
-
-    let reload_rules_spec = all_rules.clone();
-    let default_base_cmd_spec = default_base_cmd;
-    let get_active_cmd = move |dir: &std::path::Path| -> String {
-        active_command(&reload_rules_spec, &default_base_cmd_spec, dir)
-    };
-
-    mm.register_event_handler(
-        Event::CursorChange,
-        cursor_prefetch_handler(
-            cli_formatter.clone(),
-            speculative_cache.clone(),
-            get_active_cmd.clone(),
-            walker_config.clone(),
-            separator.or(input_separator).unwrap_or('\n'),
-        ),
-    );
-
-    mm.register_interrupt_handler(
-        Interrupt::Reload,
-        reload_handler(ReloadDeps {
-            reload_formatter: cli_formatter.clone(),
-            reload_render_tx: render_tx.clone(),
-            get_active_cmd,
-            spec_cache_reload: speculative_cache.clone(),
-            walker_config_reload: walker_config.clone(),
+    let nav = register_handlers(
+        &mut mm,
+        HandlerDeps {
+            cli_formatter,
+            print_handle: print_handle.clone(),
+            output_separator: output_separator.clone(),
+            copy_trailing_newline,
+            render_tx: render_tx.clone(),
+            all_rules,
+            default_base_cmd,
+            walker_config: walker_config.clone(),
+            separator,
+            input_separator,
             splitter,
             preprocess,
             group_prefix,
-            separator,
-            input_separator,
-            nav: nav.clone(),
-        }),
+        },
     );
 
     debug!("{mm:?}");
@@ -1020,67 +1232,21 @@ pub async fn start(
     }
 
     // ----------- read -----------------------
-    let handle = if sort {
-        // Collect all input, sort alphabetically, then inject in sorted order.
-        let sep = separator.or(input_separator).unwrap_or('\n');
-        let raw: Vec<u8> = read_all_input(no_read, &command, &walker_config, envs);
-
-        let text = String::from_utf8_lossy(&raw);
-        let mut lines: Vec<&str> = text.split(sep).collect();
-        if lines.last() == Some(&"") {
-            lines.pop();
-        }
-        lines.sort_unstable();
-        let sorted = lines.join("\n");
-        drop(lines);
-
-        map_reader(
-            std::io::Cursor::new(sorted),
-            push_fn,
-            None, // already newline-separated after join
-            abort_empty.then_some(render_tx),
-        )
-    } else if !std::io::stdin().is_terminal() && !no_read {
-        let stdin = std::io::stdin();
-        map_reader(
-            stdin,
-            push_fn,
+    let handle = spawn_input_reader(
+        InputSource {
+            sort,
+            no_read,
+            command,
+            shell,
+            separator,
             input_separator,
-            abort_empty.then_some(render_tx),
-        )
-    } else if is_default_file_walker_command(&command) {
-        ingest_walk(push_fn, &walker_config)
-    } else if !command.is_empty() {
-        let mut cmd_builder = if let Some(sh) = shell.as_ref()
-            && !sh.is_empty()
-        {
-            let mut iter = sh.iter();
-            let mut program = Command::new(iter.next().unwrap());
-            program.args(iter).arg(&command);
-            program
-        } else {
-            Command::from_script(&command)
-        };
-        if let Some((mut _child, stdout)) = cmd_builder
-            .envs(envs)
-            .args(&*COMMAND_ARGS.lock().unwrap())
-            .spawn_piped()
-            ._ebog()
-        {
-            map_reader(
-                stdout,
-                push_fn,
-                separator.or(input_separator),
-                abort_empty.then_some(render_tx),
-            )
-        } else {
-            eprintln!("error: no input detected.");
-            std::process::exit(99)
-        }
-    } else {
-        eprintln!("error: no input detected.");
-        std::process::exit(99)
-    };
+            abort_empty,
+            envs,
+        },
+        push_fn,
+        walker_config,
+        render_tx,
+    );
 
     if sync {
         handle.await._wbog(); // warn the mapreader error (?)
