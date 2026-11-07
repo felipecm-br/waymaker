@@ -599,6 +599,11 @@ pub struct NavConfig {
     #[partial(no_recurse, unwrap)]
     pub binds: HashMap<String, Actions<NullActionExt>>,
 
+    /// Keys of a fullscreen or diagram preview, over the defaults in
+    /// [`NavConfig::default_preview_binds`]: a key listed here replaces its default.
+    #[partial(no_recurse, unwrap)]
+    pub preview_binds: HashMap<String, Actions<NullActionExt>>,
+
     /// Show notifications for file-manager clipboard actions.
     #[serde(alias = "nav_notify", alias = "focus_notify", alias = "fm_notify")]
     pub notify: bool,
@@ -648,6 +653,7 @@ impl Default for NavConfig {
             prompt_input: None,
             live_input: None,
             binds: Self::default_binds_for_profile(NavProfile::List),
+            preview_binds: HashMap::new(),
             notify: false,
             passthrough: false,
             basic: false,
@@ -673,6 +679,52 @@ impl NavConfig {
     }
 
     /// Returns the default keybindings corresponding to the specified navigation profile.
+    /// Adds a default bind unless `key` is already bound, under this or another spelling of the
+    /// same key (`Esc`/`esc`, `space`/`" "`), so the user's bind keeps precedence.
+    pub fn add_default_bind(&mut self, key: &str, actions: Actions<NullActionExt>) {
+        if !self
+            .binds
+            .keys()
+            .any(|k| crate::render::same_nav_key(k, key))
+        {
+            self.binds.insert(key.to_string(), actions);
+        }
+    }
+
+    /// The default keys of a fullscreen or diagram preview; `[nav.preview_binds]` overrides
+    /// them key by key.
+    pub fn default_preview_binds() -> HashMap<String, Actions<NullActionExt>> {
+        let table: [(&[&str], Action<NullActionExt>); 20] = [
+            (&["j", "down"], Action::PreviewDown(3)),
+            (&["k", "up"], Action::PreviewUp(3)),
+            (&["h", "left"], Action::PreviewHScroll(-6)),
+            (&["l", "right"], Action::PreviewHScroll(6)),
+            (&["J", "shift-down"], Action::PreviewDown(15)),
+            (&["K", "shift-up"], Action::PreviewUp(15)),
+            (&["H", "shift-left"], Action::PreviewHScroll(-18)),
+            (&["L", "shift-right"], Action::PreviewHScroll(18)),
+            (&["ctrl-u", "u"], Action::PreviewHalfPageUp),
+            (&["ctrl-d", "d"], Action::PreviewHalfPageDown),
+            (&["s"], Action::ToggleDiagram),
+            (&["n", "]"], Action::NextDiagram),
+            (&["N", "["], Action::PrevDiagram),
+            (&["+", "="], Action::DiagramZoomIn),
+            (&["-"], Action::DiagramZoomOut),
+            (&["0"], Action::DiagramResetZoom),
+            (&["y"], Action::Accept),
+            (&["ctrl-c"], Action::Abort(130)),
+            (&["gg"], Action::PreviewUp(0)),
+            (&["G"], Action::PreviewDown(0)),
+        ];
+        let mut binds = HashMap::new();
+        for (keys, action) in table {
+            for key in keys {
+                binds.insert(key.to_string(), Actions::from([action.clone()]));
+            }
+        }
+        binds
+    }
+
     pub fn default_binds_for_profile(
         profile: NavProfile,
     ) -> HashMap<String, Actions<NullActionExt>> {
@@ -766,7 +818,7 @@ where
     #[serde(untagged)]
     enum NavHelper {
         Bool(bool),
-        Config(NavConfig),
+        Config(Box<NavConfig>),
     }
 
     match NavHelper::deserialize(deserializer)? {
@@ -774,7 +826,7 @@ where
             active: b,
             ..NavConfig::default()
         }),
-        NavHelper::Config(c) => Ok(c),
+        NavHelper::Config(c) => Ok(*c),
     }
 }
 

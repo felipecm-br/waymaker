@@ -239,20 +239,14 @@ fn apply_nav_binds(cli: &Cli, mut config: Config) -> Config {
         let profile = config.render.ui.nav.effective_profile();
         let defaults = waymaker::config::NavConfig::default_binds_for_profile(profile);
         for (k, v) in defaults {
-            config.render.ui.nav.binds.entry(k).or_insert(v);
+            config.render.ui.nav.add_default_bind(&k, v);
         }
 
         // In basic mode, ensure directory navigation binds h and l are silenced
         if profile == waymaker::config::NavProfile::Basic {
             let empty = waymaker::action::Actions::default();
-            for key in &["h", "l"] {
-                config
-                    .render
-                    .ui
-                    .nav
-                    .binds
-                    .entry(key.to_string())
-                    .or_insert_with(|| empty.clone());
+            for key in ["h", "l"] {
+                config.render.ui.nav.add_default_bind(key, empty.clone());
             }
         }
     }
@@ -262,13 +256,7 @@ fn apply_nav_binds(cli: &Cli, mut config: Config) -> Config {
     {
         use waymaker::action::Actions;
         let mut nb = |k: &str, actions: Actions<waymaker::action::NullActionExt>| {
-            config
-                .render
-                .ui
-                .nav
-                .binds
-                .entry(k.to_string())
-                .or_insert(actions);
+            config.render.ui.nav.add_default_bind(k, actions);
         };
         nb("esc", waymaker::acs![Action::Quit(130)]);
         nb("q", waymaker::acs![Action::Quit(130)]);

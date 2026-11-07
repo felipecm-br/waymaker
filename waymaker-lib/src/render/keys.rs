@@ -201,32 +201,6 @@ pub(super) fn apply_sort_menu<A: ActionExt>(
     *buffer = out;
 }
 
-/// The fixed keys of a fullscreen or diagram preview: scrolling, diagram controls, accept and
-/// abort. `g`/`G`, Esc/Enter and the rest are handled by [`process_results_nav_key`].
-fn preview_key_action<A: ActionExt>(key: &str) -> Option<Action<A>> {
-    Some(match key {
-        "j" | "down" | "Down" => Action::PreviewDown(3),
-        "k" | "up" | "Up" => Action::PreviewUp(3),
-        "h" | "left" | "Left" => Action::PreviewHScroll(-6),
-        "l" | "right" | "Right" => Action::PreviewHScroll(6),
-        "J" | "shift-j" | "shift-down" | "Shift-Down" | "Shift-down" => Action::PreviewDown(15),
-        "K" | "shift-k" | "shift-up" | "Shift-Up" | "Shift-up" => Action::PreviewUp(15),
-        "H" | "shift-left" | "Shift-Left" | "Shift-left" => Action::PreviewHScroll(-18),
-        "L" | "shift-right" | "Shift-Right" | "Shift-right" => Action::PreviewHScroll(18),
-        "ctrl-u" | "u" => Action::PreviewHalfPageUp,
-        "ctrl-d" | "d" => Action::PreviewHalfPageDown,
-        "s" => Action::ToggleDiagram,
-        "n" | "]" => Action::NextDiagram,
-        "N" | "[" => Action::PrevDiagram,
-        "+" | "=" => Action::DiagramZoomIn,
-        "-" => Action::DiagramZoomOut,
-        "0" => Action::DiagramResetZoom,
-        "y" => Action::Accept,
-        "ctrl-c" => Action::Abort(130),
-        _ => return None,
-    })
-}
-
 /// Emits the actions of a nav bind, tracking the focus each one moves to.
 fn push_nav_actions<A: ActionExt>(
     actions: &crate::action::Actions<NullActionExt>,
@@ -307,6 +281,7 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
     key: &str,
     fallback_action: Option<Action<A>>,
     focus_binds: &super::nav_keymap::NavKeymap,
+    preview_binds: &super::nav_keymap::NavKeymap,
     pending_nav_key: &mut Option<char>,
     sort_menu_active: &mut bool,
     sim_focus: &mut Focus,
@@ -315,15 +290,21 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
     preview_diagram_mode: bool,
 ) {
     if preview_fullscreen || preview_diagram_mode {
-        if let Some(action) = preview_key_action(key) {
-            out.push(RenderCommand::Action(action));
+        // g and G keep their own arms: g waits for a second g, G cancels that wait.
+        if key != "g"
+            && key != "G"
+            && let Some(actions) = preview_binds.get(key)
+        {
+            push_nav_actions(actions, sim_focus, out);
             return;
         }
         match key {
             "g" => {
                 if *pending_nav_key == Some('g') {
                     *pending_nav_key = None;
-                    out.push(RenderCommand::Action(Action::PreviewUp(0)));
+                    if let Some(actions) = preview_binds.get("gg") {
+                        push_nav_actions(actions, sim_focus, out);
+                    }
                 } else {
                     *pending_nav_key = Some('g');
                 }
@@ -331,7 +312,9 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
             }
             "G" => {
                 *pending_nav_key = None;
-                out.push(RenderCommand::Action(Action::PreviewDown(0)));
+                if let Some(actions) = preview_binds.get("G") {
+                    push_nav_actions(actions, sim_focus, out);
+                }
                 return;
             }
             k if k.eq_ignore_ascii_case("esc") || (preview_fullscreen && k == "enter") => {
@@ -501,6 +484,7 @@ pub(super) fn apply_focus_binds<A: ActionExt>(
         buffer,
         initial_focus,
         focus_binds,
+        &std::collections::HashMap::new(),
         overlay_active,
         pending_nav_key,
         sort_menu_active,
@@ -513,6 +497,7 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
     buffer: &mut Vec<RenderCommand<A>>,
     initial_focus: Focus,
     focus_binds: &std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
+    preview_binds: &std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
     overlay_active: bool,
     pending_nav_key: &mut Option<char>,
     sort_menu_active: &mut bool,
@@ -535,9 +520,14 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
 
     let mut out = Vec::with_capacity(buffer.len());
     let keymap = super::nav_keymap::NavKeymap::from_strings(focus_binds);
+    let preview_keymap = super::nav_keymap::NavKeymap::from_layers(
+        &crate::config::NavConfig::default_preview_binds(),
+        preview_binds,
+    );
     let mut resolver = NavResolver::new(
         initial_focus,
         &keymap,
+        &preview_keymap,
         preview_fullscreen,
         preview_diagram_mode,
     );
@@ -554,6 +544,7 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
 /// that key are then dropped).
 pub(super) struct NavResolver<'b> {
     focus_binds: &'b super::nav_keymap::NavKeymap,
+    preview_binds: &'b super::nav_keymap::NavKeymap,
     preview_fullscreen: bool,
     preview_diagram_mode: bool,
     sim_focus: Focus,
@@ -564,11 +555,13 @@ impl<'b> NavResolver<'b> {
     pub(super) fn new(
         initial_focus: Focus,
         focus_binds: &'b super::nav_keymap::NavKeymap,
+        preview_binds: &'b super::nav_keymap::NavKeymap,
         preview_fullscreen: bool,
         preview_diagram_mode: bool,
     ) -> Self {
         Self {
             focus_binds,
+            preview_binds,
             preview_fullscreen,
             preview_diagram_mode,
             sim_focus: if preview_fullscreen {
@@ -589,6 +582,7 @@ impl<'b> NavResolver<'b> {
         out: &mut Vec<RenderCommand<A>>,
     ) {
         let focus_binds = self.focus_binds;
+        let preview_binds = self.preview_binds;
         let (preview_fullscreen, preview_diagram_mode) =
             (self.preview_fullscreen, self.preview_diagram_mode);
         let mut sim_focus = self.sim_focus;
@@ -650,6 +644,7 @@ impl<'b> NavResolver<'b> {
                         &key,
                         Some(Action::Char(c)),
                         focus_binds,
+                        preview_binds,
                         pending_nav_key,
                         sort_menu_active,
                         &mut sim_focus,
@@ -674,6 +669,7 @@ impl<'b> NavResolver<'b> {
                         &key,
                         Some(action),
                         focus_binds,
+                        preview_binds,
                         pending_nav_key,
                         sort_menu_active,
                         &mut sim_focus,
@@ -707,6 +703,7 @@ impl<'b> NavResolver<'b> {
                         key,
                         Some(action),
                         focus_binds,
+                        preview_binds,
                         pending_nav_key,
                         sort_menu_active,
                         &mut sim_focus,
@@ -729,6 +726,7 @@ impl<'b> NavResolver<'b> {
                         key,
                         Some(action),
                         focus_binds,
+                        preview_binds,
                         pending_nav_key,
                         sort_menu_active,
                         &mut sim_focus,

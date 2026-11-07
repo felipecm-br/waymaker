@@ -1144,6 +1144,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1164,6 +1165,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1184,6 +1186,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1204,6 +1207,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1222,6 +1226,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1240,6 +1245,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1257,6 +1263,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1274,6 +1281,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1295,6 +1303,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1315,6 +1324,7 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         &mut buffer,
         Focus::Results,
         &focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1584,10 +1594,14 @@ fn nav_key(
     let mut focus = Focus::Results;
     let mut out = Vec::new();
     let keymap = super::nav_keymap::NavKeymap::from_strings(focus_binds);
+    let preview = super::nav_keymap::NavKeymap::from_strings(
+        &crate::config::NavConfig::default_preview_binds(),
+    );
     keys::process_results_nav_key::<NullActionExt>(
         key,
         None,
         &keymap,
+        &preview,
         &mut pending,
         &mut sort_menu_active,
         &mut focus,
@@ -1739,6 +1753,7 @@ fn focus_mode(
         &mut buffer,
         focus,
         focus_binds,
+        &HashMap::new(),
         false,
         &mut pending,
         &mut sort_menu_active,
@@ -1910,10 +1925,14 @@ fn nav_key_with_fallback(
     let mut focus = Focus::Results;
     let mut out = Vec::new();
     let keymap = super::nav_keymap::NavKeymap::from_strings(focus_binds);
+    let preview = super::nav_keymap::NavKeymap::from_strings(
+        &crate::config::NavConfig::default_preview_binds(),
+    );
     keys::process_results_nav_key::<NullActionExt>(
         key,
         Some(fallback),
         &keymap,
+        &preview,
         &mut pending,
         &mut sort_menu_active,
         &mut focus,

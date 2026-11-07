@@ -1,7 +1,13 @@
 ## [Unreleased]
 
+### ✨ Features
+
+- The keys of a fullscreen or diagram preview are configurable: `[ui.nav.preview_binds]` overrides them key by key (`"J" = "PreviewDown(30)"`); unlisted keys keep their defaults
+- `[ui.nav.binds]` keys are matched as keys rather than strings, so `shift-j` and `J`, or `Esc` and `esc`, name the same key
+
 ### 🐛 Bug Fixes
 
+- With `results.wrap` on, moving up onto a first row that was cut off left it cut, showing only its last line; it is now drawn whole
 - A `[binds]` key bound to a built-in file-manager alias (`@create`, `@rename`, `@delete`, `@zip`, `@unzip`, `@yank`, `@cut`, `@undo`, `@redo`, ...) did nothing: the bind was dropped at startup. The default `F2` (`@rename`) now renames
 - The `jump` preset showed `a Add`, `r Rename`, `d Trash` and `z/Z Zip` hints but bound none of them; the keys now do what the hints say
 - In `jump` the file-manager box (create, rename, trash confirmation, zip) was never drawn, so the prompt and the typed name were invisible

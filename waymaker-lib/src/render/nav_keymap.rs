@@ -80,6 +80,22 @@ impl NavKeymap {
         }
     }
 
+    /// `defaults` with `overrides` on top: an override replaces the default for the same key,
+    /// whatever its spelling.
+    pub(super) fn from_layers(
+        defaults: &HashMap<String, Actions<NullActionExt>>,
+        overrides: &HashMap<String, Actions<NullActionExt>>,
+    ) -> Self {
+        let mut keymap = Self::from_strings(defaults);
+        for (k, v) in overrides {
+            if let Some(key) = parse_nav_key(k) {
+                keymap.binds.insert(key, v.clone());
+            }
+            keymap.spellings.insert(k.clone());
+        }
+        keymap
+    }
+
     /// Whether `key` is bound with exactly this spelling.
     pub(super) fn contains_spelling(&self, key: &str) -> bool {
         self.spellings.contains(key)
@@ -166,6 +182,35 @@ mod tests {
         assert_eq!(parse_nav_key("shift-?"), parse_nav_key("?"));
         assert_eq!(parse_nav_key("shift-j"), parse_nav_key("J"));
         assert!(matches!(parse_nav_key("ctrl-r"), Some(NavKey::Single(_))));
+    }
+
+    #[test]
+    fn a_users_spelling_of_a_default_key_keeps_precedence() {
+        let mut nav = crate::config::NavConfig {
+            binds: HashMap::from([("Esc".to_string(), Actions::from([Action::Pos(1)]))]),
+            ..Default::default()
+        };
+        nav.add_default_bind("esc", Actions::from([Action::Quit(130)]));
+        nav.add_default_bind("q", Actions::from([Action::Quit(130)]));
+        assert_eq!(nav.binds.len(), 2, "{:?}", nav.binds.keys());
+        let keymap = NavKeymap::from_strings(&nav.binds);
+        assert_eq!(keymap.get("esc"), Some(&Actions::from([Action::Pos(1)])));
+    }
+
+    #[test]
+    fn a_preview_override_replaces_its_key_only() {
+        let defaults = crate::config::NavConfig::default_preview_binds();
+        let user = HashMap::from([("Down".to_string(), Actions::from([Action::Pos(9)]))]);
+        let keymap = NavKeymap::from_layers(&defaults, &user);
+        assert_eq!(keymap.get("down"), Some(&Actions::from([Action::Pos(9)])));
+        assert_eq!(
+            keymap.get("j"),
+            Some(&Actions::from([Action::PreviewDown(3)]))
+        );
+        assert_eq!(
+            keymap.get("gg"),
+            Some(&Actions::from([Action::PreviewUp(0)]))
+        );
     }
 
     proptest! {

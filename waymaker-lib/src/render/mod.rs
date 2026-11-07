@@ -6,6 +6,15 @@ mod keys;
 mod live_input;
 mod mouse;
 mod nav_keymap;
+
+/// Whether two nav-bind keys name the same key (`Esc`/`esc`, `space`/`" "`, `shift-j`/`J`).
+/// Keys that do not parse compare as strings.
+pub fn same_nav_key(a: &str, b: &str) -> bool {
+    match (nav_keymap::parse_nav_key(a), nav_keymap::parse_nav_key(b)) {
+        (Some(x), Some(y)) => x == y,
+        _ => a == b,
+    }
+}
 mod state;
 #[cfg(test)]
 mod tests;
@@ -194,6 +203,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                     &mut buffer,
                     state.focus(),
                     &ui.config.nav.binds,
+                    &ui.config.nav.preview_binds,
                     // An input box (create, rename, ...) takes the keys; an info box such as
                     // "Undone ..." does not, so ctrl-r still reaches @redo after an undo.
                     (picker_ui.action_visible && state.input_routing.action_box_active())
