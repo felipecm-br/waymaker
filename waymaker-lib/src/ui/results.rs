@@ -224,6 +224,10 @@ impl ResultsUI {
             self.bottom_clip = None;
         } else if self.cursor > 0 {
             self.cursor -= 1;
+            if self.cursor == 0 {
+                // The cursor is back on the first row: draw it whole instead of keeping it cut.
+                self.bottom_clip = None;
+            }
         } else if self.config.scroll_wrap {
             log::trace!("d");
 

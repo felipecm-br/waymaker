@@ -596,3 +596,170 @@ fn test_results_ui_active_and_inactive_group_header_styling() {
     assert!(cell_g2_active.modifier.contains(Modifier::BOLD));
     assert!(!cell_g2_active.modifier.contains(Modifier::DIM));
 }
+
+/// Found by `layout_props`: with wrap on, Down onto a long second item cuts the first item at
+/// the top; Up back onto the first item must draw it whole again, not leave only its last line.
+#[test]
+fn test_cursor_prev_onto_cut_first_row_draws_it_whole() {
+    use ratatui::widgets::Widget;
+    let mut config = ResultsConfig::default();
+    config.wrap = true;
+    let mut ui = ResultsUI::new(config, StatusConfig::default());
+    let area = ratatui::layout::Rect::new(0, 0, 16, 7);
+    ui.update_dimensions(&area);
+
+    let mut worker = Worker::<String>::new_single_column();
+    let injector = worker.nucleo.injector();
+    for item in [
+        format!("#0;{}", "x".repeat(37)),
+        format!("#1;{}", "x".repeat(75)),
+    ] {
+        injector.push(item, |item, cols| cols[0] = item.clone().into());
+    }
+    worker.nucleo.tick(10);
+    let mut selector = crate::selector::Selector::new(|_s: &String| (0u32, ())).disabled();
+    let mut matcher = nucleo::Matcher::default();
+
+    let mut frame = |ui: &mut ResultsUI| {
+        let mut click = Click::None;
+        let table = ui.make_table(
+            0,
+            &mut worker,
+            &mut selector,
+            &mut matcher,
+            &mut click,
+            None,
+            false,
+        );
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        table.render(area, &mut buf);
+        (0..area.height)
+            .map(|y| {
+                (0..area.width)
+                    .map(|x| buf[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+    };
+    frame(&mut ui);
+    ui.cursor_next();
+    frame(&mut ui);
+    ui.cursor_prev();
+    let rows = frame(&mut ui);
+    assert_eq!(ui.index(), 0);
+    assert!(
+        rows[0].contains("#0;"),
+        "first item's head should be on the top row: {rows:#?}"
+    );
+}
+
+mod layout_props {
+    use super::*;
+    use proptest::prelude::*;
+    use ratatui::widgets::Widget;
+
+    #[derive(Debug, Clone)]
+    enum Op {
+        Next,
+        Prev,
+        Jump(u32),
+    }
+
+    fn op() -> impl Strategy<Value = Op> {
+        prop_oneof![
+            4 => Just(Op::Next),
+            4 => Just(Op::Prev),
+            1 => (0u32..200).prop_map(Op::Jump),
+        ]
+    }
+
+    /// Item `i` starts with a unique tag `#i;` so it can be found on screen; `pad` makes some
+    /// items long enough to wrap onto several lines.
+    fn items() -> impl Strategy<Value = Vec<String>> {
+        prop::collection::vec(0usize..90, 0..150).prop_map(|pads| {
+            pads.into_iter()
+                .enumerate()
+                .map(|(i, pad)| format!("#{i};{}", "x".repeat(pad)))
+                .collect()
+        })
+    }
+
+    fn screen_text(buf: &ratatui::buffer::Buffer) -> String {
+        let a = buf.area;
+        (a.y..a.y + a.height)
+            .map(|y| {
+                (a.x..a.x + a.width)
+                    .map(|x| buf[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(96))]
+
+        /// After any cursor movement, one frame keeps the cursor inside the list and draws the
+        /// cursor's item somewhere in the results area.
+        #[test]
+        fn cursor_stays_in_range_and_on_screen(
+            items in items(),
+            width in 12u16..60,
+            height in 1u16..20,
+            wrap in any::<bool>(),
+            scroll_wrap in any::<bool>(),
+            ops in prop::collection::vec(op(), 0..40),
+        ) {
+            let mut config = ResultsConfig::default();
+            config.wrap = wrap;
+            config.scroll_wrap = scroll_wrap;
+            let mut ui = ResultsUI::new(config, StatusConfig::default());
+            let area = ratatui::layout::Rect::new(0, 0, width, height);
+            ui.update_dimensions(&area);
+
+            let mut worker = Worker::<String>::new_single_column();
+            let injector = worker.nucleo.injector();
+            for item in &items {
+                injector.push(item.clone(), |item, cols| cols[0] = item.clone().into());
+            }
+            worker.nucleo.tick(10);
+
+            let mut selector = crate::selector::Selector::new(|_s: &String| (0u32, ())).disabled();
+            let mut matcher = nucleo::Matcher::default();
+            let n = items.len() as u32;
+
+            let mut frame = |ui: &mut ResultsUI, step: &str| -> Result<(), TestCaseError> {
+                let mut click = Click::None;
+                let table =
+                    ui.make_table(0, &mut worker, &mut selector, &mut matcher, &mut click, None, false);
+                let mut buf = ratatui::buffer::Buffer::empty(area);
+                table.render(area, &mut buf);
+                if n == 0 {
+                    return Ok(());
+                }
+                let idx = ui.index();
+                prop_assert!(idx < n, "{step}: index {idx} outside {n} items");
+                let item = worker.get_nth(idx).expect("index inside the snapshot");
+                let tag = item[..=item.find(';').unwrap()].to_string();
+                let text = screen_text(&buf);
+                prop_assert!(
+                    text.contains(&tag),
+                    "{step}: cursor item {tag} not on screen (bottom {}, cursor {})\n{text}",
+                    ui.bottom,
+                    ui.cursor
+                );
+                Ok(())
+            };
+
+            frame(&mut ui, "start")?;
+            for (i, op) in ops.iter().enumerate() {
+                match op {
+                    Op::Next => { ui.cursor_next(); }
+                    Op::Prev => { ui.cursor_prev(); }
+                    Op::Jump(j) => ui.cursor_jump(*j % n.max(1)),
+                }
+                frame(&mut ui, &format!("op {i} {op:?}"))?;
+            }
+        }
+    }
+}
