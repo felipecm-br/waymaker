@@ -370,10 +370,13 @@ fn nav_to(wm: &Session, query: &str) {
 fn jump_l_enters_and_h_returns_to_the_directory_left() {
     let wm = jump();
     nav_to(&wm, "alpha");
+    // Wait on the rendered screen, not the output so far: "one.txt" (alpha's tree preview) and
+    // "top.md" are in the stream before either key is handled, so Enter could win the race
+    // and accept a file inside alpha. Only the top-level listing shows gamma/.
     wm.send("l");
-    wm.wait_for(|t| t.contains("one.txt"));
+    wm.wait_for_screen(|s| s.contains("one.txt") && !s.contains("gamma/"));
     wm.send("h");
-    wm.wait_for(|t| t.contains("top.md"));
+    wm.wait_for_screen(|s| s.contains("gamma/"));
     // The cursor is back on the directory we came out of.
     wm.send(ENTER);
     let (code, out) = wm.finish();

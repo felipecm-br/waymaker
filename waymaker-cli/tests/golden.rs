@@ -429,7 +429,7 @@ fn golden_jump_symlinks_underline_tiers() {
     wm.send("j");
     // The symlink's tree preview comes from a command; under load it can land after the
     // screen has been quiet long enough for `styled_screen`, so wait for its content.
-    wm.wait_for(|s| s.contains("main.rs (13 B)"));
+    wm.wait_for_screen(|s| s.contains("main.rs (13 B)"));
     insta::assert_snapshot!(wm.styled_screen());
 }
 
@@ -460,7 +460,7 @@ fn golden_jump_double_nav_bar() {
     wm.send("j");
     // The symlink's tree preview comes from a command; under load it can land after the
     // screen has been quiet long enough for `styled_screen`, so wait for its content.
-    wm.wait_for(|s| s.contains("main.rs (13 B)"));
+    wm.wait_for_screen(|s| s.contains("main.rs (13 B)"));
     insta::assert_snapshot!(wm.styled_screen());
 }
 
