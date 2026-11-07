@@ -68,27 +68,14 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     let has_footer_separator =
         footer_ui.config.separator != crate::config::HorizontalSeparator::None;
 
-    let base_footer_height = if state.preview_fullscreen {
-        ui.config.nav_hints_height(PREVIEW_NAV_HINTS.len()).max(1)
-    } else if show_sort_menu {
-        ui.config.sort_menu.height(SORT_MENU_ITEMS.len())
-    } else if show_nav_hints {
-        let count = if is_filter_mode {
-            FILTER_NAV_HINTS.len()
-        } else {
-            match ui.config.nav.effective_profile() {
-                crate::config::NavProfile::Fm => NAV_HINTS.len(),
-                crate::config::NavProfile::List => LIST_NAV_HINTS.len(),
-                crate::config::NavProfile::Basic => BASIC_NAV_HINTS.len(),
-                crate::config::NavProfile::None => 0,
-            }
-        };
-        ui.config.nav_hints_height(count)
-    } else if footer_ui.show {
-        footer_ui.content_height()
-    } else {
-        0
-    };
+    let base_footer_height = footer_content_height(
+        state,
+        ui,
+        footer_ui,
+        is_filter_mode,
+        show_sort_menu,
+        show_nav_hints,
+    );
 
     let effective_footer_height = if base_footer_height > 0 && has_footer_separator {
         base_footer_height + 1
@@ -98,7 +85,7 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
 
     let is_full_footer = full_width_footer || show_nav_hints || show_sort_menu;
 
-    let mut footer = if is_full_footer || preview_ui.as_ref().is_none_or(|p| !p.visible()) {
+    let footer = if is_full_footer || preview_ui.as_ref().is_none_or(|p| !p.visible()) {
         split(&mut _area, effective_footer_height, picker_ui.reverse())
     } else {
         Rect::default()
@@ -112,57 +99,18 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     //   - if multiple groups: vertical (one row each), width = widest " N "
     let counter_gap_width = counter_gap_width(picker_ui);
 
-    let mut parent_peek_rect = take_parent_peek(ui, picker_ui, &mut _area);
+    let parent_peek_rect = take_parent_peek(ui, picker_ui, &mut _area);
 
-    let [preview, picker_area, footer, gap_area] = if let Some(preview_ui) = preview_ui.as_mut()
-        && preview_ui.visible()
-    {
-        if state.preview_fullscreen {
-            let (preview, footer) = if footer.height > 0 {
-                (_area, footer)
-            } else {
-                let mut full_area = _area;
-                let f = split(&mut full_area, effective_footer_height, false);
-                (full_area, f)
-            };
-            [preview, Rect::default(), footer, Rect::default()]
-        } else {
-            // Temporarily widen the gap so the counter fits horizontally.
-            let original_gap = preview_ui.setting().map(|s| s.layout.gap).unwrap_or(0);
-            let effective_gap = original_gap.max(if counter_gap_width > 0 {
-                counter_gap_width + 2
-            } else {
-                0
-            });
-            if let Some(s) = preview_ui.setting_mut() {
-                s.layout.gap = effective_gap;
-            }
-            let [preview, mut picker_area, gap_area] = preview_ui.split(_area);
-            // Restore the configured gap so nothing else is affected.
-            if let Some(s) = preview_ui.setting_mut() {
-                s.layout.gap = original_gap;
-            }
-
-            if state.iterations == 0 && _area.width < 30 && picker_area.width <= 5 {
-                warn!("UI too narrow, hiding preview");
-                preview_ui.show(false);
-
-                [Rect::default(), _area, footer, Rect::default()]
-            } else {
-                if !is_full_footer {
-                    footer = split(
-                        &mut picker_area,
-                        effective_footer_height,
-                        picker_ui.reverse(),
-                    );
-                }
-
-                [preview, picker_area, footer, gap_area]
-            }
-        }
-    } else {
-        [Rect::default(), _area, footer, Rect::default()]
-    };
+    let [preview, picker_area, footer, gap_area] = split_preview_area(
+        state,
+        picker_ui,
+        preview_ui,
+        _area,
+        footer,
+        effective_footer_height,
+        counter_gap_width,
+        is_full_footer,
+    );
 
     let original_breadcrumb_show = picker_ui.breadcrumb_config.show;
     if is_global_breadcrumb {
@@ -176,29 +124,8 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
         picker_ui.breadcrumb_config.show = original_breadcrumb_show;
     }
 
-    let mut footer = footer;
-    if !picker_ui.reverse() && footer.height > 0 {
-        let picker_bottom = results.y + results.height;
-        let preview_bottom = if preview.height > 0 {
-            preview.y + preview.height
-        } else {
-            0
-        };
-        let content_bottom = picker_bottom.max(preview_bottom);
-        if content_bottom < footer.y {
-            footer.y = content_bottom;
-        }
-    }
-
-    if parent_peek_rect.width > 0 {
-        if footer.height > 0 {
-            let available_h = footer.y.saturating_sub(parent_peek_rect.y);
-            parent_peek_rect.height = parent_peek_rect.height.min(available_h);
-        }
-        if let Some(max_h) = ui.config.parent_peek.max {
-            parent_peek_rect.height = parent_peek_rect.height.min(max_h);
-        }
-    }
+    let (footer, parent_peek_rect) =
+        fit_footer_and_peek(ui, picker_ui, footer, results, preview, parent_peek_rect);
 
     // save dimensions and check if dimensions changed
     *did_resize = state.update_layout(Layout {
@@ -235,84 +162,9 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
         }
     };
 
-    let nav_color = ui.config.nav.color;
-    let nav_mode = ui.config.nav.active;
-    let nav_do_blink = ui.config.nav.blink;
-    let nav_bold = ui.config.nav.bold;
-    let nav_bar = ui.config.nav.bar;
-    let nav_marker = ui.config.nav.marker.clone();
-    let nav_char = picker_ui
-        .results
-        .config
-        .multi_prefix
-        .chars()
-        .next()
-        .unwrap_or('│')
-        .to_string();
-    let input_focus_info = nav_mode.then_some(FocusInfo {
-        focused: state.focus == Focus::Input,
-        blink_phase: state.focus_blink,
-        color: nav_color,
-        do_blink: nav_do_blink,
-        bold: nav_bold,
-        bar: None,
-        marker: String::new(),
-        nav_char: nav_char.clone(),
-        nav_prompt: ui.config.nav.prompt.clone(),
-    });
-    let results_focus_info = nav_mode.then_some(FocusInfo {
-        focused: state.focus == Focus::Results,
-        blink_phase: state.focus_blink,
-        color: nav_color,
-        do_blink: nav_do_blink,
-        bold: nav_bold,
-        bar: nav_bar,
-        marker: nav_marker,
-        nav_char,
-        nav_prompt: ui.config.nav.prompt.clone(),
-    });
+    let (nav_color, input_focus_info, results_focus_info) = focus_infos(state, ui, picker_ui);
 
-    if picker_ui.action_visible {
-        let cfg = &picker_ui.action_config;
-        // Apply width percentage — centered within the allocated row(s).
-        let action_w = cfg.width_pct.compute_clamped(action.width, 1, 0);
-        let x_pad = action.width.saturating_sub(action_w) / 2;
-        let action_full_rect = Rect {
-            x: action.x + x_pad,
-            y: action.y,
-            width: action_w,
-            height: action.height,
-        };
-        // Render the separator border (default: bottom line) over the full area.
-        // It only draws at the edges of `action_full_rect`, so the input and
-        // preview content rendered afterwards is not obscured.
-        if !cfg.border.is_empty() {
-            frame.render_widget(cfg.border.as_static_block(), action_full_rect);
-        }
-
-        let mut current_y = action_full_rect.y;
-
-        let action_input_rect = Rect {
-            x: action_full_rect.x,
-            y: current_y,
-            width: action_w,
-            height: action_full_rect.height.min(1),
-        };
-        render_input(frame, action_input_rect, &mut picker_ui.action, None, None);
-        current_y += 1;
-
-        // Render preview area below if preview_height > 0.
-        if cfg.preview_height > 0 && action_full_rect.height > current_y - action_full_rect.y {
-            let preview_rect = Rect {
-                x: action_full_rect.x,
-                y: current_y,
-                width: action_w,
-                height: cfg.preview_height,
-            };
-            let block = ratatui::widgets::Block::bordered();
-            frame.render_widget(block, preview_rect);
-        }
-    }
+    draw_action_box(frame, picker_ui, action);
 
     draw_picker(
         frame,
@@ -369,6 +221,236 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     if crate::ui::no_color() {
         crate::ui::strip_colors(frame.buffer_mut());
     }
+}
+
+/// Rows the footer needs: preview nav hints when fullscreen, the sort menu, the nav hints of the
+/// focused pane, or the footer's own content. Excludes the separator row.
+fn footer_content_height(
+    state: &State,
+    ui: &UI,
+    footer_ui: &DisplayUI,
+    is_filter_mode: bool,
+    show_sort_menu: bool,
+    show_nav_hints: bool,
+) -> u16 {
+    if state.preview_fullscreen {
+        ui.config.nav_hints_height(PREVIEW_NAV_HINTS.len()).max(1)
+    } else if show_sort_menu {
+        ui.config.sort_menu.height(SORT_MENU_ITEMS.len())
+    } else if show_nav_hints {
+        let count = if is_filter_mode {
+            FILTER_NAV_HINTS.len()
+        } else {
+            match ui.config.nav.effective_profile() {
+                crate::config::NavProfile::Fm => NAV_HINTS.len(),
+                crate::config::NavProfile::List => LIST_NAV_HINTS.len(),
+                crate::config::NavProfile::Basic => BASIC_NAV_HINTS.len(),
+                crate::config::NavProfile::None => 0,
+            }
+        };
+        ui.config.nav_hints_height(count)
+    } else if footer_ui.show {
+        footer_ui.content_height()
+    } else {
+        0
+    }
+}
+
+/// Splits the pane left after the breadcrumb and footer into `[preview, picker, footer, gap]`:
+/// the preview takes it all when fullscreen; otherwise the gap is widened while splitting so the
+/// selection counter fits, a too-narrow first frame hides the preview, and a footer that is not
+/// full width comes out of the picker column.
+#[allow(clippy::too_many_arguments)]
+fn split_preview_area<T: SSS, S: Selection>(
+    state: &State,
+    picker_ui: &PickerUI<'_, T, S>,
+    preview_ui: &mut Option<PreviewUI>,
+    _area: Rect,
+    mut footer: Rect,
+    effective_footer_height: u16,
+    counter_gap_width: u16,
+    is_full_footer: bool,
+) -> [Rect; 4] {
+    if let Some(preview_ui) = preview_ui.as_mut()
+        && preview_ui.visible()
+    {
+        if state.preview_fullscreen {
+            let (preview, footer) = if footer.height > 0 {
+                (_area, footer)
+            } else {
+                let mut full_area = _area;
+                let f = split(&mut full_area, effective_footer_height, false);
+                (full_area, f)
+            };
+            [preview, Rect::default(), footer, Rect::default()]
+        } else {
+            // Temporarily widen the gap so the counter fits horizontally.
+            let original_gap = preview_ui.setting().map(|s| s.layout.gap).unwrap_or(0);
+            let effective_gap = original_gap.max(if counter_gap_width > 0 {
+                counter_gap_width + 2
+            } else {
+                0
+            });
+            if let Some(s) = preview_ui.setting_mut() {
+                s.layout.gap = effective_gap;
+            }
+            let [preview, mut picker_area, gap_area] = preview_ui.split(_area);
+            // Restore the configured gap so nothing else is affected.
+            if let Some(s) = preview_ui.setting_mut() {
+                s.layout.gap = original_gap;
+            }
+
+            if state.iterations == 0 && _area.width < 30 && picker_area.width <= 5 {
+                warn!("UI too narrow, hiding preview");
+                preview_ui.show(false);
+
+                [Rect::default(), _area, footer, Rect::default()]
+            } else {
+                if !is_full_footer {
+                    footer = split(
+                        &mut picker_area,
+                        effective_footer_height,
+                        picker_ui.reverse(),
+                    );
+                }
+
+                [preview, picker_area, footer, gap_area]
+            }
+        }
+    } else {
+        [Rect::default(), _area, footer, Rect::default()]
+    }
+}
+
+/// The nav-mode focus markers of the filter and the results (`None` outside nav mode), and the
+/// nav colour.
+fn focus_infos<T: SSS, S: Selection>(
+    state: &State,
+    ui: &UI,
+    picker_ui: &PickerUI<'_, T, S>,
+) -> (Color, Option<FocusInfo>, Option<FocusInfo>) {
+    let nav_color = ui.config.nav.color;
+    let nav_mode = ui.config.nav.active;
+    let nav_do_blink = ui.config.nav.blink;
+    let nav_bold = ui.config.nav.bold;
+    let nav_bar = ui.config.nav.bar;
+    let nav_marker = ui.config.nav.marker.clone();
+    let nav_char = picker_ui
+        .results
+        .config
+        .multi_prefix
+        .chars()
+        .next()
+        .unwrap_or('│')
+        .to_string();
+    let input_focus_info = nav_mode.then_some(FocusInfo {
+        focused: state.focus == Focus::Input,
+        blink_phase: state.focus_blink,
+        color: nav_color,
+        do_blink: nav_do_blink,
+        bold: nav_bold,
+        bar: None,
+        marker: String::new(),
+        nav_char: nav_char.clone(),
+        nav_prompt: ui.config.nav.prompt.clone(),
+    });
+    let results_focus_info = nav_mode.then_some(FocusInfo {
+        focused: state.focus == Focus::Results,
+        blink_phase: state.focus_blink,
+        color: nav_color,
+        do_blink: nav_do_blink,
+        bold: nav_bold,
+        bar: nav_bar,
+        marker: nav_marker,
+        nav_char,
+        nav_prompt: ui.config.nav.prompt.clone(),
+    });
+    (nav_color, input_focus_info, results_focus_info)
+}
+
+/// Draws the action box (fm rename/create input and its optional preview) centred in `action`.
+fn draw_action_box<T: SSS, S: Selection>(
+    frame: &mut Frame,
+    picker_ui: &mut PickerUI<'_, T, S>,
+    action: Rect,
+) {
+    if picker_ui.action_visible {
+        let cfg = &picker_ui.action_config;
+        // Apply width percentage — centered within the allocated row(s).
+        let action_w = cfg.width_pct.compute_clamped(action.width, 1, 0);
+        let x_pad = action.width.saturating_sub(action_w) / 2;
+        let action_full_rect = Rect {
+            x: action.x + x_pad,
+            y: action.y,
+            width: action_w,
+            height: action.height,
+        };
+        // Render the separator border (default: bottom line) over the full area.
+        // It only draws at the edges of `action_full_rect`, so the input and
+        // preview content rendered afterwards is not obscured.
+        if !cfg.border.is_empty() {
+            frame.render_widget(cfg.border.as_static_block(), action_full_rect);
+        }
+
+        let mut current_y = action_full_rect.y;
+
+        let action_input_rect = Rect {
+            x: action_full_rect.x,
+            y: current_y,
+            width: action_w,
+            height: action_full_rect.height.min(1),
+        };
+        render_input(frame, action_input_rect, &mut picker_ui.action, None, None);
+        current_y += 1;
+
+        // Render preview area below if preview_height > 0.
+        if cfg.preview_height > 0 && action_full_rect.height > current_y - action_full_rect.y {
+            let preview_rect = Rect {
+                x: action_full_rect.x,
+                y: current_y,
+                width: action_w,
+                height: cfg.preview_height,
+            };
+            let block = ratatui::widgets::Block::bordered();
+            frame.render_widget(block, preview_rect);
+        }
+    }
+}
+
+/// Moves a bottom footer up to sit right under the picker and preview content, and keeps the
+/// parent-peek pane above the footer and within `parent_peek.max` rows.
+fn fit_footer_and_peek<T: SSS, S: Selection>(
+    ui: &UI,
+    picker_ui: &PickerUI<'_, T, S>,
+    footer: Rect,
+    results: Rect,
+    preview: Rect,
+    mut parent_peek_rect: Rect,
+) -> (Rect, Rect) {
+    let mut footer = footer;
+    if !picker_ui.reverse() && footer.height > 0 {
+        let picker_bottom = results.y + results.height;
+        let preview_bottom = if preview.height > 0 {
+            preview.y + preview.height
+        } else {
+            0
+        };
+        let content_bottom = picker_bottom.max(preview_bottom);
+        if content_bottom < footer.y {
+            footer.y = content_bottom;
+        }
+    }
+
+    if parent_peek_rect.width > 0 {
+        if footer.height > 0 {
+            let available_h = footer.y.saturating_sub(parent_peek_rect.y);
+            parent_peek_rect.height = parent_peek_rect.height.min(available_h);
+        }
+        if let Some(max_h) = ui.config.parent_peek.max {
+            parent_peek_rect.height = parent_peek_rect.height.min(max_h);
+        }
+    }
+    (footer, parent_peek_rect)
 }
 
 /// What [`draw_picker`] reads; field names are the `draw_frame` locals it was moved from.
