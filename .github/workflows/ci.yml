@@ -111,9 +111,12 @@ jobs:
         run: |
           # Build against the dependency versions the workspace is tested with.
           cp Cargo.lock fuzz/Cargo.lock
+          # The installed cargo-fuzz is a musl build and defaults to its own target, where
+          # the address sanitizer cannot link; build for the runner's glibc host instead.
+          host=$(rustc +nightly -vV | sed -n 's/^host: //p')
           for target in $(cargo +nightly fuzz list); do
             echo "::group::$target"
-            cargo +nightly fuzz run "$target" -- -max_total_time=30
+            cargo +nightly fuzz run --target "$host" "$target" -- -max_total_time=30
             echo "::endgroup::"
           done
       - name: Upload crashing inputs
