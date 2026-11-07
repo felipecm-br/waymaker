@@ -296,23 +296,35 @@ fn nav_keys_sent_together_see_the_state_the_earlier_key_left() {
     assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
 }
 
-/// In navigation mode, help lists the nav binds in effect under their own heading, the
-/// fallback keys (such as `d`, half a page down) included. The preview keys follow below, past
-/// what this screen shows: the help pane does not scroll.
+/// In navigation mode, help lists the nav binds in effect, then the preview keys, each under its
+/// own heading. `u` scrolls the help up: the list profile does not bind it, so this is the
+/// fallback bind (half a page up) at work.
 #[test]
 fn nav_help_lists_nav_and_preview_binds() {
-    let wm = Launch::new(FRUIT)
-        .args(&[
+    let wm = Session::start(
+        FRUIT,
+        &[
             "ui.nav.active=true",
             "ui.nav.focus_on_start=picker",
             "b.f1",
             "Help",
-        ])
-        .size(200, 100)
-        .ready("banana")
-        .start();
+        ],
+    );
     wm.send("\x1bOP"); // F1
-    wm.wait_for_screen(|s| s.contains("Navigation") && s.contains("d = PreviewHalfPageDown"));
+    wm.wait_for_screen(|s| s.contains("= @Accept"));
+    wm.send("G"); // to the end of the help: the preview keys
+    wm.wait_for_screen(|s| s.contains("shift-up = PreviewUp(15)"));
+    let mut seen = (false, false);
+    for _ in 0..40 {
+        let screen = wm.current_screen();
+        seen.0 |= screen.contains("Preview (fullscreen or diagram)");
+        seen.1 |= screen.contains("Navigation");
+        if seen == (true, true) {
+            break;
+        }
+        wm.send("u");
+    }
+    assert_eq!(seen, (true, true), "{}", wm.current_screen());
     wm.send("q");
     assert_eq!(wm.finish().0, 130);
 }
