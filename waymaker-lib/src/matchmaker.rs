@@ -184,136 +184,8 @@ impl ConfigMatchmaker {
         // the computed number of columns, <= cc.max_columns = MAX_COLUMNS
         let col_count = worker.columns.len();
 
-        // Arc over box due to capturing
-        let splitter: SplitterFn<Either<Arc<str>, Box<Text<'static>>>> = match cc.split {
-            Split::Delimiter(ref rg) => {
-                let rg = rg.clone();
-                let names = cc.names.clone();
-                let col_count = worker.columns.len();
-                let mut has_named_group = false;
-
-                // Map named captures to column indices
-                let capture_to_idx: Vec<Option<usize>> = rg
-                    .capture_names()
-                    .enumerate()
-                    .map(|(i, name_opt)| {
-                        if i == 0 {
-                            None
-                        } else {
-                            name_opt.and_then(|name| {
-                                has_named_group = true;
-                                names.iter().position(|n| n.name.0 == name)
-                            })
-                        }
-                    })
-                    .collect();
-
-                // Determine the mode:
-                // 1. Named captures → capture_to_idx has at least one Some
-                // 2. All unnamed → capture_to_idx has at least one None beyond index 0
-                // 3. No capture groups → captures_len() == 1
-                let has_unnamed = rg.captures_len() > 1 && !has_named_group;
-
-                if has_named_group {
-                    log::debug!("Named regex: {rg} with {} groups", capture_to_idx.len());
-                    if capture_to_idx.iter().all(|x| x.is_none()) {
-                        ebog!("No capture group matches a column name");
-                        has_error = true;
-                    }
-
-                    // Named capture groups
-                    Arc::new(move |s| {
-                        let s = &s.to_cow();
-                        let mut ranges = vec![(0u32, 0u32); col_count];
-
-                        if let Some(caps) = rg.captures(s) {
-                            for (group_idx, col_idx_opt) in
-                                capture_to_idx.iter().enumerate().skip(1)
-                            {
-                                if let Some(col_idx) = col_idx_opt
-                                    && let Some(m) = caps.get(group_idx)
-                                {
-                                    ranges[*col_idx] = (m.start() as u32, m.end() as u32);
-                                }
-                            }
-                        }
-
-                        ColumnRanges::from(ranges)
-                    })
-                } else if has_unnamed {
-                    log::debug!(
-                        "Unnamed regex: {rg} with {} groups",
-                        capture_to_idx.len() - 1
-                    );
-
-                    // All unnamed capture groups → map in order
-                    Arc::new(move |s| {
-                        let s = &s.to_cow();
-                        let mut ranges = vec![(0u32, 0u32); col_count];
-                        if let Some(caps) = rg.captures(s) {
-                            for (i, group) in caps.iter().skip(1).enumerate().take(col_count) {
-                                if let Some(m) = group {
-                                    ranges[i] = (m.start() as u32, m.end() as u32);
-                                }
-                            }
-                        }
-
-                        ColumnRanges::from(ranges)
-                    })
-                } else {
-                    log::debug!("Delimiter regex: {rg}");
-
-                    // No capture groups → normal delimiter split
-                    if col_count <= 2 {
-                        Arc::new(move |s| {
-                            let s = &s.to_cow();
-                            let mut ranges = arrayvec::ArrayVec::<(u32, u32), 2>::new();
-                            let mut last_end = 0;
-
-                            for m in rg.find_iter(s).take(col_count - 1) {
-                                ranges.push((last_end as u32, m.start() as u32));
-                                last_end = m.end();
-                            }
-
-                            ranges.push((last_end as u32, s.len() as u32));
-                            ColumnRanges::Inline(ranges)
-                        })
-                    } else {
-                        Arc::new(move |s| {
-                            let s = &s.to_cow();
-                            let mut ranges = Vec::with_capacity(col_count);
-                            let mut last_end = 0;
-
-                            for m in rg.find_iter(s).take(col_count - 1) {
-                                ranges.push((last_end as u32, m.start() as u32));
-                                last_end = m.end();
-                            }
-
-                            ranges.push((last_end as u32, s.len() as u32));
-                            ColumnRanges::Multi(ranges.into_boxed_slice())
-                        })
-                    }
-                }
-            }
-            // not recommended but its supported ig
-            Split::Regexes(ref rgs) => {
-                let rgs = rgs.clone(); // or Arc
-                Arc::new(move |s| {
-                    let s = &s.to_cow();
-                    let mut ranges = Vec::with_capacity(col_count);
-
-                    for re in rgs.iter().take(col_count) {
-                        if let Some(m) = re.find(s) {
-                            ranges.push((m.start() as u32, m.end() as u32));
-                        } else {
-                            ranges.push((0, 0));
-                        }
-                    }
-                    ColumnRanges::from(ranges)
-                })
-            }
-            Split::None => Arc::new(|s| ColumnRanges::single(0u32, s.byte_len() as u32)),
-        };
+        let (splitter, splitter_error) = make_splitter(&cc, &worker, col_count);
+        has_error |= splitter_error;
         let injector = IndexedInjector::new_globally_indexed(injector);
         let injector = SegmentedInjector::new(injector, splitter.clone());
         let injector = AnsiInjector::new(injector, preprocess_config);
@@ -345,6 +217,147 @@ impl ConfigMatchmaker {
 
         (new, injector, misc)
     }
+}
+
+/// The function that splits an item into column ranges, from `[columns] split`: a regex's named
+/// captures (by column name), its unnamed captures (in order), or its matches as delimiters; a
+/// list of regexes (one per column); or the whole item. Also returns whether named captures
+/// matched no column name.
+fn make_splitter(
+    cc: &ColumnsConfig,
+    worker: &Worker<ConfigMMItem>,
+    col_count: usize,
+) -> (SplitterFn<Either<Arc<str>, Box<Text<'static>>>>, bool) {
+    let mut has_error = false;
+    // Arc over box due to capturing
+    let splitter: SplitterFn<Either<Arc<str>, Box<Text<'static>>>> = match cc.split {
+        Split::Delimiter(ref rg) => {
+            let rg = rg.clone();
+            let names = cc.names.clone();
+            let col_count = worker.columns.len();
+            let mut has_named_group = false;
+
+            // Map named captures to column indices
+            let capture_to_idx: Vec<Option<usize>> = rg
+                .capture_names()
+                .enumerate()
+                .map(|(i, name_opt)| {
+                    if i == 0 {
+                        None
+                    } else {
+                        name_opt.and_then(|name| {
+                            has_named_group = true;
+                            names.iter().position(|n| n.name.0 == name)
+                        })
+                    }
+                })
+                .collect();
+
+            // Determine the mode:
+            // 1. Named captures → capture_to_idx has at least one Some
+            // 2. All unnamed → capture_to_idx has at least one None beyond index 0
+            // 3. No capture groups → captures_len() == 1
+            let has_unnamed = rg.captures_len() > 1 && !has_named_group;
+
+            if has_named_group {
+                log::debug!("Named regex: {rg} with {} groups", capture_to_idx.len());
+                if capture_to_idx.iter().all(|x| x.is_none()) {
+                    ebog!("No capture group matches a column name");
+                    has_error = true;
+                }
+
+                // Named capture groups
+                Arc::new(move |s| {
+                    let s = &s.to_cow();
+                    let mut ranges = vec![(0u32, 0u32); col_count];
+
+                    if let Some(caps) = rg.captures(s) {
+                        for (group_idx, col_idx_opt) in capture_to_idx.iter().enumerate().skip(1) {
+                            if let Some(col_idx) = col_idx_opt
+                                && let Some(m) = caps.get(group_idx)
+                            {
+                                ranges[*col_idx] = (m.start() as u32, m.end() as u32);
+                            }
+                        }
+                    }
+
+                    ColumnRanges::from(ranges)
+                })
+            } else if has_unnamed {
+                log::debug!(
+                    "Unnamed regex: {rg} with {} groups",
+                    capture_to_idx.len() - 1
+                );
+
+                // All unnamed capture groups → map in order
+                Arc::new(move |s| {
+                    let s = &s.to_cow();
+                    let mut ranges = vec![(0u32, 0u32); col_count];
+                    if let Some(caps) = rg.captures(s) {
+                        for (i, group) in caps.iter().skip(1).enumerate().take(col_count) {
+                            if let Some(m) = group {
+                                ranges[i] = (m.start() as u32, m.end() as u32);
+                            }
+                        }
+                    }
+
+                    ColumnRanges::from(ranges)
+                })
+            } else {
+                log::debug!("Delimiter regex: {rg}");
+
+                // No capture groups → normal delimiter split
+                if col_count <= 2 {
+                    Arc::new(move |s| {
+                        let s = &s.to_cow();
+                        let mut ranges = arrayvec::ArrayVec::<(u32, u32), 2>::new();
+                        let mut last_end = 0;
+
+                        for m in rg.find_iter(s).take(col_count - 1) {
+                            ranges.push((last_end as u32, m.start() as u32));
+                            last_end = m.end();
+                        }
+
+                        ranges.push((last_end as u32, s.len() as u32));
+                        ColumnRanges::Inline(ranges)
+                    })
+                } else {
+                    Arc::new(move |s| {
+                        let s = &s.to_cow();
+                        let mut ranges = Vec::with_capacity(col_count);
+                        let mut last_end = 0;
+
+                        for m in rg.find_iter(s).take(col_count - 1) {
+                            ranges.push((last_end as u32, m.start() as u32));
+                            last_end = m.end();
+                        }
+
+                        ranges.push((last_end as u32, s.len() as u32));
+                        ColumnRanges::Multi(ranges.into_boxed_slice())
+                    })
+                }
+            }
+        }
+        // not recommended but its supported ig
+        Split::Regexes(ref rgs) => {
+            let rgs = rgs.clone(); // or Arc
+            Arc::new(move |s| {
+                let s = &s.to_cow();
+                let mut ranges = Vec::with_capacity(col_count);
+
+                for re in rgs.iter().take(col_count) {
+                    if let Some(m) = re.find(s) {
+                        ranges.push((m.start() as u32, m.end() as u32));
+                    } else {
+                        ranges.push((0, 0));
+                    }
+                }
+                ColumnRanges::from(ranges)
+            })
+        }
+        Split::None => Arc::new(|s| ColumnRanges::single(0u32, s.byte_len() as u32)),
+    };
+    (splitter, has_error)
 }
 
 impl<T: SSS, S: Selection> Matchmaker<T, S> {
