@@ -201,6 +201,46 @@ pub(super) fn apply_sort_menu<A: ActionExt>(
     *buffer = out;
 }
 
+/// The fixed keys of a fullscreen or diagram preview: scrolling, diagram controls, accept and
+/// abort. `g`/`G`, Esc/Enter and the rest are handled by [`process_results_nav_key`].
+fn preview_key_action<A: ActionExt>(key: &str) -> Option<Action<A>> {
+    Some(match key {
+        "j" | "down" | "Down" => Action::PreviewDown(3),
+        "k" | "up" | "Up" => Action::PreviewUp(3),
+        "h" | "left" | "Left" => Action::PreviewHScroll(-6),
+        "l" | "right" | "Right" => Action::PreviewHScroll(6),
+        "J" | "shift-j" | "shift-down" | "Shift-Down" | "Shift-down" => Action::PreviewDown(15),
+        "K" | "shift-k" | "shift-up" | "Shift-Up" | "Shift-up" => Action::PreviewUp(15),
+        "H" | "shift-left" | "Shift-Left" | "Shift-left" => Action::PreviewHScroll(-18),
+        "L" | "shift-right" | "Shift-Right" | "Shift-right" => Action::PreviewHScroll(18),
+        "ctrl-u" | "u" => Action::PreviewHalfPageUp,
+        "ctrl-d" | "d" => Action::PreviewHalfPageDown,
+        "s" => Action::ToggleDiagram,
+        "n" | "]" => Action::NextDiagram,
+        "N" | "[" => Action::PrevDiagram,
+        "+" | "=" => Action::DiagramZoomIn,
+        "-" => Action::DiagramZoomOut,
+        "0" => Action::DiagramResetZoom,
+        "y" => Action::Accept,
+        "ctrl-c" => Action::Abort(130),
+        _ => return None,
+    })
+}
+
+/// Emits the actions of a nav bind, tracking the focus each one moves to.
+fn push_nav_actions<A: ActionExt>(
+    actions: &crate::action::Actions<NullActionExt>,
+    sim_focus: &mut Focus,
+    out: &mut Vec<RenderCommand<A>>,
+) {
+    for action in actions.iter().cloned() {
+        if let Some(action) = action_from_null::<A>(action) {
+            update_sim_focus(&action, sim_focus);
+            out.push(RenderCommand::Action(action));
+        }
+    }
+}
+
 #[inline]
 pub(super) fn get_nav_bind<'a>(
     focus_binds: &'a std::collections::HashMap<String, crate::action::Actions<NullActionExt>>,
@@ -274,47 +314,11 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
     preview_diagram_mode: bool,
 ) {
     if preview_fullscreen || preview_diagram_mode {
+        if let Some(action) = preview_key_action(key) {
+            out.push(RenderCommand::Action(action));
+            return;
+        }
         match key {
-            "j" | "down" | "Down" => {
-                out.push(RenderCommand::Action(Action::PreviewDown(3)));
-                return;
-            }
-            "k" | "up" | "Up" => {
-                out.push(RenderCommand::Action(Action::PreviewUp(3)));
-                return;
-            }
-            "h" | "left" | "Left" => {
-                out.push(RenderCommand::Action(Action::PreviewHScroll(-6)));
-                return;
-            }
-            "l" | "right" | "Right" => {
-                out.push(RenderCommand::Action(Action::PreviewHScroll(6)));
-                return;
-            }
-            "J" | "shift-j" | "shift-down" | "Shift-Down" | "Shift-down" => {
-                out.push(RenderCommand::Action(Action::PreviewDown(15)));
-                return;
-            }
-            "K" | "shift-k" | "shift-up" | "Shift-Up" | "Shift-up" => {
-                out.push(RenderCommand::Action(Action::PreviewUp(15)));
-                return;
-            }
-            "H" | "shift-left" | "Shift-Left" | "Shift-left" => {
-                out.push(RenderCommand::Action(Action::PreviewHScroll(-18)));
-                return;
-            }
-            "L" | "shift-right" | "Shift-Right" | "Shift-right" => {
-                out.push(RenderCommand::Action(Action::PreviewHScroll(18)));
-                return;
-            }
-            "ctrl-u" | "u" => {
-                out.push(RenderCommand::Action(Action::PreviewHalfPageUp));
-                return;
-            }
-            "ctrl-d" | "d" => {
-                out.push(RenderCommand::Action(Action::PreviewHalfPageDown));
-                return;
-            }
             "g" => {
                 if *pending_nav_key == Some('g') {
                     *pending_nav_key = None;
@@ -329,38 +333,6 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
                 out.push(RenderCommand::Action(Action::PreviewDown(0)));
                 return;
             }
-            "s" => {
-                out.push(RenderCommand::Action(Action::ToggleDiagram));
-                return;
-            }
-            "n" | "]" => {
-                out.push(RenderCommand::Action(Action::NextDiagram));
-                return;
-            }
-            "N" | "[" => {
-                out.push(RenderCommand::Action(Action::PrevDiagram));
-                return;
-            }
-            "+" | "=" => {
-                out.push(RenderCommand::Action(Action::DiagramZoomIn));
-                return;
-            }
-            "-" => {
-                out.push(RenderCommand::Action(Action::DiagramZoomOut));
-                return;
-            }
-            "0" => {
-                out.push(RenderCommand::Action(Action::DiagramResetZoom));
-                return;
-            }
-            "y" => {
-                out.push(RenderCommand::Action(Action::Accept));
-                return;
-            }
-            "ctrl-c" => {
-                out.push(RenderCommand::Action(Action::Abort(130)));
-                return;
-            }
             k if k.eq_ignore_ascii_case("esc") || (preview_fullscreen && k == "enter") => {
                 *sim_focus = Focus::Input;
                 out.push(RenderCommand::Action(Action::CyclePreview));
@@ -369,12 +341,7 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
             k => {
                 *pending_nav_key = None;
                 if let Some(actions) = get_nav_bind(focus_binds, k) {
-                    for action in actions.iter().cloned() {
-                        if let Some(action) = action_from_null::<A>(action) {
-                            update_sim_focus(&action, sim_focus);
-                            out.push(RenderCommand::Action(action));
-                        }
-                    }
+                    push_nav_actions(actions, sim_focus, out);
                     return;
                 }
                 if let Some(action) = fallback_action {
@@ -458,58 +425,33 @@ pub(super) fn process_results_nav_key<A: ActionExt>(
             if key == "g" {
                 let seq = "gg".to_string();
                 if let Some(actions) = get_nav_bind(focus_binds, &seq) {
-                    for action in actions.iter().cloned() {
-                        if let Some(action) = action_from_null::<A>(action) {
-                            update_sim_focus(&action, sim_focus);
-                            out.push(RenderCommand::Action(action));
-                        }
-                    }
+                    push_nav_actions(actions, sim_focus, out);
                 } else {
                     out.push(RenderCommand::Action(Action::PreviewUp(0)));
                 }
             } else if key == "t" {
                 let seq = "gt".to_string();
                 if let Some(actions) = get_nav_bind(focus_binds, &seq) {
-                    for action in actions.iter().cloned() {
-                        if let Some(action) = action_from_null::<A>(action) {
-                            update_sim_focus(&action, sim_focus);
-                            out.push(RenderCommand::Action(action));
-                        }
-                    }
+                    push_nav_actions(actions, sim_focus, out);
                 } else {
                     out.push(RenderCommand::Action(Action::Pos(0)));
                 }
             } else if key == "b" {
                 let seq = "gb".to_string();
                 if let Some(actions) = get_nav_bind(focus_binds, &seq) {
-                    for action in actions.iter().cloned() {
-                        if let Some(action) = action_from_null::<A>(action) {
-                            update_sim_focus(&action, sim_focus);
-                            out.push(RenderCommand::Action(action));
-                        }
-                    }
+                    push_nav_actions(actions, sim_focus, out);
                 } else {
                     out.push(RenderCommand::Action(Action::Pos(-1)));
                 }
             } else if let Some(actions) = get_nav_bind(focus_binds, key) {
-                for action in actions.iter().cloned() {
-                    if let Some(action) = action_from_null::<A>(action) {
-                        update_sim_focus(&action, sim_focus);
-                        out.push(RenderCommand::Action(action));
-                    }
-                }
+                push_nav_actions(actions, sim_focus, out);
             }
         }
         _ => {
             if key == "g" && !focus_binds.contains_key("g") {
                 *pending_nav_key = Some('g');
             } else if let Some(actions) = get_nav_bind(focus_binds, key) {
-                for action in actions.iter().cloned() {
-                    if let Some(action) = action_from_null::<A>(action) {
-                        update_sim_focus(&action, sim_focus);
-                        out.push(RenderCommand::Action(action));
-                    }
-                }
+                push_nav_actions(actions, sim_focus, out);
             } else if let Some(action) = fallback_action {
                 match &action {
                     Action::ToggleFocus => {
@@ -617,12 +559,7 @@ pub(super) fn apply_focus_binds_mode<A: ActionExt>(
                 }
                 if sim_focus == Focus::Results {
                     if let Some(actions) = get_nav_bind(focus_binds, "esc") {
-                        for action in actions.iter().cloned() {
-                            if let Some(action) = action_from_null::<A>(action) {
-                                update_sim_focus(&action, &mut sim_focus);
-                                out.push(RenderCommand::Action(action));
-                            }
-                        }
+                        push_nav_actions(actions, &mut sim_focus, &mut out);
                     } else {
                         out.push(RenderCommand::Action(Action::Quit(130)));
                     }
