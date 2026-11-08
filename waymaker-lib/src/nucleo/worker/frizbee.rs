@@ -1,9 +1,12 @@
+#[cfg(feature = "frizbee")]
 use std::borrow::Cow;
 
+#[cfg(feature = "frizbee")]
 use super::{
     Worker,
     sort::{cmp_ascii_case_insensitive, compute_item_score, get_item_tier_and_clean_path},
 };
+#[cfg(feature = "frizbee")]
 use crate::SSS;
 
 /// Cached result set for the Frizbee matcher engine.
@@ -16,6 +19,7 @@ pub struct FrizbeeWorkerCache {
     pub ranked_indices: Vec<(u32, u8)>,
 }
 
+#[cfg(feature = "frizbee")]
 impl<T: SSS> Worker<T> {
     /// Ensure the Frizbee search cache is fresh for the current query and snapshot.
     /// Returns true if the cache was updated, false if it was already up to date.
@@ -249,7 +253,7 @@ impl<T: SSS> Worker<T> {
             .into_iter()
             .map(|(idx, tier, _)| (idx, tier))
             .collect();
-        return true;
+        true
     }
 
     /// Retrieve all currently matched items using the frizbee engine for scoring,

@@ -988,7 +988,7 @@ impl Previewer {
         }
     }
 
-    fn reset_markdown_preview_state(&mut self, path: &String, width: Option<usize>) {
+    fn reset_markdown_preview_state(&mut self, path: &str, width: Option<usize>) {
         if !self.config.delay_clear {
             self.clear_image();
             self.clear_string();
@@ -1013,12 +1013,12 @@ impl Previewer {
         {
             let mut iter = s.iter();
             let mut program = Command::new(iter.next().unwrap());
-            program.args(iter).arg(&cmd);
+            program.args(iter).arg(cmd);
             program
-        } else if let Some(direct) = try_parse_simple_command(&cmd) {
+        } else if let Some(direct) = try_parse_simple_command(cmd) {
             direct
         } else {
-            Command::from_script(&cmd)
+            Command::from_script(cmd)
         }
     }
 }

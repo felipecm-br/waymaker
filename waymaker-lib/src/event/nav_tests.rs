@@ -230,18 +230,18 @@ fn test_apply_focus_binds_sequences() {
 
 fn assert_focus_binds_sort_menu(
     focus_binds: &HashMap<String, Actions<NullActionExt>>,
-    mut pending: &mut Option<char>,
-    mut sort_menu_active: &mut bool,
+    pending: &mut Option<char>,
+    sort_menu_active: &mut bool,
 ) {
     // Test ',' opens sort menu
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char(','))];
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
     );
     assert_eq!(buffer.len(), 1);
@@ -253,10 +253,10 @@ fn assert_focus_binds_sort_menu(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
     );
     assert_eq!(buffer.len(), 1);
@@ -272,10 +272,10 @@ fn assert_focus_binds_sort_menu(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
     );
     assert_eq!(buffer.len(), 1);
@@ -291,10 +291,10 @@ fn assert_focus_binds_sort_menu(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
     );
     assert_eq!(buffer.len(), 0);
@@ -819,18 +819,18 @@ fn test_preview_fullscreen_key_navigation() {
 
 fn assert_preview_fullscreen_diagram_and_jumps(
     focus_binds: &HashMap<String, Actions<NullActionExt>>,
-    mut pending: &mut Option<char>,
-    mut sort_menu_active: &mut bool,
+    pending: &mut Option<char>,
+    sort_menu_active: &mut bool,
 ) {
     // s when preview_fullscreen is true -> ToggleDiagram
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char('s'))];
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -847,10 +847,10 @@ fn assert_preview_fullscreen_diagram_and_jumps(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -867,10 +867,10 @@ fn assert_preview_fullscreen_diagram_and_jumps(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -881,10 +881,10 @@ fn assert_preview_fullscreen_diagram_and_jumps(
     apply_focus_binds(
         &mut buffer,
         Focus::Input,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -900,10 +900,10 @@ fn assert_preview_fullscreen_diagram_and_jumps(
     apply_focus_binds(
         &mut buffer,
         Focus::Input,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -917,10 +917,10 @@ fn assert_preview_fullscreen_diagram_and_jumps(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -933,10 +933,10 @@ fn assert_preview_fullscreen_diagram_and_jumps(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -953,10 +953,10 @@ fn assert_preview_fullscreen_diagram_and_jumps(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -969,10 +969,10 @@ fn assert_preview_fullscreen_diagram_and_jumps(
     apply_focus_binds(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         true,
     );
     assert_eq!(buffer.len(), 1);
@@ -1083,19 +1083,19 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
 
 fn assert_diagram_zoom_reset_and_fallback_scroll(
     focus_binds: &HashMap<String, Actions<NullActionExt>>,
-    mut pending: &mut Option<char>,
-    mut sort_menu_active: &mut bool,
+    pending: &mut Option<char>,
+    sort_menu_active: &mut bool,
 ) {
     // 2. '0' resets zoom
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char('0'))];
     apply_focus_binds_mode(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         &HashMap::new(),
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
         true,
     );
@@ -1110,11 +1110,11 @@ fn assert_diagram_zoom_reset_and_fallback_scroll(
     apply_focus_binds_mode(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         &HashMap::new(),
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
         true,
     );
@@ -1128,11 +1128,11 @@ fn assert_diagram_zoom_reset_and_fallback_scroll(
     apply_focus_binds_mode(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         &HashMap::new(),
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
         true,
     );
@@ -1146,11 +1146,11 @@ fn assert_diagram_zoom_reset_and_fallback_scroll(
     apply_focus_binds_mode(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         &HashMap::new(),
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
         true,
     );
@@ -1168,11 +1168,11 @@ fn assert_diagram_zoom_reset_and_fallback_scroll(
     apply_focus_binds_mode(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         &HashMap::new(),
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
         false,
     );
@@ -1189,11 +1189,11 @@ fn assert_diagram_zoom_reset_and_fallback_scroll(
     apply_focus_binds_mode(
         &mut buffer,
         Focus::Results,
-        &focus_binds,
+        focus_binds,
         &HashMap::new(),
         false,
-        &mut pending,
-        &mut sort_menu_active,
+        pending,
+        sort_menu_active,
         false,
         false,
     );

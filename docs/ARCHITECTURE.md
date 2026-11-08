@@ -16,7 +16,7 @@ A running picker is three cooperating parts connected by unbounded `tokio::mpsc`
 
 - **Event loop**: `EventLoop::run` in [`waymaker-lib/src/event.rs`](../waymaker-lib/src/event.rs). Reads terminal input (crossterm `EventStream`), ticks, termination signals and controller events; looks keys up in the bind map; sends `RenderCommand`s.
 - **Render loop**: `render_loop` in [`waymaker-lib/src/render/mod.rs`](../waymaker-lib/src/render/mod.rs). Owns all UI state. Drains commands in batches, applies actions, runs interrupt and event handlers, draws.
-- **Worker**: `Worker` in [`waymaker-lib/src/nucleo/worker.rs`](../waymaker-lib/src/nucleo/worker.rs), wrapping nucleo's matcher threads. Input is pushed through an injector (`WorkerInjector` in [`nucleo/injector.rs`](../waymaker-lib/src/nucleo/injector.rs)) by whichever task reads stdin or the start command (`map_reader_batched` in [`waymaker-cli/src/start/ingest.rs`](../waymaker-cli/src/start/ingest.rs)).
+- **Worker**: `Worker` in [`waymaker-lib/src/nucleo/worker/mod.rs`](../waymaker-lib/src/nucleo/worker/mod.rs), wrapping nucleo's matcher threads. Input is pushed through an injector (`WorkerInjector` in [`nucleo/injector.rs`](../waymaker-lib/src/nucleo/injector.rs)) by whichever task reads stdin or the start command (`map_reader_batched` in [`waymaker-cli/src/start/ingest.rs`](../waymaker-cli/src/start/ingest.rs)).
 
 `Matchmaker::pick` in [`waymaker-lib/src/matchmaker.rs`](../waymaker-lib/src/matchmaker.rs) builds these, spawns the event loop, and runs the render loop until it returns the selection.
 
@@ -101,8 +101,8 @@ The previewer is one such handler. `make_previewer` in [`matchmaker.rs`](../waym
 | A new built-in action | `Action` in [`action.rs`](../waymaker-lib/src/action.rs), `handle_action` |
 | A new CLI-only action | `MMAction` and `action_handler` in `waymaker-cli/src/action/` |
 | Something must run a process | an `Interrupt` plus a handler in `register.rs` |
-| Ranking and sorting | `Worker` in `nucleo/worker.rs` |
+| Ranking and sorting | `Worker` in `nucleo/worker/` |
 | Input parsing and columns | `start/ingest.rs`, `nucleo/injector.rs` |
 | Layout and drawing | `render/frame.rs`, `render/draw.rs`, `ui/` |
 | Preview behaviour | `preview/previewer.rs`, `make_previewer` |
-| Config shape | `waymaker-lib/src/config.rs`, `waymaker-cli/src/config.rs` |
+| Config shape | `waymaker-lib/src/config/`, `waymaker-cli/src/config.rs` |

@@ -1206,11 +1206,11 @@ fn configure_sort_threshold(sort: bool, worker: &mut waymaker::config::WorkerCon
     }
 }
 
-fn fill_first_additional_command(additional_commands: &mut [String], command: &String) {
+fn fill_first_additional_command(additional_commands: &mut [String], command: &str) {
     if let Some(first) = additional_commands.first_mut()
         && first.is_empty()
     {
-        *first = command.clone();
+        *first = command.to_owned();
     }
 }
 
@@ -1222,9 +1222,9 @@ fn select_command(initial_index: usize, additional_commands: &[String], command:
     }
 }
 
-fn select_initial_cmd(command: &String, no_read: bool) -> String {
+fn select_initial_cmd(command: &str, no_read: bool) -> String {
     if !command.is_empty() && std::io::stdin().is_terminal() || no_read {
-        command.clone()
+        command.to_owned()
     } else {
         String::new()
     }
@@ -1251,7 +1251,7 @@ fn nav_help_binds(
 }
 
 fn init_event_loop_mode(event_loop: &EventLoop<MMAction>, mode: Option<String>, initial_cmd: &str) {
-    let mode = bind_mode(mode, &initial_cmd);
+    let mode = bind_mode(mode, initial_cmd);
     log::trace!("mode: {}", mode);
     event_loop.input_state().set_mode(mode);
 }
@@ -1277,7 +1277,7 @@ fn send_initial_mode_index(initial_index: usize, render_tx: &RenderSender<MMActi
 
 fn maybe_spawn_reload_ticker(reload_interval: Option<u64>, render_tx: &RenderSender<MMAction>) {
     if let Some(interval) = reload_interval {
-        spawn_reload_ticker(interval, &render_tx);
+        spawn_reload_ticker(interval, render_tx);
     }
 }
 
@@ -1293,7 +1293,7 @@ fn cli_formatter_fn() -> CliFormatter {
 }
 
 fn build_cli_previewer(
-    mut mm: &mut waymaker::ConfigMatchmaker,
+    mm: &mut waymaker::ConfigMatchmaker,
     previewer: waymaker::config::PreviewerConfig,
     cli_formatter: &CliFormatter,
     binds: BindMap<MMAction>,
@@ -1303,7 +1303,7 @@ fn build_cli_previewer(
     )>,
 ) -> waymaker::preview::previewer::Previewer {
     make_previewer(
-        &mut mm,
+        mm,
         previewer,
         cli_formatter.clone(),
         Box::new(move |config, mode| {
@@ -1323,10 +1323,10 @@ fn build_cli_previewer(
 
 #[allow(clippy::too_many_arguments)]
 fn register_cli_handlers(
-    mut mm: &mut waymaker::ConfigMatchmaker,
+    mm: &mut waymaker::ConfigMatchmaker,
     cli_formatter: CliFormatter,
     print_handle: &AppendOnly<String>,
-    output_separator: &String,
+    output_separator: &str,
     copy_trailing_newline: bool,
     render_tx: &RenderSender<MMAction>,
     all_rules: Vec<crate::config::PathRule>,
@@ -1341,11 +1341,11 @@ fn register_cli_handlers(
     group_prefix: Option<String>,
 ) -> SharedNav {
     register_handlers(
-        &mut mm,
+        mm,
         HandlerDeps {
             cli_formatter,
             print_handle: print_handle.clone(),
-            output_separator: output_separator.clone(),
+            output_separator: output_separator.to_owned(),
             copy_trailing_newline,
             render_tx: render_tx.clone(),
             all_rules,
@@ -1368,7 +1368,7 @@ fn new_action_context(
     initial_index: usize,
     output_template: Option<String>,
     print_handle: &AppendOnly<String>,
-    output_separator: &String,
+    output_separator: &str,
     nav_notify: bool,
     nav: SharedNav,
 ) -> ActionContext {
@@ -1378,7 +1378,7 @@ fn new_action_context(
         additional_commands: (additional_commands, initial_index),
         output_template,
         print_handle: print_handle.clone(),
-        output_separator: output_separator.clone(),
+        output_separator: output_separator.to_owned(),
         clipboard: Arc::new(Mutex::new(None)),
         fm_notify: nav_notify,
         undo_stack: Arc::new(Mutex::new(Vec::new())),

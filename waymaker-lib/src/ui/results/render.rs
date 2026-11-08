@@ -1426,7 +1426,7 @@ impl ResultsUI {
     #[allow(clippy::too_many_arguments)]
     fn decorate_cut_col_icon_and_symlink(
         &self,
-        mut t: &mut ratatui::text::Text<'_>,
+        t: &mut ratatui::text::Text<'_>,
         icon_name: &str,
         is_selected: bool,
         is_current_row: bool,
@@ -1440,8 +1440,8 @@ impl ResultsUI {
     ) {
         if self.config.icons {
             insert_icon_span(
-                &mut t,
-                &icon_name,
+                t,
+                icon_name,
                 !is_selected && nav_bar_span.is_some(),
                 is_current_row,
                 self.config.uncolor_current_icon,
@@ -1452,13 +1452,13 @@ impl ResultsUI {
                 is_cut,
                 self.mode_index,
                 &self.config,
-                self.get_flash_op(&icon_name, cwd),
+                self.get_flash_op(icon_name, cwd),
             );
         }
         if self.config.symlink.active {
             maybe_append_symlink_target(
-                &mut t,
-                &icon_name,
+                t,
+                icon_name,
                 self.config.symlink.style.into(),
                 widths[target_prefix_col],
             );
@@ -1522,7 +1522,7 @@ impl ResultsUI {
         col_idx: usize,
         height: u16,
         b_color: Option<ratatui::style::Color>,
-        prefix: &String,
+        prefix: &str,
         icon_name: &str,
         is_selected: bool,
         is_spinner: bool,
@@ -1539,9 +1539,9 @@ impl ResultsUI {
 
         prefix_span(
             col,
-            prefix.clone(),
-            self.active_prefix_style(&icon_name, is_selected, is_spinner, cwd),
-            self.inactive_prefix_style(&icon_name, is_selected, is_spinner, cwd),
+            prefix.to_owned(),
+            self.active_prefix_style(icon_name, is_selected, is_spinner, cwd),
+            self.inactive_prefix_style(icon_name, is_selected, is_spinner, cwd),
             is_current_row,
             if !is_selected {
                 nav_bar_span.clone()
@@ -1554,7 +1554,7 @@ impl ResultsUI {
         if self.config.icons && col_idx == 0 {
             insert_icon_span(
                 col,
-                &icon_name,
+                icon_name,
                 !is_selected && nav_bar_span.is_some(),
                 is_current_row,
                 self.config.uncolor_current_icon,
@@ -1565,13 +1565,13 @@ impl ResultsUI {
                 is_cut,
                 self.mode_index,
                 &self.config,
-                self.get_flash_op(&icon_name, cwd),
+                self.get_flash_op(icon_name, cwd),
             );
         }
         if self.config.symlink.active && col_idx == 0 {
             maybe_append_symlink_target(
                 col,
-                &icon_name,
+                icon_name,
                 self.config.symlink.style.into(),
                 self.width,
             );
@@ -1599,7 +1599,7 @@ impl ResultsUI {
         is_current_row: bool,
         is_topside_tier_underlined: bool,
         b_color: Option<ratatui::style::Color>,
-        prefix: &String,
+        prefix: &str,
         icon_name: String,
         is_selected: bool,
         is_pinned: bool,
@@ -1643,7 +1643,7 @@ impl ResultsUI {
                 if x == target_prefix_col {
                     prefix_span(
                         &mut t,
-                        prefix.clone(),
+                        prefix.to_owned(),
                         self.active_prefix_style(&icon_name, is_selected, is_spinner, cwd),
                         self.inactive_prefix_style(
                             &icon_name,

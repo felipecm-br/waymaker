@@ -88,7 +88,7 @@ Releasing is the explicit "ship it" step, intentionally decoupled from coding ta
 
 ## Navigation Hints
 
-- Start in `waymaker-cli/src/config.rs` and `waymaker-lib/src/config.rs` for config shape questions.
+- Start in `waymaker-cli/src/config.rs` and `waymaker-lib/src/config/` for config shape questions.
 - Start in `waymaker-lib/src/action.rs`, `waymaker-lib/src/matchmaker.rs`, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for action flow or TUI behavior.
 - Start in `waymaker-cli/assets/config.toml` and `waymaker-cli/assets/presets/` for default UX and preset behavior.
 - Start in `waymaker-partial/tests/` for expected merge semantics and macro edge cases.

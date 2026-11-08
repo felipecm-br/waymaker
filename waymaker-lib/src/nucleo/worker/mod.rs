@@ -727,7 +727,7 @@ impl<T: SSS> Worker<T> {
         } else if should_sort {
             self.sorted_window(
                 snapshot,
-                &status,
+                status,
                 start,
                 end,
                 effective_sort_order,
