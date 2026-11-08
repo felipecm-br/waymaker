@@ -676,6 +676,14 @@ pub struct QueryConfig {
     #[partial(alias = "i")]
     pub initial: String,
 
+    /// File that keeps accepted queries, recalled with `HistoryPrev`/`HistoryNext` (fzf's
+    /// `--history`). Empty disables history. `wm` resolves `"auto"` to a file per preset in the
+    /// state directory.
+    pub history: String,
+
+    /// Most queries the history file keeps. Default 1000.
+    pub history_size: usize,
+
     /// Maintain padding when moving the cursor in the bar.
     pub scroll_padding: bool,
 
@@ -722,6 +730,8 @@ impl Default for QueryConfig {
             prompt: "> ".to_string(),
             cursor: CursorSetting::default(),
             initial: Default::default(),
+            history: String::new(),
+            history_size: 1000,
 
             scroll_padding: true,
             status_inline: false,

@@ -151,6 +151,8 @@ pub struct PickerUI<'a, T: SSS, S: Selection> {
     pub matcher: &'a mut nucleo::Matcher,
     pub selector: Selector<T, S>,
     pub worker: Worker<T>,
+    /// Accepted queries, recalled into the filter (`query.history`).
+    pub history: crate::history::QueryHistory,
 }
 
 impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
@@ -188,6 +190,10 @@ impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
             }),
             breadcrumb_config,
             results: ResultsUI::new(results_config, status_config),
+            history: crate::history::QueryHistory::load(
+                crate::history::QueryHistory::path_from_config(&input_config.history),
+                input_config.history_size,
+            ),
             query: QueryUI::new(input_config),
             header: DisplayUI::new(header_config),
             matcher,
@@ -282,6 +288,13 @@ impl<'a, T: SSS, O: Selection> PickerUI<'a, T, O> {
         );
         let width = self.results.table_width();
         (table, width)
+    }
+
+    /// Saves the query to history; called when the picker finishes with a selection.
+    pub fn record_query(&mut self) {
+        if let Err(e) = self.history.record(&self.query.input) {
+            log::warn!("Could not save the query history: {e}");
+        }
     }
 
     /// Runs the query. When it changed, the cursor moves to the best match, or with

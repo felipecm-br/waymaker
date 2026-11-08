@@ -70,6 +70,7 @@ expression: out
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -77,7 +78,7 @@ expression: out
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -100,7 +101,7 @@ expression: out
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -202,6 +203,7 @@ expression: out
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -209,7 +211,7 @@ expression: out
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -232,7 +234,7 @@ expression: out
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -535,7 +537,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -558,7 +560,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -665,6 +667,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -672,7 +675,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -695,7 +698,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -816,6 +819,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -823,7 +827,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -846,7 +850,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -948,6 +952,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -955,7 +960,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -978,7 +983,7 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -1116,6 +1121,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -1123,7 +1129,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = Print({=char}), Quit(0)
 "Esc" = @unwind
 "F1" = @help
@@ -1162,7 +1168,7 @@ fi
     echo "SetPrompt(${HEADERS[$MM_INDEX]})"
 )
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 "tty^^Enter" = Copy(
@@ -1272,6 +1278,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -1279,7 +1286,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -1312,7 +1319,7 @@ fi
     echo "SetQuery("{$0}")"
 )
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -1450,6 +1457,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -1457,7 +1465,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -1480,7 +1488,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 "tty^^@accept" = Copy(echo {char}), Quit(0)
@@ -1587,6 +1595,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @restart, Reload
@@ -1595,7 +1604,7 @@ fi
 "Ctrl-x" = @toggle_start, Reload
 "Ctrl-y" = @copy_id
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -1618,7 +1627,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -1779,6 +1788,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -1786,7 +1796,7 @@ fi
 "Ctrl-u" = @toggle_up, Reload
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -1809,7 +1819,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -1946,6 +1956,7 @@ fi
 "Ctrl-k" = @kill, Reload
 "Ctrl-l" = @look
 "Ctrl-m" = @mount
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -1953,7 +1964,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -1976,7 +1987,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -2135,7 +2146,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -2158,7 +2169,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -2269,6 +2280,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -2276,7 +2288,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @mount
 "Esc" = @unwind
 "F1" = @help
@@ -2299,7 +2311,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -2405,6 +2417,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -2412,7 +2425,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = Become(echo {id})
 "Esc" = @unwind
 "F1" = @help
@@ -2436,7 +2449,7 @@ fi
 "Shift-Tab" = Become(wm docker/compose)
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -2545,6 +2558,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -2552,7 +2566,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = Become(echo {name})
 "Esc" = @unwind
 "F1" = @help
@@ -2576,7 +2590,7 @@ fi
 "Shift-Tab" = Become(wm docker/compose)
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -2678,6 +2692,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -2685,7 +2700,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -2708,7 +2723,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -2810,6 +2825,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -2817,7 +2833,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -2841,7 +2857,7 @@ fi
 "Shift-Tab" = Up
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Down
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -2952,6 +2968,7 @@ git --paginate log --graph --decorate=short --date=short \
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -2959,7 +2976,7 @@ git --paginate log --graph --decorate=short --date=short \
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -2982,7 +2999,7 @@ git --paginate log --graph --decorate=short --date=short \
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -3093,6 +3110,7 @@ done;
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -3100,7 +3118,7 @@ done;
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -3123,7 +3141,7 @@ done;
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -3231,6 +3249,7 @@ fi)
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -3238,7 +3257,7 @@ fi)
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -3261,7 +3280,7 @@ fi)
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -3761,6 +3780,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -3769,7 +3789,7 @@ esac
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -3802,7 +3822,7 @@ esac
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -4089,6 +4109,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -4097,7 +4118,7 @@ fi
 "Ctrl-u" = @unstage, Reload
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -4120,7 +4141,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -4777,7 +4798,7 @@ false
 "Ctrl-u" = @update, Reload
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -4834,7 +4855,7 @@ false
     echo "SetHeader(${HEADERS[$MM_INDEX]}$ref)"
 )
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -4944,6 +4965,7 @@ false
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = ChDir({=}), Cancel, Reload, Pos(0), FocusNav
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -4952,7 +4974,7 @@ false
 "Ctrl-v" = @paste_into
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = ToggleFocus
 "F1" = @help
@@ -4975,7 +4997,7 @@ false
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = @reloadnext
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -5127,6 +5149,7 @@ false
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -5135,7 +5158,7 @@ false
 "Ctrl-x" = ExecuteSilent(kill -9 {=pid}), Reload
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -5158,7 +5181,7 @@ false
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -5264,6 +5287,7 @@ false
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @restart, Reload
@@ -5272,7 +5296,7 @@ false
 "Ctrl-x" = @toggle_start, Reload
 "Ctrl-y" = @copy_id
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -5295,7 +5319,7 @@ false
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -5401,6 +5425,7 @@ false
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -5408,7 +5433,7 @@ false
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -5435,7 +5460,7 @@ false
         echo "SetStyledPrompt({blue,italic:$context> })"
     )
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -5541,6 +5566,7 @@ false
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @record, Reload
@@ -5548,7 +5574,7 @@ false
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -5571,7 +5597,7 @@ false
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -5782,6 +5808,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @record, Reload
@@ -5789,7 +5816,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -5812,7 +5839,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -6002,6 +6029,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = @kill, Reload
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = @pause, Reload
 "Ctrl-r" = @reload
@@ -6010,7 +6038,7 @@ fi
 "Ctrl-u" = @unload, Reload
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -6033,7 +6061,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -6135,6 +6163,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -6142,7 +6171,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -6165,7 +6194,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -6267,6 +6296,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -6274,7 +6304,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -6297,7 +6327,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -6470,6 +6500,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -6477,7 +6508,7 @@ fi
 "Ctrl-u" = @unload, Reload
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -6500,7 +6531,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -6603,6 +6634,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -6610,7 +6642,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = Quit
 "F1" = @help
@@ -6633,7 +6665,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -6719,6 +6751,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -6726,7 +6759,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -6749,7 +6782,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -6851,6 +6884,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = #search, BecomeOrResume(
@@ -6866,7 +6900,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -6892,7 +6926,7 @@ FS_OPTS='opener=ob-open' fs
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -7028,6 +7062,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -7035,7 +7070,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -7058,7 +7093,7 @@ FS_OPTS='opener=ob-open' fs
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -7162,6 +7197,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -7169,7 +7205,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -7193,7 +7229,7 @@ FS_OPTS='opener=ob-open' fs
 "Shift-Tab" = ReloadPrev
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = ReloadNext
-"Up" = Up
+"Up" = UpOrHistory
 "nav^^Down" = Down
 "nav^^Enter" = Accept
 "nav^^Esc" = Quit
@@ -7465,6 +7501,7 @@ FS_OPTS='opener=ob-open' fs
         exit 0
     ), Reload
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -7472,7 +7509,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -7503,7 +7540,7 @@ FS_OPTS='opener=ob-open' fs
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -7609,6 +7646,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -7618,7 +7656,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-w" = Transform(sh "$(dirname -- "$MM_OVERRIDE")"/rg/toggle-word.sh)
 "Ctrl-y" = ExecuteSilent(test -n "{1}" && printf "%s:%s" {1} {2} | (command -v wl-copy >/dev/null 2>&1 && wl-copy || xclip -in -selection clipboard 2>/dev/null || tmux load-buffer -))
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = Become(${EDITOR:-nvim} +{2} {1})
 "Esc" = ToggleFocus
 "F1" = @help
@@ -7642,7 +7680,7 @@ FS_OPTS='opener=ob-open' fs
 "Shift-Up" = PreviewHalfPageUp
 "Start" = @enter_rg
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -7764,6 +7802,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -7771,7 +7810,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = ToggleFocus
 "F1" = @help
@@ -7795,7 +7834,7 @@ FS_OPTS='opener=ob-open' fs
 "Shift-Tab" = @reloadprev
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = @reloadnext
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -7901,6 +7940,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -7909,7 +7949,7 @@ FS_OPTS='opener=ob-open' fs
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -7932,7 +7972,7 @@ FS_OPTS='opener=ob-open' fs
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -8053,6 +8093,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -8060,7 +8101,7 @@ esac
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -8083,7 +8124,7 @@ esac
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -8193,6 +8234,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -8200,7 +8242,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -8223,7 +8265,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -8334,7 +8376,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -8357,7 +8399,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -8459,6 +8501,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = Reload
@@ -8466,7 +8509,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -8489,7 +8532,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -8604,6 +8647,7 @@ fi
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = Reload
@@ -8611,7 +8655,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -8634,7 +8678,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -8758,6 +8802,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -8765,7 +8810,7 @@ esac
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -8788,7 +8833,7 @@ esac
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -8897,6 +8942,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -8904,7 +8950,7 @@ esac
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -8927,7 +8973,7 @@ esac
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -9049,7 +9095,7 @@ fi
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -9072,7 +9118,7 @@ fi
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -9181,6 +9227,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -9188,7 +9235,7 @@ esac
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -9211,7 +9258,7 @@ esac
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -9345,6 +9392,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -9352,7 +9400,7 @@ esac
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -9375,7 +9423,7 @@ esac
 "Shift-Down" = PreviewHalfPageDown
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -9477,6 +9525,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -9484,7 +9533,7 @@ esac
 "Ctrl-u" = Cancel
 "Ctrl-y" = ExecuteSilent(printf "%s" {bind} | tmux load-buffer -w -)
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = Become(sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --run {table} {bind})
 "Esc" = Quit
 "F1" = @help
@@ -9508,7 +9557,7 @@ esac
 "Shift-Tab" = @reloadprev
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = @reloadnext
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -9613,6 +9662,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {} "$MM_ORIGIN_CWD")
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -9622,7 +9672,7 @@ esac
 "Ctrl-w" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})
 "Ctrl-y" = Accept
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = Accept
 "Esc" = ToggleFocus
 "F1" = @help
@@ -9646,7 +9696,7 @@ esac
 "Shift-Tab" = SetPrompt(sha> ), SetQuery(), Reload(cat $WM_SCROLLBACK_DIR/sha.txt), SetMode(sha), Pos(0)
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = SetPrompt(cmd> ), SetQuery(), Reload(cat $WM_SCROLLBACK_DIR/cmd.txt), SetMode(cmd), Pos(0)
-"Up" = Up
+"Up" = UpOrHistory
 "all^^Shift-BackTab" = SetPrompt(sha> ), SetQuery(), Reload(cat $WM_SCROLLBACK_DIR/sha.txt), SetMode(sha), Pos(0)
 "all^^Shift-Tab" = SetPrompt(sha> ), SetQuery(), Reload(cat $WM_SCROLLBACK_DIR/sha.txt), SetMode(sha), Pos(0)
 "all^^Tab" = SetPrompt(cmd> ), SetQuery(), Reload(cat $WM_SCROLLBACK_DIR/cmd.txt), SetMode(cmd), Pos(0)
@@ -9814,6 +9864,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = @look
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = @open
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -9821,7 +9872,7 @@ esac
 "Ctrl-u" = Cancel
 "Ctrl-y" = @copy
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = @accept
 "Esc" = @unwind
 "F1" = @help
@@ -9845,7 +9896,7 @@ esac
 "Shift-Up" = PreviewHalfPageUp
 "Start" = @enter_rg
 "Tab" = Toggle
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
@@ -9959,6 +10010,7 @@ esac
 "Ctrl-j" = Down
 "Ctrl-k" = Up
 "Ctrl-l" = ChDir({=}), Cancel, Reload, Pos(0), FocusNav
+"Ctrl-n" = HistoryNext
 "Ctrl-o" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {} "$MM_ORIGIN_CWD")
 "Ctrl-p" = SwitchPreview
 "Ctrl-r" = @reload
@@ -9967,7 +10019,7 @@ esac
 "Ctrl-v" = ExecuteSilent(test -n "$MM_ORIGIN_PANE" && tmux send-keys -t "$MM_ORIGIN_PANE" -l -- {})
 "Ctrl-y" = Accept
 "Delete" = @rm
-"Down" = Down
+"Down" = DownOrHistory
 "Enter" = CyclePreview
 "Esc" = ToggleFocus
 "F1" = @help
@@ -9991,7 +10043,7 @@ esac
 "Shift-Tab" = @reloadprev
 "Shift-Up" = PreviewHalfPageUp
 "Tab" = @reloadnext
-"Up" = Up
+"Up" = UpOrHistory
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]

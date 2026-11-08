@@ -9,6 +9,7 @@ pub use config::{FolderRule, SortMenuConfig};
 mod config_types;
 pub mod event;
 pub mod frecency;
+pub mod history;
 pub mod input_state;
 
 pub mod message;

@@ -191,6 +191,8 @@ All colors and modifiers come from ratatui:
 
 - `prompt`: (string) The prompt prefix (default "> ").
 - `initial`: (string) Initial text in the input bar.
+- `history`: (string) File that keeps accepted queries, one per line, recalled with `HistoryPrev`/`HistoryNext` (fzf's `--history`). `"auto"` is one file per preset under the state directory (`~/.local/state/waymaker/history/<preset>`); `""` disables history. The default config sets `"auto"`.
+- `history_size`: (number) Most queries the history file keeps. Default `1000`.
 - `style`: [Style Settings](#style-settings) for the input text.
 - `prompt_style`: [Style Settings](#style-settings) for the prompt.
 - `cursor`: Cursor style.

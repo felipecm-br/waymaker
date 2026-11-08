@@ -250,6 +250,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
 
         if state.should_quit {
             log::debug!("Exiting due to should_quit");
+            picker_ui.record_query();
             return if picker_ui.selector.is_disabled()
                 && let Some((_, item)) = get_current(&picker_ui)
             {
@@ -427,6 +428,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
 
             if state.should_quit {
                 log::debug!("Exiting due to should_quit");
+                picker_ui.record_query();
                 return if picker_ui.selector.is_disabled()
                     && let Some((_, item)) = get_current(&picker_ui)
                 {

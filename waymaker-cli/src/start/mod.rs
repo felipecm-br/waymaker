@@ -79,6 +79,29 @@ fn load_base_config(cli: &Cli, cfg_path: &Path) -> Config {
     }
 }
 
+/// The file `query.history = "auto"` stands for: one per preset in the state directory, named
+/// after the `-o` overrides (`git/status` as `git-status`, files by their stem), or `default`.
+fn auto_history_path(overrides: &[std::path::PathBuf]) -> Option<std::path::PathBuf> {
+    let key = overrides
+        .iter()
+        .filter_map(|p| {
+            if p.is_relative() && p.extension().is_none() {
+                Some(p.to_string_lossy().replace(['/', '\\'], "-"))
+            } else {
+                p.file_stem().map(|s| s.to_string_lossy().into_owned())
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("+");
+    let key = if key.is_empty() {
+        "default".to_string()
+    } else {
+        key
+    };
+    let base = dirs::state_dir().or_else(dirs::data_local_dir)?;
+    Some(base.join("waymaker").join("history").join(key))
+}
+
 /// Applies each `-o` override in order: a preset name (installed, else built in) or a file, plus
 /// the file its `source` names. Sets `WM_OVERRIDE`/`MM_OVERRIDE` to the last one.
 fn apply_overrides(
@@ -338,7 +361,14 @@ pub fn enter(mut cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     }
 
     // apply overrides
-    config = apply_overrides(config, std::mem::take(&mut cli.r#override))?;
+    let overrides = std::mem::take(&mut cli.r#override);
+    let history_path = auto_history_path(&overrides);
+    config = apply_overrides(config, overrides)?;
+    if config.render.query.history == "auto" {
+        config.render.query.history = history_path
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
+    }
 
     warn_config_pitfalls(&config);
 

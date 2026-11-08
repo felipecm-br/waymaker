@@ -64,9 +64,39 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         results,
         worker,
         selector: selections,
+        history,
         ..
     } = &mut *picker_ui;
     match action {
+        a @ (Action::UpOrHistory
+        | Action::DownOrHistory
+        | Action::HistoryPrev
+        | Action::HistoryNext) => {
+            // The `*OrHistory` forms recall only from the first row, so the arrows still move the
+            // cursor through the list; in a reversed layout the first row is not next to the filter.
+            let at_top = !results.reverse() && results.index() == 0;
+            let recall = match a {
+                Action::UpOrHistory => at_top && !history.is_empty(),
+                Action::DownOrHistory => at_top && history.is_browsing(&query.input),
+                _ => true,
+            };
+            if !recall {
+                let step = match a {
+                    Action::UpOrHistory => Action::<A>::Up(1),
+                    _ => Action::Down(1),
+                };
+                return cursor_action(step, results, worker, query, preview_ui, did_cursor_wrap);
+            }
+            let text = match a {
+                Action::UpOrHistory | Action::HistoryPrev => {
+                    history.prev(&query.input).map(str::to_string)
+                }
+                _ => history.next(&query.input),
+            };
+            if let Some(text) = text {
+                query.set(Some(text), u16::MAX);
+            }
+        }
         a @ (Action::Select
         | Action::Deselect
         | Action::DeselectUp
@@ -1038,6 +1068,7 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             } else {
                 selections.output().collect::<Vec<S>>()
             };
+            picker_ui.record_query();
             return Flow::Exit(Ok(ret));
         }
         Action::Abort(code) => {

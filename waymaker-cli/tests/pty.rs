@@ -127,6 +127,67 @@ fn track_keeps_the_cursor_on_its_item_when_typing() {
     assert_eq!(wm.finish(), (0, "xab\n".to_string()));
 }
 
+/// A history file holding `entries`, and the `query.history=` override naming it.
+fn history_file(entries: &str) -> (tempfile::TempDir, std::path::PathBuf, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("history");
+    std::fs::write(&path, entries).unwrap();
+    let arg = format!("query.history={}", path.display());
+    (dir, path, arg)
+}
+
+#[test]
+fn up_on_the_first_row_recalls_older_queries_and_accepting_records_the_query() {
+    let (_dir, path, arg) = history_file("ban\nfoo\n");
+    let wm = Session::start(FRUIT, &[&arg]);
+    wm.send(UP); // newest: foo
+    wm.wait_for_screen(|s| s.contains("> foo"));
+    wm.send(UP); // older: ban
+    wm.wait_for_screen(|s| s.contains("> ban"));
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "banana\n".to_string()));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "ban\nfoo\nban\n");
+}
+
+#[test]
+fn down_after_recalling_returns_to_the_typed_query() {
+    let (_dir, path, arg) = history_file("foo\n");
+    let wm = Session::start(FRUIT, &[&arg]);
+    wm.send("app");
+    wm.wait_for_screen(|s| s.contains("1/3"));
+    wm.send(UP);
+    wm.wait_for_screen(|s| s.contains("> foo"));
+    wm.send(DOWN);
+    wm.wait_for_screen(|s| s.contains("> app"));
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "foo\napp\n");
+}
+
+#[test]
+fn cancelling_does_not_record_the_query() {
+    let (_dir, path, arg) = history_file("foo\n");
+    let wm = Session::start(FRUIT, &[&arg]);
+    wm.send("ban");
+    wm.wait_for_screen(|s| s.contains("1/3"));
+    wm.send(ESC);
+    wm.send(ESC);
+    wm.send(ESC);
+    assert_eq!(wm.finish().0, 130);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "foo\n");
+}
+
+#[test]
+fn up_below_the_first_row_moves_the_cursor_even_with_history() {
+    let (_dir, _path, arg) = history_file("foo\n");
+    let wm = Session::start(FRUIT, &[&arg]);
+    wm.send(DOWN);
+    wm.send(DOWN);
+    wm.send(UP); // banana -> foobar, no recall
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
+}
+
 #[test]
 fn backspace_edits_the_query() {
     let wm = Session::start(FRUIT, &[]);

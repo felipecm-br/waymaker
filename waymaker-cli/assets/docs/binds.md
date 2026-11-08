@@ -159,6 +159,10 @@ Actions are the operations performed when a trigger is activated.
 | -------------- | -------------------------------------------------------------------- |
 | `Up(n)`        | Move selection cursor up by `n` lines (default: 1).                  |
 | `Down(n)`      | Move selection cursor down by `n` lines (default: 1).                |
+| `UpOrHistory`  | On the first row, the previous query from history (`query.history`); elsewhere, or with no history, `Up`. Bound to `up`. |
+| `DownOrHistory` | While a query recalled from history is shown and the cursor is on the first row, the next query; otherwise `Down`. Bound to `down`. |
+| `HistoryPrev`  | Replace the query with the previous one from history.                |
+| `HistoryNext`  | Replace the query with the next one from history; after the newest, the text that was being typed comes back. Bound to `ctrl-n`. |
 | `Pos(idx)`     | Move selection cursor to absolute index `idx`. `-1` for end.         |
 | `HalfPageUp`   | Scroll the results list up by half the height of the results pane.   |
 | `HalfPageDown` | Scroll the results list down by half the height of the results pane. |

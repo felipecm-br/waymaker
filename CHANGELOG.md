@@ -2,6 +2,7 @@
 
 ### ✨ Features
 
+- Query history, like fzf's `--history`: accepted queries are saved (`query.history`, one file per preset under `~/.local/state/waymaker/history/` with the default `"auto"`; `history_size` keeps 1000), and `up` on the first row recalls the previous one. `down` or `ctrl-n` goes forward, ending at the text you had typed; editing the recalled query or moving the cursor goes back to normal list movement. New actions `HistoryPrev`, `HistoryNext`, `UpOrHistory` and `DownOrHistory`. `up` on the first row no longer wraps to the last item once there is history; `ctrl-k` still does
 - `matcher.track = true` keeps the cursor on the same item while the query changes, like fzf's `--track`. The item is followed until matching finishes; moving the cursor by hand stops following it
 
 ### ⚡ Performance

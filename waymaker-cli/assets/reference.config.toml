@@ -272,6 +272,16 @@ hints_columns = 4
 # Values: true, false | Default: true
 show = true
 
+# File that keeps accepted queries, recalled with HistoryPrev/HistoryNext (`up` on the first
+# row and `ctrl-n` in the default config). "auto" is one file per preset under the state
+# directory (~/.local/state/waymaker/history/); "" disables history.
+# Values: path, "auto", "" | Default: ""
+history = ""
+
+# Most queries the history file keeps.
+# Values: integer | Default: 1000
+history_size = 1000
+
 # Default search prompt symbol.
 # Values: string (e.g. "> ", " ", "🔍 ") | Default: "> "
 prompt = "> "

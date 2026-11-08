@@ -46,6 +46,7 @@ hints = false # the built-in hint rows describe the file-manager keys; ? lists t
 
 [query]
 prompt_style.fg = "Gray"
+history = "auto" # accepted queries, one file per preset; up on the first row recalls them
 
 [results]
 # wrap = true
@@ -143,9 +144,10 @@ ansi = false # don't set to true here
 "alt-a" = "QueryPos(0)"
 
 # Navigation
-"up" = "Up"
+"up" = "UpOrHistory" # on the first row: the previous query (ctrl-k always moves)
 "ctrl-k" = "Up"
-"down" = "Down"
+"down" = "DownOrHistory" # while a recalled query is shown: the next one
+"ctrl-n" = "HistoryNext"
 "ctrl-j" = "Down"
 "pagedown" = "HalfPageDown"
 "pageup" = "HalfPageUp"

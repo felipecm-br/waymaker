@@ -62,6 +62,14 @@ pub enum Action<A: ActionExt = NullActionExt> {
     Up(u16),
     /// Move selection index down
     Down(u16),
+    /// `Up`, or the previous query from history when the cursor is on the first row
+    UpOrHistory,
+    /// `Down`, or the next query while one recalled from history is shown
+    DownOrHistory,
+    /// Replace the query with the previous one from history (`query.history`)
+    HistoryPrev,
+    /// Replace the query with the next one from history; past the newest, the text that was typed
+    HistoryNext,
     Pos(i32),
     // Scroll half page down
     HalfPageDown,
@@ -511,7 +519,7 @@ enum_from_str_display!(
     units:
     Select, Deselect, DeselectUp, Toggle, ToggleUp, CycleAll, ClearSelections, Accept,
 
-    HalfPageDown, HalfPageUp,
+    HalfPageDown, HalfPageUp, UpOrHistory, DownOrHistory, HistoryPrev, HistoryNext,
 
     ToggleWrap, TogglePreviewWrap, ToggleActionBox, ToggleFocus, FocusFilter, FocusNav, ToggleParentPeek, ToggleFooter, ToggleHeader, CyclePreview, PreviewJump,
     PreviewZoomIn, PreviewZoomOut, PreviewResetZoom,
@@ -834,6 +842,10 @@ mod tests {
             ("ClearSelections", Action::ClearSelections),
             ("HalfPageDown", Action::HalfPageDown),
             ("HalfPageUp", Action::HalfPageUp),
+            ("UpOrHistory", Action::UpOrHistory),
+            ("DownOrHistory", Action::DownOrHistory),
+            ("HistoryPrev", Action::HistoryPrev),
+            ("HistoryNext", Action::HistoryNext),
             ("ToggleWrap", Action::ToggleWrap),
             ("TogglePreviewWrap", Action::TogglePreviewWrap),
             ("ToggleActionBox", Action::ToggleActionBox),
