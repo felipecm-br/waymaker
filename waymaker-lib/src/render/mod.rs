@@ -66,28 +66,28 @@ pub(super) enum Flow<S> {
     Exit(Result<Vec<S>, MatchError>),
 }
 
-/// The result an action asked the picker to end with (`State::should_quit` or
-/// `should_quit_nomatch`), or `None` to keep running. `should_quit` ends with the selection, or
-/// the current item when selecting is disabled.
+/// The result an action asked the picker to end with ([`State::request_finish`] or
+/// [`State::request_no_match`]), or `None` to keep running.
 fn requested_exit<T: SSS, S: Selection>(
     state: &State,
     picker_ui: &mut PickerUI<'_, T, S>,
 ) -> Option<Result<Vec<S>, MatchError>> {
-    if state.should_quit {
-        log::debug!("Exiting due to should_quit");
-        let items = if picker_ui.selector.is_disabled()
-            && let Some((_, item)) = get_current(picker_ui)
-        {
-            vec![item]
-        } else {
-            picker_ui.selector.output().collect()
-        };
-        Some(Ok(picker_ui.finish(items)))
-    } else if state.should_quit_nomatch {
-        log::debug!("Exiting due to should_quit_nomatch");
-        Some(Err(MatchError::NoMatch))
-    } else {
-        None
+    match state.exit_request()? {
+        ExitRequest::Finish => {
+            log::debug!("Exiting: finish requested");
+            let items = if picker_ui.selector.is_disabled()
+                && let Some((_, item)) = get_current(picker_ui)
+            {
+                vec![item]
+            } else {
+                picker_ui.selector.output().collect()
+            };
+            Some(Ok(picker_ui.finish(items)))
+        }
+        ExitRequest::NoMatch => {
+            log::debug!("Exiting: no match requested");
+            Some(Err(MatchError::NoMatch))
+        }
     }
 }
 

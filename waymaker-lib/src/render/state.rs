@@ -49,6 +49,15 @@ pub struct ParentPeekCache {
 /// In the "standard implementation", None represents unset, String: command, Text: display
 pub type PreviewSetPayload = Option<Result<String, Text<'static>>>;
 
+/// How an action asked the picker to end, acted on once the current batch of actions is done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExitRequest {
+    /// End with the selection, or the current item when selecting is disabled, as `Accept` does.
+    Finish,
+    /// End with [`crate::MatchError::NoMatch`].
+    NoMatch,
+}
+
 pub struct State {
     /// Shared with the event loop: which input takes typed keys, and the bind mode.
     pub input_routing: crate::input_state::SharedInputState,
@@ -98,12 +107,8 @@ pub struct State {
     pub envs: EnvVars,
     /// A place to stash the preview visibility when overriding it
     stashed_preview_visibility: Option<bool>,
-    /// Setting this to true finishes the picker with the contents of [`Selector`].
-    /// If [`Selector`] is disabled, the picker finishes with the current item.
-    /// If there are no items to finish with, the picker finishes with [`crate::errors::MatchError::Abort`]\(0).
-    pub should_quit: bool,
-    /// Setting this to true finishes the picker with [`crate::MatchError::NoMatch`].
-    pub should_quit_nomatch: bool,
+    /// How an action asked the picker to end; see [`State::request_finish`].
+    exit_request: Option<ExitRequest>,
     pub filtering: bool,
 
     /// This field is never touched by the rendering loop and is reserved for
@@ -145,6 +150,22 @@ impl Default for State {
 }
 
 impl State {
+    /// Ends the picker with the selection, or the current item when selecting is disabled, once
+    /// the current actions are done; the query is saved to history as on `Accept`.
+    pub fn request_finish(&mut self) {
+        self.exit_request = Some(ExitRequest::Finish);
+    }
+
+    /// Ends the picker with [`crate::MatchError::NoMatch`] once the current actions are done.
+    pub fn request_no_match(&mut self) {
+        self.exit_request = Some(ExitRequest::NoMatch);
+    }
+
+    /// The exit an action asked for, if any.
+    pub fn exit_request(&self) -> Option<ExitRequest> {
+        self.exit_request
+    }
+
     /// Which pane has keyboard focus in navigation mode; shared with the event loop.
     pub fn focus(&self) -> Focus {
         self.input_routing.focus()
@@ -202,8 +223,7 @@ impl State {
             cached_cwd: None,
 
             events: Event::empty(),
-            should_quit: false,
-            should_quit_nomatch: false,
+            exit_request: None,
             filtering: true,
 
             discriminant_payload: None,

@@ -67,11 +67,11 @@ impl Matchmaker<ConfigMMItem, ConfigMMInnerItem> {
                                     let _ = std::io::stdin().read_line(&mut input);
                                 }
                                 Some(1) if i.success() => {
-                                    state.should_quit = true;
+                                    state.request_finish();
                                 }
                                 Some(2) => {
                                     if i.success() {
-                                        state.should_quit = true;
+                                        state.request_finish();
                                     } else if i.code().is_some() {
                                         println!("\nPress enter to continue...");
                                         let mut input = String::new();

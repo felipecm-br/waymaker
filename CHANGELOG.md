@@ -20,6 +20,7 @@
 
 ### 🔄 Changed
 
+- Library API: `State::should_quit` and `State::should_quit_nomatch` are replaced by `State::request_finish()` and `State::request_no_match()` (read back with `exit_request()`). Every finish now goes through one exit (`requested_exit`, then `PickerUI::finish`), which also saves the query to history
 - The default layout gives the preview 60% of the width (list 40%, preview 60%), and the footer spans both panes (`footer.row_connection = "Full"`), so its hints are no longer cut to the list's width. Set `percentage = 40` in the first `[[preview.layout]]` for the old split
 - The default picker has navigation mode: `esc` unwinds as before, but with nothing left to unwind it moves to the results instead of exiting, so exiting from a clean prompt takes `esc esc` (still code 130). In navigation mode, letters are keys: `?` help, `/` or `I` back to the query, `j`/`k`, `gt`/`gb`, `+`/`-` and `}`/`{` resize the preview, `'` preview jump, `o`/`O` open, `w`/`W` print, `c`/`C` copy. These give home-row paths to actions that were only on `alt-*` chords. The footer's help hint, which named `?` while `?` typed into the query, now reads `esc nav │ ? help`. Set `ui.nav.active = false` for the old single-`esc` exit
 - `Unwind` with navigation mode active moves focus to the results as its last step in the filter, instead of exiting. This also applies to the `workspace`, `tmux/scrollback`, `pr` and `downloads` presets, which inherit `esc = @unwind`

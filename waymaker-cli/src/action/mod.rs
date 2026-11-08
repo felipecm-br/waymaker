@@ -375,7 +375,7 @@ fn accept(state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
         crate::formatter::format_cli(state, template, Some(&repeat));
     } else if selected_items.is_empty() {
         // Nothing to output: exit like a failed match so scripts can tell.
-        state.should_quit_nomatch = true;
+        state.request_no_match();
         return;
     } else {
         for item in selected_items {
@@ -383,7 +383,7 @@ fn accept(state: &mut MMState<'_, '_>, ctx: &mut ActionContext) {
         }
     }
 
-    state.should_quit = true;
+    state.request_finish();
 }
 
 /// `Transform(cmd)`: runs the command and sends each line of its output as an action.
