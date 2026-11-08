@@ -34,7 +34,9 @@ pub enum Action<A: ActionExt = NullActionExt> {
     Quit(i32),
     /// Exit at once with code (default 130), whatever is open or selected: what `ctrl-c` does.
     Abort(i32),
-    /// Unwind active state in cascade or quit with code
+    /// Unwind active state in cascade (inputs, boxes, overlays, help, selections, marks,
+    /// query), then quit with code. With navigation mode active, the last step in the filter
+    /// moves focus to the results instead of quitting.
     Unwind(i32),
 
     // Results

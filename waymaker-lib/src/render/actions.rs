@@ -75,7 +75,18 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::CycleAll
         | Action::ClearSelections) => return selection_action(a, results, worker, selections),
         a @ (Action::Accept | Action::Abort(..) | Action::Quit(..) | Action::Unwind(..)) => {
-            return exit_action(a, state, picker_ui, tui, overlay_ui, exit_config);
+            let unwind = matches!(a, Action::Unwind(_));
+            let flow = exit_action(a, state, picker_ui, tui, overlay_ui, exit_config);
+            // With nothing left to unwind in the filter, navigation mode takes the keys
+            // instead of the picker exiting; unwinding again from there exits.
+            if unwind
+                && matches!(flow, Flow::Exit(Err(_)))
+                && ui.config.nav.active
+                && state.focus() == Focus::Input
+            {
+                return focus_action(Action::<A>::FocusNav, state, ui, picker_ui, tui);
+            }
+            return flow;
         }
 
         // Results

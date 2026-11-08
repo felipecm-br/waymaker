@@ -25,7 +25,16 @@ fn query_then_accept_prints_the_match() {
 #[test]
 fn escape_quits_with_130() {
     // Cancelling exits 130 like ctrl-c (and fzf), so scripts can tell it from "no match" (1).
+    // The first Esc hands the keys to navigation mode; the second exits.
     let wm = Session::start(FRUIT, &[]);
+    wm.send(ESC);
+    wm.send(ESC);
+    assert_eq!(wm.finish(), (130, String::new()));
+}
+
+#[test]
+fn escape_quits_at_once_without_nav_mode() {
+    let wm = Session::start(FRUIT, &["ui.nav.active=false"]);
     wm.send(ESC);
     assert_eq!(wm.finish(), (130, String::new()));
 }
@@ -40,12 +49,35 @@ fn escape_cascade_clears_query_before_quitting() {
     wm.send(ENTER);
     assert_eq!(wm.finish(), (0, "apple\n".to_string()));
 
-    // When query is already empty, Esc quits with 130
+    // With the query empty, Esc enters navigation mode, and Esc there quits with 130
     let wm2 = Session::start(FRUIT, &[]);
     wm2.send("ban");
     wm2.send(ESC); // clears query
+    wm2.send(ESC); // navigation mode
     wm2.send(ESC); // quits with 130
     assert_eq!(wm2.finish(), (130, String::new()));
+}
+
+#[test]
+fn escape_enters_navigation_mode_where_letters_are_keys() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send(ESC);
+    wm.send("j"); // moves down instead of typing into the query
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
+}
+
+#[test]
+fn escape_closes_help_in_navigation_mode_without_quitting() {
+    let wm = Session::start(FRUIT, &[]);
+    wm.send(ESC);
+    wm.send("?");
+    wm.wait_for_screen(|s| s.contains("@accept"));
+    wm.send(ESC); // closes the help
+    wm.send("/"); // back to the filter
+    wm.send("ban");
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "banana\n".to_string()));
 }
 
 #[test]

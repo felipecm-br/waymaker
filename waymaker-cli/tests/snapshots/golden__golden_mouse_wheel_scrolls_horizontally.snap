@@ -1,12 +1,12 @@
 ---
 source: waymaker-cli/tests/golden.rs
-assertion_line: 653
+assertion_line: 660
 expression: wm.styled_screen()
 ---
  0|
  1| >                 0_abcdefghijabcdefghijabcdefgh
  2|   6/6             ijabcdefghijabcdefghijabcdefgh
- 3|   ..abcdefghijabcdijabcdefghijabcdefghij
+ 3| │ ..abcdefghijabcdijabcdefghijabcdefghij
  4|   ..abcdefghijabcd
  5|   ..abcdefghijabcd
  6|   ..abcdefghijabcd
@@ -18,7 +18,7 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-5 fg=2 italic
- 3: 3-4 fg=8 | 5-18 bold
+ 3: 1 fg=6 | 3-4 fg=8 | 5-18 bold
  4: 3-4 fg=8
  5: 3-4 fg=8
  6: 3-4 fg=8

@@ -235,6 +235,18 @@ fn apply_nav_binds(cli: &Cli, mut config: Config) -> Config {
         }
     }
 
+    layer_nav_profile_defaults(&mut config);
+    if config.render.ui.nav.active {
+        for problem in config.render.ui.nav.sequence_conflicts() {
+            wbog!("[ui.nav.binds] {problem}.");
+        }
+    }
+    config
+}
+
+/// Adds the navigation profile's default binds under `[ui.nav.binds]`: a key the config
+/// binds keeps its binding.
+pub(crate) fn layer_nav_profile_defaults(config: &mut Config) {
     if config.render.ui.nav.active {
         let profile = config.render.ui.nav.effective_profile();
         let defaults = waymaker::config::NavConfig::default_binds_for_profile(profile);
@@ -286,12 +298,6 @@ fn apply_nav_binds(cli: &Cli, mut config: Config) -> Config {
         nb("b", waymaker::acs![Action::Semantic("pins".into())]);
         nb("*", waymaker::acs![Action::Semantic("pin".into())]);
     }
-    if config.render.ui.nav.active {
-        for problem in config.render.ui.nav.sequence_conflicts() {
-            wbog!("[ui.nav.binds] {problem}.");
-        }
-    }
-    config
 }
 
 pub fn enter(mut cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {

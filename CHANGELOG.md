@@ -10,6 +10,9 @@
 
 ### 🔄 Changed
 
+- The default picker has navigation mode: `esc` unwinds as before, but with nothing left to unwind it moves to the results instead of exiting, so exiting from a clean prompt takes `esc esc` (still code 130). In navigation mode, letters are keys: `?` help, `/` or `I` back to the query, `j`/`k`, `gt`/`gb`, `+`/`-` and `}`/`{` resize the preview, `'` preview jump, `o`/`O` open, `w`/`W` print, `c`/`C` copy. These give home-row paths to actions that were only on `alt-*` chords. The footer's help hint, which named `?` while `?` typed into the query, now reads `esc nav │ ? help`. Set `ui.nav.active = false` for the old single-`esc` exit
+- `Unwind` with navigation mode active moves focus to the results as its last step in the filter, instead of exiting. This also applies to the `workspace`, `tmux/scrollback`, `pr` and `downloads` presets, which inherit `esc = @unwind`
+- The bind-table snapshot test shows each table as the picker starts, with the navigation profile's defaults layered in (`start::layer_nav_profile_defaults`)
 - The navigation-mode cursor indicator (`ui.nav.color`) defaults to cyan instead of yellow, keeping warm colours for state (yank, cut, bookmarks); `reference.config.toml` listed the default as `Darkgray`. Set `ui.nav.color = "yellow"` to keep the old look
 - Internal modular decomposition with no behaviour change (verified by `scripts/verify_move.py`): split `nucleo/worker.rs` into `nucleo/worker/{mod,sort,frizbee,cell,tests}.rs`, `config.rs` into `config/{mod,nav,results,tests}.rs`, `ui/preview.rs`, `utils/markdown.rs` and `utils/mermaid.rs` into `mod.rs` + `tests.rs`, extracted `ui/results/styler.rs`, and decomposed `Results::render_rows`, `Previewer::with_config`, `start::start` and `waymaker-partial-macros` so every file in the workspace is `< 2,000` lines and every function across all 4 crates is `< 200` lines
 

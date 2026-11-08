@@ -4,6 +4,8 @@ min = 15
 
 [ui.nav]
 active = true
+marker = ""
+hints = true
 bar = "Plain"
 color = "black"
 

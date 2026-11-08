@@ -27,6 +27,7 @@ underline_style.fg = "#f9e2af"
 
 [ui.nav]
 active = true
+marker = ""
 profile = "fm"
 focus_on_start = "picker"
 bar = "Plain"

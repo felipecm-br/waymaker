@@ -385,6 +385,7 @@ mod tests {
     /// a reviewed diff in `src/snapshots/`. Accept intended changes with `cargo insta review`.
     #[test]
     fn test_bind_tables_snapshot() {
+        // Tables as the picker starts with them: profile defaults layered under the config.
         use waymaker_partial::Apply;
 
         fn table(config: &Config) -> String {
@@ -421,13 +422,16 @@ mod tests {
         toml_files(&assets.join("presets"), &mut presets);
         presets.sort();
 
-        let mut out = format!("## config.toml\n{}", table(&Config::default()));
+        let mut base = Config::default();
+        crate::start::layer_nav_profile_defaults(&mut base);
+        let mut out = format!("## config.toml\n{}", table(&base));
         for path in presets {
             let rel = path.strip_prefix(&assets).unwrap().display().to_string();
             let partial: PartialConfig = toml::from_str(&std::fs::read_to_string(&path).unwrap())
                 .unwrap_or_else(|e| panic!("{rel}: {e}"));
             let mut config = Config::default();
             config.apply(partial);
+            crate::start::layer_nav_profile_defaults(&mut config);
             out.push_str(&format!("\n## {rel}\n{}", table(&config)));
         }
         insta::assert_snapshot!(out);

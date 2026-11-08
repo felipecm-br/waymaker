@@ -1,12 +1,12 @@
 ---
 source: waymaker-cli/tests/golden.rs
-assertion_line: 1315
+assertion_line: 1321
 expression: wm.styled_screen()
 ---
  0|
  1| > an                        mango/03
  2|   9/30
- 3|   mango/03
+ 3| │ mango/03
  4|   mango/13
  5|   mango/23
  6|   banana/01
@@ -22,7 +22,7 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-6 fg=2 italic
- 3: 3 bold | 4-5 fg=2 italic | 6-28 bold
+ 3: 1 fg=6 | 3 bold | 4-5 fg=2 italic | 6-28 bold
  4: 4-5 fg=2 italic
  5: 4-5 fg=2 italic
  6: 6-7 fg=2 italic

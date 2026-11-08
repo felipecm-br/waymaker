@@ -9,6 +9,8 @@ restore_fullscreen = false
 
 [ui.nav]
 active = true
+marker = ""
+hints = true
 bar = "Plain"
 color = "white"
 

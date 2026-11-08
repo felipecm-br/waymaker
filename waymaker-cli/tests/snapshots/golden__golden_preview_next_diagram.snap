@@ -1,12 +1,12 @@
 ---
 source: waymaker-cli/tests/golden.rs
-assertion_line: 942
+assertion_line: 949
 expression: wm.styled_screen()
 ---
  0|
  1| >                                                         diagrams.md
  2|   1/1                                                     ╭─ [Mermaid Diagram (Press 's' to view
- 3|   diagrams.md                                             image)] ╮
+ 3| │ diagrams.md                                             image)] ╮
  4|                                                           │   ┌───┐                              │
  5|                                                           │   │ A │                              │
  6|                                                           │   └───┘                              │
@@ -36,7 +36,7 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-5 fg=2 italic | 59-96 fg=4 bold
- 3: 3-58 bold | 59-67 fg=4 bold
+ 3: 1 fg=6 | 3-58 bold | 59-67 fg=4 bold
  4: 59-60 fg=4 | 61-62 fg=15 bold | 63-67 fg=6 | 97-98 fg=4
  5: 59-60 fg=4 | 61-62 fg=15 bold | 63 fg=6 | 64-66 fg=15 bold | 67 fg=6 | 97-98 fg=4
  6: 59-60 fg=4 | 61-62 fg=15 bold | 63-67 fg=6 | 97-98 fg=4

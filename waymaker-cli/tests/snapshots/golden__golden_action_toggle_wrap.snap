@@ -1,12 +1,12 @@
 ---
 source: waymaker-cli/tests/golden.rs
-assertion_line: 987
+assertion_line: 993
 expression: wm.styled_screen()
 ---
  0|
  1| >                           entry_00 lorem ipsum dolor sit
  2|   20/20                     amet consectetur adipiscing
- 3|   entry_00 lorem ipsum dolo↵elit sed do eiusmod tempor
+ 3| │ entry_00 lorem ipsum dolo↵elit sed do eiusmod tempor
  4|   r sit amet consectetur ad↵
  5|   ipiscing elit sed do eius↵
  6|   mod tempor
@@ -22,7 +22,7 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-7 fg=2 italic
- 3: 3-27 bold | 28 fg=8 dim
+ 3: 1 fg=6 | 3-27 bold | 28 fg=8 dim
  4: 3-27 bold | 28 fg=8 dim
  5: 3-27 bold | 28 fg=8 dim
  6: 3-28 bold

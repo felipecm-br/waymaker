@@ -6,7 +6,7 @@ expression: wm.styled_screen()
  0|
  1| > e               lime/09
  2|   24/30
- 3|   lime/09
+ 3| │ lime/09
  4|   lime/19
  5|   lime/29
  6|   apple/00
@@ -21,7 +21,7 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-7 fg=2 italic
- 3: 3-5 bold | 6 fg=2 italic | 7-18 bold
+ 3: 1 fg=6 | 3-5 bold | 6 fg=2 italic | 7-18 bold
  4: 6 fg=2 italic
  5: 6 fg=2 italic
  6: 7 fg=2 italic

@@ -1,6 +1,6 @@
 ---
 source: waymaker-cli/tests/golden.rs
-assertion_line: 528
+assertion_line: 534
 expression: wm.styled_screen()
 ---
  0|
@@ -10,7 +10,7 @@ expression: wm.styled_screen()
  4|   r sit amet consectetur ad↵
  5|   ipiscing elit sed do eius↵
  6|   mod tempor
- 7|   ipiscing elit sed do eius↵
+ 7| │ ipiscing elit sed do eius↵
  8|   mod tempor
  9|   entry_02 lorem ipsum dolo↵
 10|   r sit amet consectetur ad↵
@@ -33,7 +33,7 @@ expression: wm.styled_screen()
  3: 28 fg=8 dim
  4: 28 fg=8 dim
  5: 28 fg=8 dim
- 7: 3-27 bold | 28 fg=8 dim
+ 7: 1 fg=6 | 3-27 bold | 28 fg=8 dim
  8: 3-28 bold
  9: 28 fg=8 dim
 10: 28 fg=8 dim

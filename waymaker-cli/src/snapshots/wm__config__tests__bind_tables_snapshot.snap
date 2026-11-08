@@ -1,6 +1,6 @@
 ---
 source: waymaker-cli/src/config.rs
-assertion_line: 433
+assertion_line: 437
 expression: out
 ---
 ## config.toml
@@ -105,22 +105,35 @@ expression: out
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/ai/llm.toml
 [binds]
@@ -224,22 +237,35 @@ expression: out
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/ai/pi_extensions.toml
 [binds]
@@ -537,22 +563,35 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/ai/pi_sessions.toml
 [binds]
@@ -661,22 +700,35 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/cargo-rx.toml
 [binds]
@@ -799,22 +851,35 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/csv.toml
 [binds]
@@ -918,22 +983,35 @@ print("removed " + str(len(removed)) + " extension(s) from mm_extensions and pi 
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/dict/emoji.toml
 [binds]
@@ -1097,22 +1175,35 @@ fi
 ), Quit(0)
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/dict/en.toml
 [binds]
@@ -1226,22 +1317,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/dict/unicode.toml
 [binds]
@@ -1382,22 +1486,35 @@ fi
 "tty^^@accept" = Copy(echo {char}), Quit(0)
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/docker/base.toml
 [binds]
@@ -1506,22 +1623,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/docker/compose.toml
 [binds]
@@ -1684,22 +1814,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/docker/containers.toml
 [binds]
@@ -1838,22 +1981,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/docker/images.toml
 [binds]
@@ -2007,22 +2163,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/docker/mount.toml
 [binds]
@@ -2135,22 +2304,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/docker/network.toml
 [binds]
@@ -2259,22 +2441,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/docker/volumes.toml
 [binds]
@@ -2386,22 +2581,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/downloads.toml
 [binds]
@@ -2505,22 +2713,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/ftb.toml
 [binds]
@@ -2625,22 +2846,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/git/base.toml
 [binds]
@@ -2753,22 +2987,35 @@ git --paginate log --graph --decorate=short --date=short \
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/git/browse.toml
 [binds]
@@ -2881,22 +3128,35 @@ done;
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/git/grep.toml
 [binds]
@@ -3006,22 +3266,35 @@ fi)
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/git/restore.toml
 [binds]
@@ -3534,22 +3807,35 @@ esac
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/git/status.toml
 [binds]
@@ -3839,22 +4125,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/git/switch.toml
 [binds]
@@ -4540,22 +4839,35 @@ false
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/jump.toml
 [binds]
@@ -4668,6 +4980,7 @@ false
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
 "*" = @bookmark
 "+" = ExpandPreview(2)
 "," = SortMenu
@@ -4676,11 +4989,19 @@ false
 "/" = FocusFilter
 "=" = ExpandPreview(2)
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
+"D" = @fm_dragdrop
 "G" = Pos(-1)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown(5)
 "K" = PreviewUp(5)
+"O" = @open_2
 "P" = @paste_into
 "U" = Reload(curr="$(pwd)"; while [ "$curr" != "/" ] && [ -n "$curr" ]; do curr="$(dirname "$curr")"; echo "$curr"; done), Cancel, Pos(0)
+"W" = @print_2
+"X" = @fm_uncut
+"Y" = @fm_unyank
 "Z" = @unzip
 "\\" = ToggleParentPeek
 "a" = @create
@@ -4691,6 +5012,7 @@ false
 "b" = @bookmarks
 "backspace" = ChDir(..), Cancel, Reload, FocusNav
 "backtab" = @reloadprev
+"c" = @copy
 "ctrl-d" = PreviewHalfPageDown
 "ctrl-e" = Execute(nvim {+})
 "ctrl-h" = ChDir(..), Cancel, Reload, FocusNav
@@ -4720,6 +5042,7 @@ false
 "l" = ChDir({=}), Cancel, Reload, Pos(0), FocusNav
 "left" = ChDir(..), Cancel, Reload, FocusNav
 "m" = @bookmark
+"o" = @open
 "p" = @paste
 "q" = Quit
 "r" = @rename
@@ -4729,10 +5052,13 @@ false
 "shift-k" = PreviewUp(5)
 "tab" = @reloadnext
 "u" = @undo
+"w" = @print
 "x" = @cut
 "y" = @yank
 "z" = @zip
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/kill.toml
 [binds]
@@ -4837,22 +5163,35 @@ false
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/kube/base.toml
 [binds]
@@ -4961,22 +5300,35 @@ false
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/kube/pods.toml
 [binds]
@@ -5088,22 +5440,35 @@ false
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/linux/prefpanes.toml
 [binds]
@@ -5211,22 +5576,35 @@ false
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/macos/prefpanes.toml
 [binds]
@@ -5439,22 +5817,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/macos/services.toml
 [binds]
@@ -5647,22 +6038,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/man.toml
 [binds]
@@ -5766,22 +6170,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/memory.toml
 [binds]
@@ -5885,22 +6302,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/misc/tabby-select.toml
 [binds]
@@ -6075,22 +6505,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/nvim.toml
 [binds]
@@ -6194,23 +6637,20 @@ fi
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
-" " = Toggle
-"," = SortMenu
-"." = NextColumn
-"/" = FocusFilter
-">" = PrevColumn
-"G" = PreviewDown(0)
-"J" = PreviewDown
-"K" = PreviewUp
-"\\" = ToggleParentPeek
-"esc" = Quit
-"gb" = Pos(-1)
-"gg" = PreviewUp(0)
-"gt" = Pos(0)
-"j" = Down
-"k" = Up
-"q" = Quit
-"|" = ToggleParentPeek
+"'" = PreviewJump
+"+" = ExpandPreview(2)
+"-" = ShrinkPreview(2)
+"?" = Help
+"C" = @copy_active
+"I" = FocusFilter, QueryPos(0)
+"O" = @open_2
+"W" = @print_2
+"c" = @copy
+"esc" = @unwind
+"o" = @open
+"w" = @print
+"{" = ShrinkPreview(10)
+"}" = ExpandPreview(10)
 
 ## presets/obsidian/inboxnotes.toml
 [binds]
@@ -6314,22 +6754,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/obsidian/vaults.toml
 [binds]
@@ -6444,22 +6897,35 @@ FS_OPTS='opener=ob-open' fs
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/patches/git-status.toml
 [binds]
@@ -6597,22 +7063,35 @@ FS_OPTS='opener=ob-open' fs
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/pr.toml
 [binds]
@@ -6735,22 +7214,35 @@ FS_OPTS='opener=ob-open' fs
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/ps.toml
 [binds]
@@ -7016,22 +7508,35 @@ FS_OPTS='opener=ob-open' fs
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/rg.toml
 [binds]
@@ -7142,14 +7647,23 @@ FS_OPTS='opener=ob-open' fs
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown(5)
 "K" = PreviewUp(5)
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
+"c" = @copy
 "ctrl-/" = CyclePreview
 "ctrl-d" = PreviewHalfPageDown
 "ctrl-e" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/tmux/open.sh {1}:{2} "$MM_ORIGIN_CWD")
@@ -7176,8 +7690,11 @@ FS_OPTS='opener=ob-open' fs
 "shift-j" = PreviewDown(5)
 "shift-k" = PreviewUp(5)
 "u" = PreviewHalfPageUp
+"w" = @print
 "y" = ExecuteSilent(test -n "{1}" && printf "%s:%s" {1} {2} | (command -v wl-copy >/dev/null 2>&1 && wl-copy || xclip -in -selection clipboard 2>/dev/null || tmux load-buffer -))
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/session-picker.toml
 [binds]
@@ -7282,30 +7799,38 @@ FS_OPTS='opener=ob-open' fs
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
-" " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = 
-"." = NextColumn
+"-" = ShrinkPreview(2)
 "/" = FocusFilter
-">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "D" = ExecuteAsync(wm session kill "{=}"), SetQuery(), Reload
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
-"\\" = ToggleParentPeek
+"O" = @open_2
+"W" = @print_2
 "backtab" = @reloadprev
+"c" = @copy
 "ctrl-d" = ExecuteAsync(wm session kill "{=}"), SetQuery(), Reload
 "d" = ExecuteAsync(wm session kill "{=}"), SetQuery(), Reload
 "esc" = Quit
-"gb" = Pos(-1)
 "gg" = PreviewUp(0)
-"gt" = Pos(0)
+"h" = 
 "j" = Down
 "k" = Up
+"l" = 
+"o" = @open
 "q" = Quit
 "shift-backtab" = @reloadprev
 "shift-tab" = @reloadprev
 "tab" = @reloadnext
-"|" = ToggleParentPeek
+"w" = @print
+"{" = ShrinkPreview(10)
+"}" = ExpandPreview(10)
 
 ## presets/ssh/hosts.toml
 [binds]
@@ -7412,22 +7937,35 @@ FS_OPTS='opener=ob-open' fs
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/ssh/keys.toml
 [binds]
@@ -7550,22 +8088,35 @@ esac
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/ssh/known.toml
 [binds]
@@ -7677,22 +8228,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/ssh/tailscale.toml
 [binds]
@@ -7798,22 +8362,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/switcher/linux.main.toml
 [binds]
@@ -7917,22 +8494,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/switcher/macos.main.toml
 [binds]
@@ -8049,22 +8639,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/terminal/mutagen.toml
 [binds]
@@ -8190,22 +8793,35 @@ esac
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/terminal/zellij_current.toml
 [binds]
@@ -8316,22 +8932,35 @@ esac
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/terminal/zellij_layout.toml
 [binds]
@@ -8448,22 +9077,35 @@ fi
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/terminal/zellij_other.toml
 [binds]
@@ -8574,22 +9216,35 @@ esac
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/terminal/zellij_session.toml
 [binds]
@@ -8725,22 +9380,35 @@ esac
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/tmux/keybindings.toml
 [binds]
@@ -8844,28 +9512,35 @@ esac
 "shift+scrolldown" = PreviewDown
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
-" " = Toggle
-"," = SortMenu
-"." = NextColumn
+"'" = PreviewJump
+"+" = ExpandPreview(2)
+"-" = ShrinkPreview(2)
 "/" = FocusFilter
-">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
-"\\" = ToggleParentPeek
+"O" = @open_2
+"W" = @print_2
 "backtab" = @reloadprev
+"c" = @copy
 "enter" = Become(sh "$(dirname -- "$MM_OVERRIDE")"/keybindings.sh --run {table} {bind})
 "esc" = Quit
-"gb" = Pos(-1)
 "gg" = PreviewUp(0)
-"gt" = Pos(0)
+"h" = 
 "j" = Down
 "k" = Up
+"l" = 
+"o" = @open
 "q" = Quit
 "shift-tab" = @reloadprev
 "tab" = @reloadnext
+"w" = @print
 "y" = ExecuteSilent(printf "%s" {bind} | tmux load-buffer -w -)
-"|" = ToggleParentPeek
+"{" = ShrinkPreview(10)
+"}" = ExpandPreview(10)
 
 ## presets/tmux/scrollback.toml
 [binds]
@@ -8991,15 +9666,24 @@ esac
 "url^^Tab" = SetPrompt(sha> ), SetQuery(), Reload(cat $WM_SCROLLBACK_DIR/sha.txt), SetMode(sha), Pos(0)
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown(5)
 "K" = PreviewUp(5)
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
 "b" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})
+"c" = @copy
 "ctrl-J" = PreviewDown(5)
 "ctrl-K" = PreviewUp(5)
 "ctrl-b" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})
@@ -9036,7 +9720,9 @@ esac
 "w" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})
 "x" = ExecuteSilent("$(dirname -- "$MM_OVERRIDE")"/open.sh {})
 "y" = Accept
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/win.rg.toml
 [binds]
@@ -9164,22 +9850,35 @@ esac
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
+"+" = ExpandPreview(2)
 "," = SortMenu
+"-" = ShrinkPreview(2)
 "." = NextColumn
 "/" = FocusFilter
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown
 "K" = PreviewUp
+"O" = @open_2
+"W" = @print_2
 "\\" = ToggleParentPeek
-"esc" = Quit
+"c" = @copy
+"esc" = @unwind
 "gb" = Pos(-1)
 "gg" = PreviewUp(0)
 "gt" = Pos(0)
 "j" = Down
 "k" = Up
+"o" = @open
 "q" = Quit
+"w" = @print
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)
 
 ## presets/workspace.toml
 [binds]
@@ -9297,6 +9996,7 @@ esac
 "shift+scrollup" = PreviewUp
 [ui.nav.binds]
 " " = Toggle
+"'" = PreviewJump
 "*" = @bookmark
 "+" = DiagramZoomIn
 "," = SortMenu
@@ -9306,16 +10006,22 @@ esac
 "0" = DiagramResetZoom
 "=" = DiagramZoomIn
 ">" = PrevColumn
+"?" = Help
+"C" = @copy_active
 "G" = PreviewDown(0)
+"I" = FocusFilter, QueryPos(0)
 "J" = PreviewDown(5)
 "K" = PreviewUp(5)
 "N" = PrevDiagram
+"O" = @open_2
 "U" = Reload(curr="$(pwd)"; while [ "$curr" != "/" ] && [ -n "$curr" ]; do curr="$(dirname "$curr")"; echo "$curr"; done), Cancel, Pos(0)
+"W" = @print_2
 "[" = PrevDiagram
 "\\" = ToggleParentPeek
 "]" = NextDiagram
 "b" = @bookmarks
 "backtab" = @reloadprev
+"c" = @copy
 "ctrl-J" = PreviewDown(5)
 "ctrl-K" = PreviewUp(5)
 "ctrl-c" = Quit
@@ -9357,5 +10063,8 @@ esac
 "tab" = @reloadnext
 "u" = PreviewHalfPageUp
 "up" = Up
+"w" = @print
 "y" = Accept
+"{" = ShrinkPreview(10)
 "|" = ToggleParentPeek
+"}" = ExpandPreview(10)

@@ -7,7 +7,7 @@ expression: wm.styled_screen()
  1|    enter accept │ tab mark  entry_04
  2|   ipiscing elit
  3|   entry_05
- 4|   entry_04
+ 4| │ entry_04
  5|   entry_03 lorem ipsum dolo↵
  6|   r sit amet consectetur ad↵
  7|   ipiscing elit
@@ -29,7 +29,7 @@ expression: wm.styled_screen()
 23|
 -- styles --
  1: 1-3 fg=6 | 4-8 fg=6 bold | 9 fg=6 | 10-15 fg=8 | 16 fg=6 | 17 fg=8 | 18 fg=6 | 19-21 fg=6 bold | 22 fg=6 | 23-26 fg=8 | 27-28 fg=6
- 4: 3-28 bold
+ 4: 1 fg=6 | 3-28 bold
  5: 28 fg=8 dim
  6: 28 fg=8 dim
 10: 28 fg=8 dim

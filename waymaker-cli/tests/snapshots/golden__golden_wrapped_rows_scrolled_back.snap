@@ -10,7 +10,7 @@ expression: wm.styled_screen()
  4|   ipiscing elit
  5|   entry_01
  6|   entry_02
- 7|   entry_03 lorem ipsum dolo↵
+ 7| │ entry_03 lorem ipsum dolo↵
  8|   r sit amet consectetur ad↵
  9|   ipiscing elit
 10|   entry_04
@@ -31,7 +31,7 @@ expression: wm.styled_screen()
  1: 1-2 fg=7
  2: 1-7 fg=2 italic
  3: 28 fg=8 dim
- 7: 3-27 bold | 28 fg=8 dim
+ 7: 1 fg=6 | 3-27 bold | 28 fg=8 dim
  8: 3-27 bold | 28 fg=8 dim
  9: 3-28 bold
 12: 28 fg=8 dim

@@ -1,12 +1,12 @@
 ---
 source: waymaker-cli/tests/golden.rs
-assertion_line: 863
+assertion_line: 870
 expression: wm.styled_screen()
 ---
  0|
  1| >                                                         doc.txt
  2|   2/2                                                     Alt-Enter = @Accept
- 3|   doc.txt                                                 Enter = @accept
+ 3| │ doc.txt                                                 Enter = @accept
  4|   other.txt                                               Ctrl-Enter = @accept_2
  5|                                                           F9 = @break
  6|                                                           Ctrl-y = @copy
@@ -30,7 +30,7 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-5 fg=2 italic | 59-67 fg=2 | 71-77 fg=15
- 3: 3-58 bold | 59-63 fg=2 | 67-73 fg=15
+ 3: 1 fg=6 | 3-58 bold | 59-63 fg=2 | 67-73 fg=15
  4: 59-68 fg=2 | 72-80 fg=15
  5: 59-60 fg=2 | 64-69 fg=15
  6: 59-64 fg=2 | 68-72 fg=15

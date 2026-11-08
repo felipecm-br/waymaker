@@ -6,6 +6,32 @@ max = 120
 # --- UI ---
 [ui]
 border = { type = "Rounded" }
+
+# Navigation mode: esc unwinds (closes boxes, clears marks and the query), then hands
+# the keys to the results instead of exiting; single letters below work there.
+# From navigation mode, esc or q exits and / returns to the query.
+[ui.nav]
+active = true
+marker = "│"
+hints = false # the built-in hint rows describe the file-manager keys; ? lists these
+
+[ui.nav.binds]
+# Added to the profile defaults (j/k, gt/gb, space, `,`, esc/q, ...): home-row
+# paths for actions that are otherwise alt-only. y/p/P are left to the fm profile.
+"esc" = "@unwind" # close help/boxes, clear marks and query, then exit
+"?" = "Help"
+"I" = ["FocusFilter", "QueryPos(0)"]
+"+" = "ExpandPreview(2)"
+"-" = "ShrinkPreview(2)"
+"}" = "ExpandPreview(10)"
+"{" = "ShrinkPreview(10)"
+"'" = "PreviewJump"
+"o" = "@open"
+"O" = "@open_2"
+"w" = "@print" # write to stdout
+"W" = "@print_2"
+"c" = "@copy"
+"C" = "@copy_active"
 # sort_menu = { columns = 4, show_title = true }
 # default_sort = "Natural"
 
@@ -29,7 +55,7 @@ prompt_style.fg = "Gray"
 [header]
 
 [footer]
-content = " {cyan,bold:enter} {darkgray:accept} {darkgray:│} {cyan,bold:tab} {darkgray:mark} {darkgray:│} {cyan,bold:ctrl-p} {darkgray:preview} {darkgray:│} {cyan,bold:ctrl-/} {darkgray:layout} {darkgray:│} {cyan,bold:esc} {cyan,bold:?} {darkgray:help}"
+content = " {cyan,bold:enter} {darkgray:accept} {darkgray:│} {cyan,bold:tab} {darkgray:mark} {darkgray:│} {cyan,bold:ctrl-p} {darkgray:preview} {darkgray:│} {cyan,bold:ctrl-/} {darkgray:layout} {darkgray:│} {cyan,bold:esc} {darkgray:nav} {darkgray:│} {cyan,bold:?} {darkgray:help}"
 
 # --- Preview ---
 [preview]
