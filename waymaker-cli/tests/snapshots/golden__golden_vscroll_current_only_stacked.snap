@@ -4,8 +4,8 @@ assertion_line: 567
 expression: wm.styled_screen()
 ---
  0|
- 1| >                                             item_00_with_a_rather_long_name_
- 2|   20/20                                       that_wraps_in_the_list
+ 1| >                              item_00_with_a_rather_long_name_that_wraps_in_t
+ 2|   20/20                        he_list
  3| │ 1K
  4|   2026-01-01
  5|   item_01
@@ -14,12 +14,12 @@ expression: wm.styled_screen()
  8|   item_02
  9|   3K
 10|   2026-01-03
-11|   item_03_with_a_rather_long_name_that_wraps_↵
-12|   in_the_list
+11|   item_03_with_a_rather_long_n↵
+12|   ame_that_wraps_in_the_list
 13|   4K
 14|   2026-01-04
 15|   item_04
-16|    enter accept │ tab mark │ ctrl-p preview
+16|    enter accept │ tab mark │ ctrl-p preview │ ctrl-/ layout │ esc nav │ ? help
 17|
 18|
 19|
@@ -37,5 +37,5 @@ expression: wm.styled_screen()
  1: 1-2 fg=7
  2: 1-7 fg=2 italic
  3: 1 fg=6
-11: 46 fg=8 dim
-16: 1-3 fg=6 | 4-8 fg=6 bold | 9 fg=6 | 10-15 fg=8 | 16 fg=6 | 17 fg=8 | 18 fg=6 | 19-21 fg=6 bold | 22 fg=6 | 23-26 fg=8 | 27 fg=6 | 28 fg=8 | 29 fg=6 | 30-35 fg=6 bold | 36 fg=6 | 37-43 fg=8 | 44-46 fg=6
+11: 31 fg=8 dim
+16: 1-3 fg=6 | 4-8 fg=6 bold | 9 fg=6 | 10-15 fg=8 | 16 fg=6 | 17 fg=8 | 18 fg=6 | 19-21 fg=6 bold | 22 fg=6 | 23-26 fg=8 | 27 fg=6 | 28 fg=8 | 29 fg=6 | 30-35 fg=6 bold | 36 fg=6 | 37-43 fg=8 | 44 fg=6 | 45 fg=8 | 46 fg=6 | 47-52 fg=6 bold | 53 fg=6 | 54-59 fg=8 | 60 fg=6 | 61 fg=8 | 62 fg=6 | 63-65 fg=6 bold | 66 fg=6 | 67-69 fg=8 | 70 fg=6 | 71 fg=8 | 72 fg=6 | 73 fg=6 bold | 74 fg=6 | 75-78 fg=8

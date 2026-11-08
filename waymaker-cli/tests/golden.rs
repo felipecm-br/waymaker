@@ -676,20 +676,20 @@ fn drag_preview(args: &'static [&'static str], from: (u16, u16), to: (u16, u16))
 #[test]
 fn golden_mouse_drag_gap_grows_preview() {
     // The default layout has a one-column drag gap at the preview's left edge.
-    let wm = drag_preview(&[], (72, 8), (52, 8));
+    let wm = drag_preview(&[], (49, 8), (29, 8));
     insta::assert_snapshot!(wm.styled_screen());
 }
 
 #[test]
 fn golden_mouse_drag_gap_shrinks_preview() {
-    let wm = drag_preview(&[], (72, 8), (92, 8));
+    let wm = drag_preview(&[], (49, 8), (69, 8));
     insta::assert_snapshot!(wm.styled_screen());
 }
 
 #[test]
 fn golden_mouse_drag_edge_without_gap() {
     // `gap=0`: the first `drag_width` columns of the preview are the handle instead.
-    let wm = drag_preview(&["p.l", "gap=0", "preview.drag_width=2"], (72, 8), (52, 8));
+    let wm = drag_preview(&["p.l", "gap=0", "preview.drag_width=2"], (49, 8), (29, 8));
     insta::assert_snapshot!(wm.styled_screen());
 }
 
@@ -711,7 +711,7 @@ const LONG_TEXT: &str = "line 01\nline 02\nline 03\nline 04\nline 05\nline 06\nl
 #[test]
 fn golden_mouse_drag_gap_left_preview() {
     // Preview on the left: its gap is its last column, and dragging right grows it.
-    let wm = drag_preview(&["p.l", "side=left"], (49, 8), (69, 8));
+    let wm = drag_preview(&["p.l", "side=left"], (72, 8), (92, 8));
     insta::assert_snapshot!(wm.styled_screen());
 }
 

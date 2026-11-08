@@ -4,14 +4,14 @@ assertion_line: 385
 expression: wm.styled_screen()
 ---
  0|
- 1| >                           README.md
+ 1| >                      README.md
  2|      3/3
  3| │   README.md
  4|   1K
  5|   2026-01-03
  6|     Cargo.toml
  7|   2K
- 8|       enter accept
+ 8|       enter accept │ tab mark │ ctrl-p preview
  9|
 10|
 11|
@@ -20,6 +20,6 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-8 fg=2 italic
- 3: 1 fg=6 | 3 bold | 4 fg=4 bold | 5-28 bold
+ 3: 1 fg=6 | 3 bold | 4 fg=4 bold | 5-23 bold
  6: 4 fg=1
- 8: 1-6 fg=6 | 7-11 fg=6 bold | 12 fg=6 | 13-18 fg=8 | 19-28 fg=6
+ 8: 1-6 fg=6 | 7-11 fg=6 bold | 12 fg=6 | 13-18 fg=8 | 19 fg=6 | 20 fg=8 | 21 fg=6 | 22-24 fg=6 bold | 25 fg=6 | 26-29 fg=8 | 30 fg=6 | 31 fg=8 | 32 fg=6 | 33-38 fg=6 bold | 39 fg=6 | 40-46 fg=8 | 47-58 fg=6

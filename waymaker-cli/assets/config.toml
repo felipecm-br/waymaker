@@ -55,6 +55,7 @@ prompt_style.fg = "Gray"
 [header]
 
 [footer]
+row_connection = "Full" # span list and preview, so the list can stay narrow
 content = " {cyan,bold:enter} {darkgray:accept} {darkgray:│} {cyan,bold:tab} {darkgray:mark} {darkgray:│} {cyan,bold:ctrl-p} {darkgray:preview} {darkgray:│} {cyan,bold:ctrl-/} {darkgray:layout} {darkgray:│} {cyan,bold:esc} {darkgray:nav} {darkgray:│} {cyan,bold:?} {darkgray:help}"
 
 # --- Preview ---
@@ -72,7 +73,7 @@ command = "wm preview-file {1}"
 
 
 side = "right"
-percentage = 40
+percentage = 60 # list 40 / preview 60
 min = 30
 
 [[preview.layout]]

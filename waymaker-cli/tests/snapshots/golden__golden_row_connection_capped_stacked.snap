@@ -4,14 +4,14 @@ assertion_line: 549
 expression: wm.styled_screen()
 ---
  0|
- 1| >                                             beta
+ 1| >                              beta
  2|   4/4
  3| │ beta
  4|   3M
  5|   2025-12-31
  6|   gamma
  7|   980
- 8|    enter accept │ tab mark │ ctrl-p preview
+ 8|    enter accept │ tab mark │ ctrl-p preview │ ctrl-/ layout │ esc nav │ ? help
  9|
 10|
 11|
@@ -22,5 +22,5 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-5 fg=2 italic
- 3: 1 fg=6 | 3-46 bold
- 8: 1-3 fg=6 | 4-8 fg=6 bold | 9 fg=6 | 10-15 fg=8 | 16 fg=6 | 17 fg=8 | 18 fg=6 | 19-21 fg=6 bold | 22 fg=6 | 23-26 fg=8 | 27 fg=6 | 28 fg=8 | 29 fg=6 | 30-35 fg=6 bold | 36 fg=6 | 37-43 fg=8 | 44-46 fg=6
+ 3: 1 fg=6 | 3-31 bold
+ 8: 1-3 fg=6 | 4-8 fg=6 bold | 9 fg=6 | 10-15 fg=8 | 16 fg=6 | 17 fg=8 | 18 fg=6 | 19-21 fg=6 bold | 22 fg=6 | 23-26 fg=8 | 27 fg=6 | 28 fg=8 | 29 fg=6 | 30-35 fg=6 bold | 36 fg=6 | 37-43 fg=8 | 44 fg=6 | 45 fg=8 | 46 fg=6 | 47-52 fg=6 bold | 53 fg=6 | 54-59 fg=8 | 60 fg=6 | 61 fg=8 | 62 fg=6 | 63-65 fg=6 bold | 66 fg=6 | 67-69 fg=8 | 70 fg=6 | 71 fg=8 | 72 fg=6 | 73 fg=6 bold | 74 fg=6 | 75-78 fg=8

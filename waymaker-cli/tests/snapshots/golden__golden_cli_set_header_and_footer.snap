@@ -4,7 +4,7 @@ assertion_line: 1161
 expression: wm.styled_screen()
 ---
  0|
- 1| >                           apple/00
+ 1| >                      apple/00
  2|   30/30
  3|   a header line
  4| │ apple/00
@@ -22,6 +22,6 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-7 fg=2 italic
- 3: 1-28 fg=6
- 4: 1 fg=6 | 3-28 bold
- 8: 1-28 fg=6
+ 3: 1-23 fg=6
+ 4: 1 fg=6 | 3-23 bold
+ 8: 1-58 fg=6

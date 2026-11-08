@@ -4,16 +4,16 @@ assertion_line: 246
 expression: wm.styled_screen()
 ---
  0|
- 1| >                       src/module_24/a_rather_long_fi
- 2|      25/25              le_name_that_wraps_24.rs
- 3|     e_that_wraps_22.rs
- 4|     src/module_23/a_ra↵
- 5|     ther_long_file_nam↵
- 6|     e_that_wraps_23.rs
- 7| │   src/module_24/a_ra↵
- 8|     ther_long_file_nam↵
- 9|     e_that_wraps_24.rs
-10|       enter accept
+ 1| >                    src/module_24/a_rather_long_file_
+ 2|      25/25           name_that_wraps_24.rs
+ 3|     _rather_long_fi↵
+ 4|     le_name_that_wr↵
+ 5|     aps_23.rs
+ 6| │   src/module_24/a↵
+ 7|     _rather_long_fi↵
+ 8|     le_name_that_wr↵
+ 9|     aps_24.rs
+10|       enter accept │ tab mark │ ctrl-p preview
 11|
 12|
 13|
@@ -26,11 +26,11 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-10 fg=2 italic
- 3: 4 fg=1
- 4: 4 fg=1 | 24 fg=8 dim
- 5: 4 fg=1 | 24 fg=8 dim
- 6: 4 fg=1
- 7: 1 fg=6 | 3 bold | 4 fg=1 bold | 5-23 bold | 24 fg=8 dim
- 8: 3 bold | 4 fg=1 bold | 5-23 bold | 24 fg=8 dim
- 9: 3 bold | 4 fg=1 bold | 5-24 bold
-10: 1-6 fg=6 | 7-11 fg=6 bold | 12 fg=6 | 13-18 fg=8 | 19-24 fg=6
+ 3: 4 fg=1 | 21 fg=8 dim
+ 4: 4 fg=1 | 21 fg=8 dim
+ 5: 4 fg=1
+ 6: 1 fg=6 | 3 bold | 4 fg=1 bold | 5-20 bold | 21 fg=8 dim
+ 7: 3 bold | 4 fg=1 bold | 5-20 bold | 21 fg=8 dim
+ 8: 3 bold | 4 fg=1 bold | 5-20 bold | 21 fg=8 dim
+ 9: 3 bold | 4 fg=1 bold | 5-21 bold
+10: 1-6 fg=6 | 7-11 fg=6 bold | 12 fg=6 | 13-18 fg=8 | 19 fg=6 | 20 fg=8 | 21 fg=6 | 22-24 fg=6 bold | 25 fg=6 | 26-29 fg=8 | 30 fg=6 | 31 fg=8 | 32 fg=6 | 33-38 fg=6 bold | 39 fg=6 | 40-46 fg=8 | 47-54 fg=6

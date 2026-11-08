@@ -4,7 +4,7 @@ assertion_line: 1039
 expression: wm.styled_screen()
 ---
  0|
- 1| >                           apple/00
+ 1| >                      apple/00
  2|   30/30
  3| │ apple/00
  4|   banana/01
@@ -22,7 +22,7 @@ expression: wm.styled_screen()
 -- styles --
  1: 1-2 fg=7
  2: 1-7 fg=2 italic
- 3: 1 fg=6 | 3-28 bold
+ 3: 1 fg=6 | 3-23 bold
  5: 1-4 fg=6 bold | 5-10 fg=15 | 15-18 fg=6 bold | 19-30 fg=15 | 31-34 fg=2 bold | 35-42 fg=15 | 45-48 fg=2 bold | 49-58 fg=15
  6: 1-4 fg=3 bold | 5-10 fg=15 | 15-18 fg=3 bold | 19-30 fg=15 | 31-34 fg=10 bold | 35-40 fg=15 | 45-48 fg=10 bold | 49-58 fg=15
  7: 1-4 fg=5 bold | 5-9 fg=15 | 15-18 fg=5 bold | 19-29 fg=15 | 30-33 fg=4 bold | 34-37 fg=15 | 44-47 fg=4 bold | 48-57 fg=15
