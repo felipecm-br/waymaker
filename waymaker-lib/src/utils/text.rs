@@ -191,7 +191,7 @@ pub fn clip_text_lines<'a, 'b: 'a>(original: &'a mut Text<'b>, max_lines: u16, f
 }
 
 pub fn wrapped_line_height(line: &Line<'_>, width: u16) -> u16 {
-    line.width().div_ceil(width as usize) as u16
+    super::cells(line.width().div_ceil(width as usize))
 }
 
 pub fn wrapping_indicator<'a>() -> Span<'a> {
@@ -219,7 +219,7 @@ fn slice_cow<'a>(cow: &Cow<'a, str>, start: usize, end: usize) -> Cow<'a, str> {
 /// Wrap a line if it exceeds max_width, with an indicator as the final line character
 /// Any grapheme which doesn't fit in max_width is forced onto a new line.
 pub fn wrap_line<'a>(line: Line<'a>, max_width: u16, indicator: &Span<'a>) -> Vec<Line<'a>> {
-    if max_width == 0 || line.width() as u16 <= max_width {
+    if max_width == 0 || super::cells(line.width()) <= max_width {
         return vec![line];
     }
 

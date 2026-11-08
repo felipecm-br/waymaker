@@ -664,7 +664,7 @@ impl<T: SSS> Worker<T> {
                     };
 
                     if col_idx < widths.len() {
-                        widths[col_idx] = widths[col_idx].max(computed_width as u16)
+                        widths[col_idx] = widths[col_idx].max(crate::utils::cells(computed_width))
                     }
 
                     cell
@@ -825,7 +825,7 @@ impl<T: SSS> Worker<T> {
                 }
 
                 if width_limits.get(i).cloned() != Some(0) && !skip {
-                    raw_widths[i].push(t.width() as u16);
+                    raw_widths[i].push(crate::utils::cells(t.width()));
                 }
             }
             row.push(t);

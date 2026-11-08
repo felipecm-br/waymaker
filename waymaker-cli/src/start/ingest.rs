@@ -238,8 +238,8 @@ pub(super) fn inject_line(
         }
 
         if remaining > 0 {
-            let item = injector.wrap((current_group.clone(), line)).unwrap();
-            let item = injector.injector.wrap(item).unwrap();
+            let item = injector.wrap((current_group.clone(), line))?;
+            let item = injector.injector.wrap(item)?;
             header_buf.push(item);
             remaining -= 1;
 

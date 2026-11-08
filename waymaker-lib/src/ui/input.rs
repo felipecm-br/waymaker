@@ -561,7 +561,7 @@ impl QueryUI {
         let (should_underline, u_style) = self.active_underline_style(focused);
 
         if should_underline && area_width > 0 {
-            let cur_w = line.spans.iter().map(|s| s.content.width()).sum::<usize>() as u16;
+            let cur_w = crate::utils::cells(line.spans.iter().map(|s| s.content.width()).sum());
             let pad = area_width.saturating_sub(cur_w);
             if pad > 0 {
                 line.push_span(Span::raw(" ".repeat(pad as usize)));
@@ -607,14 +607,11 @@ impl QueryUI {
         ));
 
         // Calculate how much of area_width the left part already consumes.
-        let left_width = line.spans.iter().map(|s| s.content.width()).sum::<usize>() as u16;
+        let left_width = crate::utils::cells(line.spans.iter().map(|s| s.content.width()).sum());
 
         // Width of the right label.
-        let label_width = right_label
-            .spans
-            .iter()
-            .map(|s| s.content.width())
-            .sum::<usize>() as u16;
+        let label_width =
+            crate::utils::cells(right_label.spans.iter().map(|s| s.content.width()).sum());
 
         // How many spaces we need to pad between left content and right label.
         let padding = area_width
@@ -632,7 +629,7 @@ impl QueryUI {
         let (should_underline, u_style) = self.active_underline_style(focused);
 
         if should_underline && area_width > 0 {
-            let cur_w = line.spans.iter().map(|s| s.content.width()).sum::<usize>() as u16;
+            let cur_w = crate::utils::cells(line.spans.iter().map(|s| s.content.width()).sum());
             let pad = area_width.saturating_sub(cur_w);
             if pad > 0 {
                 line.push_span(Span::raw(" ".repeat(pad as usize)));
@@ -664,9 +661,13 @@ impl QueryUI {
             let new_width = default_prompt.to_string().width();
 
             if new_width > old_width {
-                self.width = self.width.saturating_sub((new_width - old_width) as u16);
+                self.width = self
+                    .width
+                    .saturating_sub(crate::utils::cells(new_width - old_width));
             } else if old_width > new_width {
-                self.width += (old_width - new_width) as u16;
+                self.width = self
+                    .width
+                    .saturating_add(crate::utils::cells(old_width - new_width));
             }
 
             self.prompt = default_prompt;
@@ -679,9 +680,13 @@ impl QueryUI {
         let new_width = prompt.to_string().width();
 
         if new_width > old_width {
-            self.width = self.width.saturating_sub((new_width - old_width) as u16);
+            self.width = self
+                .width
+                .saturating_sub(crate::utils::cells(new_width - old_width));
         } else if old_width > new_width {
-            self.width += (old_width - new_width) as u16;
+            self.width = self
+                .width
+                .saturating_add(crate::utils::cells(old_width - new_width));
         }
 
         self.custom_prompt = Some(prompt.clone());

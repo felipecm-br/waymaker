@@ -13,6 +13,17 @@ pub mod mermaid;
 pub mod string;
 pub mod tree;
 
+/// The most cells [`cells`] reports: wider than any terminal, and small enough that the
+/// widths of 31 columns still add up without overflowing `u16`.
+pub const MAX_CELLS: u16 = 2_048;
+
+/// Converts a width or count to terminal cells, saturating at [`MAX_CELLS`]. A plain
+/// `as u16` wraps: a 65,546-cell line measured 10 and was laid out as a sliver.
+#[inline]
+pub fn cells(n: usize) -> u16 {
+    n.min(MAX_CELLS as usize) as u16
+}
+
 /// Serializes tests that set or remove process environment variables. Every
 /// such test in the crate must hold it, since the environment is shared across
 /// test threads. A tokio mutex so async tests can hold it across `.await`; it

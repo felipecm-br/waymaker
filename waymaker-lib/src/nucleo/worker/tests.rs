@@ -1101,3 +1101,36 @@ fn test_frizbee_active_query_ranks_exact_match_first() {
     let all_filtered = worker.get_all_sorted();
     assert_eq!(*all_filtered[0], "oi.md");
 }
+
+/// A line wider than `u16::MAX` cells measures as wide, not as its width modulo 65,536: the
+/// medians that lay out the columns saw a 65,546-cell line as 10 cells and cut its row short.
+#[test]
+fn test_width_of_a_line_wider_than_u16_saturates() {
+    let mut worker = Worker::<String>::new_single_column();
+    let injector = worker.nucleo.injector();
+    let long = "x".repeat(65_546);
+    for line in [long.clone(), long.clone(), long, "short".to_string()] {
+        injector.push(line, |item, cols| {
+            cols[0] = item.clone().into();
+        });
+    }
+    worker.nucleo.tick(10);
+
+    let mut matcher = Matcher::default();
+    let (results, _, medians, _) = worker.results(
+        0,
+        10,
+        &[100],
+        false,
+        0,
+        Style::default(),
+        &mut matcher,
+        AutoscrollSettings::default(),
+        0,
+        (0, false),
+        true,
+        false,
+    );
+    assert_eq!(results.len(), 4);
+    assert_eq!(medians[0], crate::utils::MAX_CELLS, "medians: {medians:?}");
+}

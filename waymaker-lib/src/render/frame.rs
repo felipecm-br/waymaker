@@ -951,7 +951,7 @@ fn breadcrumb_layout<T: SSS, S: Selection>(
 
         let truncate_len = picker_ui.breadcrumb_config.truncate_length;
         let num_components = components.len();
-        let mut breadcrumb_width = 0;
+        let mut breadcrumb_width: u16 = 0;
 
         for (i, mut text) in components.into_iter().enumerate() {
             if truncate_len > 0
@@ -962,14 +962,16 @@ fn breadcrumb_layout<T: SSS, S: Selection>(
                 text = text.chars().take(truncate_len).collect();
             }
 
-            breadcrumb_width += text.chars().count() as u16;
+            breadcrumb_width =
+                breadcrumb_width.saturating_add(crate::utils::cells(text.chars().count()));
             breadcrumb_spans.push(ratatui::text::Span::styled(
                 text,
                 ratatui::style::Style::from(picker_ui.breadcrumb_config.style),
             ));
             if i < num_components - 1 {
                 let sep = picker_ui.breadcrumb_config.separator.clone();
-                breadcrumb_width += sep.chars().count() as u16;
+                breadcrumb_width =
+                    breadcrumb_width.saturating_add(crate::utils::cells(sep.chars().count()));
                 breadcrumb_spans.push(ratatui::text::Span::styled(
                     sep,
                     ratatui::style::Style::from(picker_ui.breadcrumb_config.separator_style),
@@ -1019,7 +1021,7 @@ fn counter_gap_width<T: SSS, S: Selection>(picker_ui: &PickerUI<'_, T, S>) -> u1
     .flatten()
     .collect();
 
-    widths.iter().copied().max().unwrap_or(0) as u16
+    crate::utils::cells(widths.iter().copied().max().unwrap_or(0))
 }
 
 /// Takes the parent-peek column off the left of `_area` when it is enabled and wide enough.

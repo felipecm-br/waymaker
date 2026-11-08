@@ -71,7 +71,7 @@ impl ResultsUI {
             .iter()
             .filter_map(|(g, _, _)| match g.as_ref() {
                 Some(crate::nucleo::GroupHeader::Named(s)) => {
-                    Some(UnicodeWidthStr::width(&**s) as u16 + 2)
+                    Some(crate::utils::cells(UnicodeWidthStr::width(&**s)).saturating_add(2))
                 }
                 _ => None,
             })
