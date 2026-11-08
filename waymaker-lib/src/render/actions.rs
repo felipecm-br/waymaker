@@ -64,7 +64,6 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         results,
         worker,
         selector: selections,
-        history,
         ..
     } = &mut *picker_ui;
     match action {
@@ -72,30 +71,7 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::DownOrHistory
         | Action::HistoryPrev
         | Action::HistoryNext) => {
-            // The `*OrHistory` forms recall only from the first row, so the arrows still move the
-            // cursor through the list; in a reversed layout the first row is not next to the filter.
-            let at_top = !results.reverse() && results.index() == 0;
-            let recall = match a {
-                Action::UpOrHistory => at_top && !history.is_empty(),
-                Action::DownOrHistory => at_top && history.is_browsing(&query.input),
-                _ => true,
-            };
-            if !recall {
-                let step = match a {
-                    Action::UpOrHistory => Action::<A>::Up(1),
-                    _ => Action::Down(1),
-                };
-                return cursor_action(step, results, worker, query, preview_ui, did_cursor_wrap);
-            }
-            let text = match a {
-                Action::UpOrHistory | Action::HistoryPrev => {
-                    history.prev(&query.input).map(str::to_string)
-                }
-                _ => history.next(&query.input),
-            };
-            if let Some(text) = text {
-                query.set(Some(text), u16::MAX);
-            }
+            return history_action(a, picker_ui, preview_ui, did_cursor_wrap);
         }
         a @ (Action::Select
         | Action::Deselect
@@ -688,6 +664,45 @@ fn selection_action<T: SSS, S: Selection, A: ActionExt>(
 }
 
 /// /// Cursor and scroll movement in the results and the query: Up/Down, Pos, QueryPos, HScroll/VScroll, half pages.
+/// Query history in the filter. The `*OrHistory` forms recall only from the first row, so the
+/// arrows still move the cursor through the list; in a reversed layout the first row is not next
+/// to the filter.
+fn history_action<T: SSS, S: Selection, A: ActionExt>(
+    a: Action<A>,
+    picker_ui: &mut PickerUI<'_, T, S>,
+    preview_ui: &mut Option<PreviewUI>,
+    did_cursor_wrap: &mut bool,
+) -> Flow<S> {
+    let PickerUI {
+        query,
+        results,
+        worker,
+        history,
+        ..
+    } = picker_ui;
+    let at_top = !results.reverse() && results.index() == 0;
+    let recall = match a {
+        Action::UpOrHistory => at_top && !history.is_empty(),
+        Action::DownOrHistory => at_top && history.is_browsing(&query.input),
+        _ => true,
+    };
+    if !recall {
+        let step = match a {
+            Action::UpOrHistory => Action::<A>::Up(1),
+            _ => Action::Down(1),
+        };
+        return cursor_action(step, results, worker, query, preview_ui, did_cursor_wrap);
+    }
+    let text = match a {
+        Action::UpOrHistory | Action::HistoryPrev => history.prev(&query.input).map(str::to_string),
+        _ => history.next(&query.input),
+    };
+    if let Some(text) = text {
+        query.set(Some(text), u16::MAX);
+    }
+    Flow::Proceed
+}
+
 fn cursor_action<T: SSS, S: Selection, A: ActionExt>(
     action: Action<A>,
     results: &mut ResultsUI,
