@@ -933,3 +933,136 @@ fn default_f2_renames_the_current_file() {
     eventually("F2 renamed top.md", || work.join("top.txt").is_file());
     abort(wm);
 }
+
+// ---- commands run from binds: which follow-up each one gets ----
+
+/// An override file binding `ctrl-y` to `actions` (a TOML value), a counter file the commands
+/// can append to, and the `-o` argument naming the override.
+fn bind_ctrl_y(actions: &str) -> (tempfile::TempDir, std::path::PathBuf, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let count = dir.path().join("count");
+    std::fs::write(&count, "").unwrap();
+    let actions = actions.replace("COUNT", &count.display().to_string());
+    let config = dir.path().join("binds.toml");
+    std::fs::write(&config, format!("[binds]\n\"ctrl-y\" = {actions}\n")).unwrap();
+    (dir, count, config.display().to_string())
+}
+
+const CTRL_Y: &str = "\x19";
+
+/// Waits until `path` has `lines` lines, then a little longer so a second run would show.
+fn wait_for_lines(path: &std::path::Path, lines: usize) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while std::fs::read_to_string(path).unwrap().lines().count() < lines {
+        assert!(
+            Instant::now() < deadline,
+            "{} never had {lines} lines",
+            path.display()
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    std::thread::sleep(Duration::from_millis(400));
+}
+
+#[test]
+#[ignore = "Copy runs its command twice; fixed by the next commit"]
+fn copy_runs_its_command_once() {
+    let (_dir, count, config) = bind_ctrl_y(r#""Copy(echo run >> COUNT; echo text)""#);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    wait_for_lines(&count, 1);
+    wm.send(ESC);
+    wm.send(ESC);
+    assert_eq!(wm.finish().0, 130);
+    assert_eq!(std::fs::read_to_string(&count).unwrap(), "run\n");
+}
+
+#[test]
+fn copy_async_runs_its_command_once() {
+    let (_dir, count, config) = bind_ctrl_y(r#""CopyAsync(echo run >> COUNT; echo text)""#);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    wait_for_lines(&count, 1);
+    wm.send(ESC);
+    wm.send(ESC);
+    assert_eq!(wm.finish().0, 130);
+    assert_eq!(std::fs::read_to_string(&count).unwrap(), "run\n");
+}
+
+#[test]
+fn execute_async_runs_the_rest_even_when_the_command_fails() {
+    let (_dir, _count, config) = bind_ctrl_y(r#"["ExecuteAsync(false)", "Accept"]"#);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+}
+
+#[test]
+fn execute_then_runs_the_rest_only_on_success() {
+    let (_dir, count, config) =
+        bind_ctrl_y(r#"["ExecuteThen(echo ran >> COUNT; false)", "Accept"]"#);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    wait_for_lines(&count, 1); // ran, failed, and the Accept after it did not run
+    wm.send(ESC);
+    wm.send(ESC);
+    assert_eq!(wm.finish().0, 130);
+
+    let (_dir, _count, config) = bind_ctrl_y(r#"["ExecuteThen(true)", "Accept"]"#);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    assert_eq!(wm.finish(), (0, "apple\n".to_string()));
+}
+
+#[test]
+fn execute_and_quit_finishes_only_on_success() {
+    let (_dir, _count, config) = bind_ctrl_y(r#""ExecuteAndQuit(true)""#);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    assert_eq!(wm.finish().0, 0);
+
+    let (_dir, count, config) = bind_ctrl_y(r#""ExecuteAndQuit(echo ran >> COUNT; false)""#);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    wait_for_lines(&count, 1);
+    wm.send(ESC);
+    wm.send(ESC);
+    assert_eq!(wm.finish().0, 130);
+}
+
+/// Runs `bind` (a failing command), waits at the "Press enter" prompt, answers it and leaves
+/// the picker with `esc esc`; returns what `wm` printed to stdout. The prompt is on the terminal,
+/// not stdin: stdin holds the items, so reading it never waited, and the prompt ended up in the
+/// output.
+fn run_failing_command_and_confirm(bind: &str) -> String {
+    let (_dir, _count, config) = bind_ctrl_y(bind);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    wm.wait_for_screen(|s| s.contains("Press enter to continue"));
+    std::thread::sleep(Duration::from_millis(300)); // still waiting for the answer
+    assert!(wm.current_screen().contains("Press enter to continue"));
+    wm.send(ENTER);
+    wm.wait_for_screen(|s| s.contains("3/3"));
+    wm.send(ESC);
+    wm.send(ESC);
+    let (code, out) = wm.finish();
+    assert_eq!(code, 130);
+    out
+}
+
+#[test]
+fn execute_or_confirm_asks_before_returning_after_a_failure() {
+    let out = run_failing_command_and_confirm(r#""ExecuteOrConfirm(false)""#);
+    assert_eq!(out, "");
+}
+
+#[test]
+fn become_or_finishes_on_success_and_asks_after_a_failure() {
+    let (_dir, _count, config) = bind_ctrl_y(r#""BecomeOr(true)""#);
+    let wm = Session::start(FRUIT, &["-o", &config]);
+    wm.send(CTRL_Y);
+    assert_eq!(wm.finish().0, 0);
+
+    let out = run_failing_command_and_confirm(r#""BecomeOr(false)""#);
+    assert_eq!(out, "");
+}

@@ -13,6 +13,7 @@
 
 ### 🐛 Fixed
 
+- `ExecuteOrConfirm` and `BecomeOr` did not wait at "Press enter to continue" after a failed command when the items came from a pipe (`ls | wm`): the prompt read its answer from stdin, which holds the items, and was printed to stdout, so it also ended up in the output. It now uses the terminal
 - A line wider than 65,535 cells was laid out by its width modulo 65,536, so a 65,546-cell line (minified JS, a long log line) was cut to a 10-cell sliver; debug builds panicked on the overflow instead. Widths now saturate at 2,048 cells (`utils::cells`) wherever item, query or header text is measured
 - Changing the query moves the cursor to the best match. It used to keep its row, so after moving down, typing and pressing `enter` could accept a worse match (with `apple`, `foobar`, `banana`: two `down`s, then `ba` and `enter` printed `foobar` instead of `banana`)
 - `matcher.raw` is removed: it was documented as unimplemented and did nothing; a config that sets it now gets an unknown-key warning. `matcher.reverse` was also documented as unimplemented but works (fzf's `--tac`); the docs say so now

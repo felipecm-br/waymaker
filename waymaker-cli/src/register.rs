@@ -62,9 +62,7 @@ impl Matchmaker<ConfigMMItem, ConfigMMInnerItem> {
                             match discriminant {
                                 // signal termination don't prompt
                                 Some(0) if i.code().is_some_and(|c| c != 0) => {
-                                    println!("\nPress enter to continue...");
-                                    let mut input = String::new();
-                                    let _ = std::io::stdin().read_line(&mut input);
+                                    press_enter_to_continue();
                                 }
                                 Some(1) if i.success() => {
                                     state.request_finish();
@@ -73,9 +71,7 @@ impl Matchmaker<ConfigMMItem, ConfigMMInnerItem> {
                                     if i.success() {
                                         state.request_finish();
                                     } else if i.code().is_some() {
-                                        println!("\nPress enter to continue...");
-                                        let mut input = String::new();
-                                        let _ = std::io::stdin().read_line(&mut input);
+                                        press_enter_to_continue();
                                     }
                                 }
                                 _ => {}
@@ -115,6 +111,25 @@ impl Matchmaker<ConfigMMItem, ConfigMMInnerItem> {
                 {}
             };
         });
+    }
+}
+
+/// Waits for enter after a failed command, on the terminal: stdin holds the picker's items and
+/// stdout may be piped, so neither can carry the prompt.
+fn press_enter_to_continue() {
+    use std::io::{BufRead, Write};
+    match std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/tty")
+    {
+        Ok(mut tty) => {
+            let _ = tty.write_all(b"\nPress enter to continue...\n");
+            let _ = tty.flush();
+            let mut line = String::new();
+            let _ = std::io::BufReader::new(tty).read_line(&mut line);
+        }
+        Err(e) => log::error!("Failed to open /dev/tty for the confirm prompt: {e}"),
     }
 }
 
