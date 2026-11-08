@@ -45,36 +45,36 @@ impl SegmentableItem for String {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+/// The byte range of each column of an item. One range (a plain line) is stored inline, so
+/// the type is 16 bytes, two words: every item carries one, and at millions of items each word
+/// matters. Two or more ranges are boxed.
+#[derive(Debug, Clone)]
 pub enum ColumnRanges {
-    Inline(arrayvec::ArrayVec<(u32, u32), 2>),
+    Single((u32, u32)),
     Multi(Box<[(u32, u32)]>),
 }
+
+const _: () = assert!(std::mem::size_of::<ColumnRanges>() == 16);
 
 impl ColumnRanges {
     #[inline]
     pub fn single(start: u32, end: u32) -> Self {
-        let mut arr = arrayvec::ArrayVec::new();
-        arr.push((start, end));
-        Self::Inline(arr)
+        Self::Single((start, end))
     }
 
     #[inline]
     pub fn pair(first: (u32, u32), second: (u32, u32)) -> Self {
-        let mut arr = arrayvec::ArrayVec::new();
-        arr.push(first);
-        arr.push(second);
-        Self::Inline(arr)
+        Self::Multi(Box::new([first, second]))
     }
 
     #[inline]
     pub fn from_array_vec(arr: arrayvec::ArrayVec<(u32, u32), 2>) -> Self {
-        Self::Inline(arr)
+        Self::from(arr.as_slice())
     }
 
     #[inline]
     pub fn multi(ranges: Box<[(u32, u32)]>) -> Self {
-        Self::Multi(ranges)
+        Self::from(ranges)
     }
 }
 
@@ -84,7 +84,7 @@ impl std::ops::Deref for ColumnRanges {
     #[inline]
     fn deref(&self) -> &Self::Target {
         match self {
-            Self::Inline(arr) => arr.as_slice(),
+            Self::Single(r) => std::slice::from_ref(r),
             Self::Multi(b) => b,
         }
     }
@@ -93,9 +93,31 @@ impl std::ops::Deref for ColumnRanges {
 impl AsRef<[(u32, u32)]> for ColumnRanges {
     #[inline]
     fn as_ref(&self) -> &[(u32, u32)] {
-        match self {
-            Self::Inline(arr) => arr.as_slice(),
-            Self::Multi(b) => b,
+        self
+    }
+}
+
+// Equality and hashing go by the ranges, whichever way they are stored.
+impl PartialEq for ColumnRanges {
+    fn eq(&self, other: &Self) -> bool {
+        **self == **other
+    }
+}
+
+impl Eq for ColumnRanges {}
+
+impl std::hash::Hash for ColumnRanges {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
+
+impl From<&[(u32, u32)]> for ColumnRanges {
+    #[inline]
+    fn from(ranges: &[(u32, u32)]) -> Self {
+        match ranges {
+            [r] => Self::Single(*r),
+            _ => Self::Multi(ranges.into()),
         }
     }
 }
@@ -103,21 +125,16 @@ impl AsRef<[(u32, u32)]> for ColumnRanges {
 impl From<arrayvec::ArrayVec<(u32, u32), 2>> for ColumnRanges {
     #[inline]
     fn from(arr: arrayvec::ArrayVec<(u32, u32), 2>) -> Self {
-        Self::Inline(arr)
+        Self::from(arr.as_slice())
     }
 }
 
 impl From<Box<[(u32, u32)]>> for ColumnRanges {
     #[inline]
     fn from(b: Box<[(u32, u32)]>) -> Self {
-        if b.len() <= 2 {
-            let mut arr = arrayvec::ArrayVec::new();
-            for &r in b.iter() {
-                arr.push(r);
-            }
-            Self::Inline(arr)
-        } else {
-            Self::Multi(b)
+        match *b {
+            [r] => Self::Single(r),
+            _ => Self::Multi(b),
         }
     }
 }
@@ -125,24 +142,20 @@ impl From<Box<[(u32, u32)]>> for ColumnRanges {
 impl From<Vec<(u32, u32)>> for ColumnRanges {
     #[inline]
     fn from(v: Vec<(u32, u32)>) -> Self {
-        if v.len() <= 2 {
-            let mut arr = arrayvec::ArrayVec::new();
-            for &r in &v {
-                arr.push(r);
-            }
-            Self::Inline(arr)
-        } else {
-            Self::Multi(v.into_boxed_slice())
-        }
+        Self::from(v.into_boxed_slice())
     }
 }
+
+/// The label of a run of items (`--group-prefix` lines). A thin pointer, so an item pays 8
+/// bytes for it rather than 16; the items of one group share one allocation.
+pub type GroupLabel = Arc<Arc<str>>;
 
 /// This struct implements ColumnIndexable, and can instantiate a worker with columns.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Segmented<T> {
     pub inner: T,
     pub ranges: ColumnRanges,
-    pub group: Option<Arc<str>>,
+    pub group: Option<GroupLabel>,
 }
 
 impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
@@ -174,7 +187,7 @@ impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
 
 impl<T: SegmentableItem> Segmented<T> {
     #[inline]
-    pub fn new(inner: T, ranges: impl Into<ColumnRanges>, group: Option<Arc<str>>) -> Self {
+    pub fn new(inner: T, ranges: impl Into<ColumnRanges>, group: Option<GroupLabel>) -> Self {
         Self {
             inner,
             ranges: ranges.into(),
@@ -316,7 +329,7 @@ mod tests {
         let cr = ColumnRanges::single(0, 10);
         assert_eq!(cr.len(), 1);
         assert_eq!(cr[0], (0, 10));
-        assert!(matches!(cr, ColumnRanges::Inline(_)));
+        assert!(matches!(cr, ColumnRanges::Single(_)));
         assert_eq!(cr.as_ref(), &[(0, 10)]);
     }
 
@@ -326,7 +339,22 @@ mod tests {
         assert_eq!(cr.len(), 2);
         assert_eq!(cr[0], (0, 5));
         assert_eq!(cr[1], (6, 12));
-        assert!(matches!(cr, ColumnRanges::Inline(_)));
+        assert!(matches!(cr, ColumnRanges::Multi(_)));
+    }
+
+    #[test]
+    fn test_column_ranges_equal_by_content() {
+        // One range is always stored inline, however it is built, so equal ranges compare equal.
+        let from_vec = ColumnRanges::from(vec![(0, 10)]);
+        assert!(matches!(from_vec, ColumnRanges::Single(_)));
+        assert_eq!(from_vec, ColumnRanges::single(0, 10));
+        assert_eq!(
+            ColumnRanges::Multi(Box::new([(0, 10)])),
+            ColumnRanges::single(0, 10)
+        );
+        assert_ne!(ColumnRanges::single(0, 10), ColumnRanges::single(0, 9));
+        let empty = ColumnRanges::from(Vec::new());
+        assert!(empty.is_empty());
     }
 
     #[test]

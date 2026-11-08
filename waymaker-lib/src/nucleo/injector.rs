@@ -231,7 +231,7 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> SegmentedInjecto
 impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
     for SegmentedInjector<T, I>
 {
-    type InputItem = (Option<std::sync::Arc<str>>, T);
+    type InputItem = (Option<crate::nucleo::GroupLabel>, T);
     type Inner = I;
     type Context = SplitterFn<T>;
 
@@ -309,13 +309,13 @@ mod ansi {
     impl<
         I: Injector<
             InputItem = (
-                Option<std::sync::Arc<str>>,
+                Option<crate::nucleo::GroupLabel>,
                 Either<Arc<str>, Box<Text<'static>>>,
             ),
         >,
     > Injector for AnsiInjector<I>
     {
-        type InputItem = (Option<std::sync::Arc<str>>, Arc<str>);
+        type InputItem = (Option<crate::nucleo::GroupLabel>, Arc<str>);
         type Inner = I;
         type Context = PreprocessOptions;
 

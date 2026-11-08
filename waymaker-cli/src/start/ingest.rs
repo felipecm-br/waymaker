@@ -158,8 +158,9 @@ pub fn map_reader_batched(
     const BATCH_SIZE: usize = 4096;
     tokio::task::spawn_blocking(move || {
         let mut total = 0;
-        let mut batch: Vec<(Option<Arc<str>>, Arc<str>)> = Vec::with_capacity(BATCH_SIZE);
-        let mut current_group: Option<std::sync::Arc<str>> = None;
+        let mut batch: Vec<(Option<waymaker::nucleo::GroupLabel>, Arc<str>)> =
+            Vec::with_capacity(BATCH_SIZE);
+        let mut current_group: Option<waymaker::nucleo::GroupLabel> = None;
 
         // Inject on a separate thread so reading the next batch overlaps with
         // indexing the previous one. A single consumer keeps the input order.
@@ -177,7 +178,7 @@ pub fn map_reader_batched(
             if let Some(prefix) = &group_prefix
                 && let Some(group) = line.strip_prefix(prefix.as_str())
             {
-                current_group = Some(group.trim().into());
+                current_group = Some(std::sync::Arc::new(group.trim().into()));
                 return Ok(());
             }
             total += 1;
@@ -223,14 +224,16 @@ pub(super) fn inject_line(
     let mut header_buf = Vec::with_capacity(header_lines);
     let mut remaining = header_lines;
     let injector = injector;
-    let mut current_group: Option<std::sync::Arc<str>> = None;
+    let mut current_group: Option<waymaker::nucleo::GroupLabel> = None;
 
     // For each row, take the first line of each segmented column, building a Vec<Vec<Line>>
     move |line: Arc<str>| {
         if let Some(prefix) = &group_prefix
             && line.starts_with(prefix)
         {
-            current_group = Some(line.strip_prefix(prefix).unwrap().trim().into());
+            current_group = Some(std::sync::Arc::new(
+                line.strip_prefix(prefix).unwrap().trim().into(),
+            ));
             return Ok(());
         }
 

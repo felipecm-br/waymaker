@@ -201,7 +201,7 @@ impl AsyncWalker {
     pub fn spawn_walk_parallel<I>(&self, injector: I) -> tokio::task::JoinHandle<()>
     where
         I: crate::nucleo::injector::Injector<
-                InputItem = (Option<std::sync::Arc<str>>, std::sync::Arc<str>),
+                InputItem = (Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>),
             > + Clone
             + Send
             + 'static,
@@ -246,16 +246,16 @@ impl AsyncWalker {
 
             struct BatchWorker<
                 I: crate::nucleo::injector::Injector<
-                        InputItem = (Option<std::sync::Arc<str>>, std::sync::Arc<str>),
+                        InputItem = (Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>),
                     >,
             > {
                 injector: I,
-                batch: Vec<(Option<std::sync::Arc<str>>, std::sync::Arc<str>)>,
+                batch: Vec<(Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>)>,
             }
 
             impl<
                 I: crate::nucleo::injector::Injector<
-                        InputItem = (Option<std::sync::Arc<str>>, std::sync::Arc<str>),
+                        InputItem = (Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>),
                     >,
             > Drop for BatchWorker<I>
             {
@@ -685,7 +685,7 @@ mod tests {
         struct CollectInjector(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
 
         impl crate::nucleo::injector::Injector for CollectInjector {
-            type InputItem = (Option<std::sync::Arc<str>>, std::sync::Arc<str>);
+            type InputItem = (Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>);
             type Inner = ();
             type Context = ();
             fn new(_: (), _: ()) -> Self {

@@ -160,7 +160,7 @@ impl ConfigMatchmaker {
             }
         }
 
-        worker.group_header = Some(Box::new(|item| item.inner.group.clone()));
+        worker.group_header = Some(Box::new(|item| item.inner.group.as_deref().cloned()));
 
         worker.reverse_items(worker_config.reverse);
         worker.set_stability(worker_config.sort.threshold);
@@ -321,7 +321,7 @@ fn make_splitter(
                         }
 
                         ranges.push((last_end as u32, s.len() as u32));
-                        ColumnRanges::Inline(ranges)
+                        ColumnRanges::from(ranges)
                     })
                 } else {
                     Arc::new(move |s| {

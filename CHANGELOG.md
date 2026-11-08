@@ -2,6 +2,7 @@
 
 ### ⚡ Performance
 
+- Less memory per item: `ColumnRanges` keeps one range inline and boxes two or more (24 → 16 bytes), and a group label is a thin shared pointer (`GroupLabel`, 16 → 8 bytes), so an item is 48 bytes instead of 64. On the 2M-line corpus, `wm -f` peak RSS drops from 357 to 321 MiB (narrow query) and 402 to 373 MiB (broad), with the same output and speed. Items with exactly two columns now allocate their ranges
 - Faster input ingestion and headless filtering (`wm -f`): `for_each_record` validates each 256 KB read chunk up to its last delimiter in a single SIMD `std::str::from_utf8` pass (falling back to per-record lossy decoding only when a chunk contains invalid UTF-8), `map_reader_batched` batches 4,096 records per channel send (matching the 256 KB buffer), `SegmentedInjector` builds single-column ranges inline without calling the splitter closure, and `Column::haystack` uses a direct function pointer for column 0. On the 2M-line (113 MB) corpus, `wm -f` drops from 230 ms to 199 ms on narrow queries (faster than `fzf -f` at 202 ms), 576 ms to 424 ms on broad queries (`fzf -f`: 1,128 ms), and 228 ms to 189 ms when nothing matches
 
 ### 🐛 Fixed
