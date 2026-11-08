@@ -40,7 +40,7 @@ pub struct NavConfig {
     #[serde(alias = "nav_fm")]
     pub fm: bool,
 
-    /// Navigation-mode indicator colour (set via `--color nav:` or `--nav color:`).
+    /// Navigation-mode indicator colour (set via `--color nav:` or `--nav color:`). Default: cyan.
     #[serde(deserialize_with = "camelcase_normalized")]
     #[serde(alias = "nav_color", alias = "focus_color")]
     pub color: Color,
@@ -132,7 +132,7 @@ impl Default for NavConfig {
     fn default() -> Self {
         Self {
             active: false,
-            color: Color::Yellow,
+            color: Color::Cyan,
             blink: false,
             blink_rate: BlinkRate::Normal,
             bold: false,

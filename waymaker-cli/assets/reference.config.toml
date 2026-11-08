@@ -167,7 +167,7 @@ focus_on_start = "picker"
 bar = "Plain"
 
 # Color of the navigation indicator bar.
-# Values: color name or hex "#RRGGBB" | Default: "Darkgray"
+# Values: color name or hex "#RRGGBB" | Default: "Cyan"
 color = "Darkgray"
 
 # Enables bold text for the navigation indicator.

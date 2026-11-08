@@ -6,6 +6,7 @@
 
 ### 🔄 Changed
 
+- The navigation-mode cursor indicator (`ui.nav.color`) defaults to cyan instead of yellow, keeping warm colours for state (yank, cut, bookmarks); `reference.config.toml` listed the default as `Darkgray`. Set `ui.nav.color = "yellow"` to keep the old look
 - Internal modular decomposition with no behaviour change (verified by `scripts/verify_move.py`): split `nucleo/worker.rs` into `nucleo/worker/{mod,sort,frizbee,cell,tests}.rs`, `config.rs` into `config/{mod,nav,results,tests}.rs`, `ui/preview.rs`, `utils/markdown.rs` and `utils/mermaid.rs` into `mod.rs` + `tests.rs`, extracted `ui/results/styler.rs`, and decomposed `Results::render_rows`, `Previewer::with_config`, `start::start` and `waymaker-partial-macros` so every file in the workspace is `< 2,000` lines and every function across all 4 crates is `< 200` lines
 
 ## [0.9.0] - 2026-11-07
