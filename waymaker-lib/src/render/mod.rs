@@ -66,6 +66,31 @@ pub(super) enum Flow<S> {
     Exit(Result<Vec<S>, MatchError>),
 }
 
+/// The result an action asked the picker to end with (`State::should_quit` or
+/// `should_quit_nomatch`), or `None` to keep running. `should_quit` ends with the selection, or
+/// the current item when selecting is disabled.
+fn requested_exit<T: SSS, S: Selection>(
+    state: &State,
+    picker_ui: &mut PickerUI<'_, T, S>,
+) -> Option<Result<Vec<S>, MatchError>> {
+    if state.should_quit {
+        log::debug!("Exiting due to should_quit");
+        let items = if picker_ui.selector.is_disabled()
+            && let Some((_, item)) = get_current(picker_ui)
+        {
+            vec![item]
+        } else {
+            picker_ui.selector.output().collect()
+        };
+        Some(Ok(picker_ui.finish(items)))
+    } else if state.should_quit_nomatch {
+        log::debug!("Exiting due to should_quit_nomatch");
+        Some(Err(MatchError::NoMatch))
+    } else {
+        None
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt>(
     mut ui: UI,
@@ -248,19 +273,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             }
         }
 
-        if state.should_quit {
-            log::debug!("Exiting due to should_quit");
-            picker_ui.record_query();
-            return if picker_ui.selector.is_disabled()
-                && let Some((_, item)) = get_current(&picker_ui)
-            {
-                Ok(vec![item])
-            } else {
-                Ok(picker_ui.selector.output().collect())
-            };
-        } else if state.should_quit_nomatch {
-            log::debug!("Exiting due to should_quit_nomatch");
-            return Err(MatchError::NoMatch);
+        if let Some(result) = requested_exit(&state, &mut picker_ui) {
+            return result;
         }
 
         let mut events = buffer.drain(..);
@@ -426,19 +440,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                 }
             }
 
-            if state.should_quit {
-                log::debug!("Exiting due to should_quit");
-                picker_ui.record_query();
-                return if picker_ui.selector.is_disabled()
-                    && let Some((_, item)) = get_current(&picker_ui)
-                {
-                    Ok(vec![item])
-                } else {
-                    Ok(picker_ui.selector.output().collect())
-                };
-            } else if state.should_quit_nomatch {
-                log::debug!("Exiting due to should_quit_nomatch");
-                return Err(MatchError::NoMatch);
+            if let Some(result) = requested_exit(&state, &mut picker_ui) {
+                return result;
             }
         }
 

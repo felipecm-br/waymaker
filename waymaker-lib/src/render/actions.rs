@@ -1083,8 +1083,7 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             } else {
                 selections.output().collect::<Vec<S>>()
             };
-            picker_ui.record_query();
-            return Flow::Exit(Ok(ret));
+            return Flow::Exit(Ok(picker_ui.finish(ret)));
         }
         Action::Abort(code) => {
             return Flow::Exit(Err(MatchError::Abort(code)));

@@ -290,11 +290,13 @@ impl<'a, T: SSS, O: Selection> PickerUI<'a, T, O> {
         (table, width)
     }
 
-    /// Saves the query to history; called when the picker finishes with a selection.
-    pub fn record_query(&mut self) {
+    /// Ends the picker with `items`. Every exit that accepts goes through here, so each one saves
+    /// the query to history.
+    pub fn finish(&mut self, items: Vec<O>) -> Vec<O> {
         if let Err(e) = self.history.record(&self.query.input) {
             log::warn!("Could not save the query history: {e}");
         }
+        items
     }
 
     /// Runs the query. When it changed, the cursor moves to the best match, or with
