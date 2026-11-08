@@ -25,6 +25,36 @@ pub fn handle_download(cli: &crate::clap::Cli) {
     fs::create_dir_all(&temp_dir)
         .unwrap_or_else(|e| die(format!("Could not create {}: {e}", temp_dir.display())));
 
+    let source_root = fetch_presets(&temp_dir);
+    let mut source = source_root.clone();
+    let mut dest = presets_dir.to_path_buf();
+
+    if !subfolder.is_empty() {
+        let sub_path = source_root.join(subfolder);
+        if sub_path.is_dir() {
+            source = sub_path;
+            dest = dest.join(subfolder);
+        } else if subfolder.ends_with(".toml") {
+            install_preset_file(subfolder, &source_root, &dest, &temp_dir);
+        } else {
+            report_missing_preset(subfolder, &source_root);
+        }
+    }
+
+    let count = copy_and_process(&source, &dest)
+        .unwrap_or_else(|e| die(format!("Could not copy presets to {}: {e}", dest.display())));
+    if count == 0 {
+        ebog!("Source is not available for your platform.");
+        exit(1);
+    }
+
+    ibog!("Presets successfully downloaded to: {}", dest.display());
+    fs::remove_dir_all(&temp_dir).ok();
+    exit(0);
+}
+
+/// Downloads the repository archive into `temp_dir`, unpacks it, and returns its presets folder.
+fn fetch_presets(temp_dir: &Path) -> PathBuf {
     ibog!("Downloading presets from GitHub...");
     let zip_path = temp_dir.join("waymaker.zip");
 
@@ -74,133 +104,118 @@ pub fn handle_download(cli: &crate::clap::Cli) {
         }
     }
 
-    let source_root = {
+    {
         let wm_path = temp_dir.join("waymaker-main/waymaker-cli/assets/presets");
         if wm_path.exists() {
             wm_path
         } else {
             temp_dir.join("matchmaker-main/matchmaker-cli/assets/presets")
         }
-    };
-    let mut source = source_root.clone();
-    let mut dest = presets_dir.to_path_buf();
+    }
+}
 
-    if !subfolder.is_empty() {
-        let sub_path = source_root.join(subfolder);
-        if sub_path.is_dir() {
-            source = sub_path;
-            dest = dest.join(subfolder);
-        } else if subfolder.ends_with(".toml") {
-            let path = Path::new(subfolder);
-            let parent = path.parent().unwrap_or(Path::new(""));
-            let file_name = path.file_name().unwrap().to_str().unwrap();
+/// Installs one preset file (`--download dir/name.toml`), the `win.` variant on Windows, and
+/// exits.
+fn install_preset_file(subfolder: &str, source_root: &Path, dest: &Path, temp_dir: &Path) -> ! {
+    let path = Path::new(subfolder);
+    let parent = path.parent().unwrap_or(Path::new(""));
+    let file_name = path.file_name().unwrap().to_str().unwrap();
 
-            let win_file_name = format!("win.{}", file_name);
-            let win_path = source_root.join(parent).join(&win_file_name);
-            let plain_path = source_root.join(subfolder);
+    let win_file_name = format!("win.{}", file_name);
+    let win_path = source_root.join(parent).join(&win_file_name);
+    let plain_path = source_root.join(subfolder);
 
-            #[cfg(windows)]
-            {
-                if win_path.is_file() {
-                    if !dest.exists() {
-                        fs::create_dir_all(&dest).unwrap_or_else(|e| {
-                            die(format!("Could not create {}: {e}", dest.display()))
-                        });
-                    }
-                    fs::copy(&win_path, dest.join(subfolder)).unwrap_or_else(|e| {
-                        die(format!(
-                            "Could not write {}: {e}",
-                            dest.join(subfolder).display()
-                        ))
-                    });
-                    ibog!(
-                        "Preset file successfully downloaded to: {}",
-                        dest.join(subfolder).display()
-                    );
-                    fs::remove_dir_all(&temp_dir).ok();
-                    exit(0);
-                } else if plain_path.is_file() {
-                    ebog!("Source '{}' is not available for your platform.", subfolder);
-                    exit(1);
-                } else {
-                    ebog!("'{}' unavailable.", subfolder);
-                    exit(1);
-                }
+    #[cfg(windows)]
+    {
+        if win_path.is_file() {
+            if !dest.exists() {
+                fs::create_dir_all(&dest)
+                    .unwrap_or_else(|e| die(format!("Could not create {}: {e}", dest.display())));
             }
-            #[cfg(not(windows))]
-            {
-                if plain_path.is_file() {
-                    if !dest.exists() {
-                        fs::create_dir_all(&dest).unwrap_or_else(|e| {
-                            die(format!("Could not create {}: {e}", dest.display()))
-                        });
-                    }
-                    fs::copy(&plain_path, dest.join(subfolder)).unwrap_or_else(|e| {
-                        die(format!(
-                            "Could not write {}: {e}",
-                            dest.join(subfolder).display()
-                        ))
-                    });
-                    ibog!(
-                        "Preset file successfully downloaded to: {}",
-                        dest.join(subfolder).display()
-                    );
-                    fs::remove_dir_all(&temp_dir).ok();
-                    exit(0);
-                } else if win_path.is_file() {
-                    ebog!("Source '{}' is not available for your platform.", subfolder);
-                    exit(1);
-                } else {
-                    ebog!("'{}' unavailable.", subfolder);
-                    exit(1);
-                }
-            }
+            fs::copy(&win_path, dest.join(subfolder)).unwrap_or_else(|e| {
+                die(format!(
+                    "Could not write {}: {e}",
+                    dest.join(subfolder).display()
+                ))
+            });
+            ibog!(
+                "Preset file successfully downloaded to: {}",
+                dest.join(subfolder).display()
+            );
+            fs::remove_dir_all(&temp_dir).ok();
+            exit(0);
+        } else if plain_path.is_file() {
+            ebog!("Source '{}' is not available for your platform.", subfolder);
+            exit(1);
         } else {
-            let suggested = if subfolder.ends_with(".toml") {
-                let path = Path::new(subfolder);
-
-                let parent = path.parent().unwrap_or(Path::new(""));
-
-                let file_name = path.file_name().unwrap().to_str().unwrap();
-
-                #[cfg(windows)]
-                let candidate = parent.join(format!("win.{}", file_name));
-
-                #[cfg(not(windows))]
-                let candidate = parent.join(file_name);
-
-                source_root
-                    .join(&candidate)
-                    .is_file()
-                    .then(|| parent.join(file_name).display().to_string())
-            } else {
-                None
-            };
-
-            if let Some(suggested) = suggested {
-                ebog!(
-                    "'{}' not found in the repository. Did you mean '{}'?",
-                    subfolder,
-                    suggested
-                );
-            } else {
-                ebog!("'{}' not found in the repository.", subfolder);
-            }
-
+            ebog!("'{}' unavailable.", subfolder);
             exit(1);
         }
     }
+    #[cfg(not(windows))]
+    {
+        if plain_path.is_file() {
+            if !dest.exists() {
+                fs::create_dir_all(&dest)
+                    .unwrap_or_else(|e| die(format!("Could not create {}: {e}", dest.display())));
+            }
+            fs::copy(&plain_path, dest.join(subfolder)).unwrap_or_else(|e| {
+                die(format!(
+                    "Could not write {}: {e}",
+                    dest.join(subfolder).display()
+                ))
+            });
+            ibog!(
+                "Preset file successfully downloaded to: {}",
+                dest.join(subfolder).display()
+            );
+            fs::remove_dir_all(&temp_dir).ok();
+            exit(0);
+        } else if win_path.is_file() {
+            ebog!("Source '{}' is not available for your platform.", subfolder);
+            exit(1);
+        } else {
+            ebog!("'{}' unavailable.", subfolder);
+            exit(1);
+        }
+    }
+}
 
-    let count = copy_and_process(&source, &dest)
-        .unwrap_or_else(|e| die(format!("Could not copy presets to {}: {e}", dest.display())));
-    if count == 0 {
-        ebog!("Source is not available for your platform.");
-        exit(1);
+/// Reports a `--download` name the repository does not have, suggesting the file it may mean,
+/// and exits.
+fn report_missing_preset(subfolder: &str, source_root: &Path) -> ! {
+    let suggested = if subfolder.ends_with(".toml") {
+        let path = Path::new(subfolder);
+
+        let parent = path.parent().unwrap_or(Path::new(""));
+
+        let file_name = path.file_name().unwrap().to_str().unwrap();
+
+        #[cfg(windows)]
+        let candidate = parent.join(format!("win.{}", file_name));
+
+        #[cfg(not(windows))]
+        let candidate = parent.join(file_name);
+
+        source_root
+            .join(&candidate)
+            .is_file()
+            .then(|| parent.join(file_name).display().to_string())
+    } else {
+        None
+    };
+
+    if let Some(suggested) = suggested {
+        ebog!(
+            "'{}' not found in the repository. Did you mean '{}'?",
+            subfolder,
+            suggested
+        );
+    } else {
+        ebog!("'{}' not found in the repository.", subfolder);
     }
 
-    ibog!("Presets successfully downloaded to: {}", dest.display());
-    fs::remove_dir_all(&temp_dir).ok();
-    exit(0);
+    exit(1);
 }
 
 fn copy_and_process(src: &Path, dst: &Path) -> std::io::Result<usize> {
