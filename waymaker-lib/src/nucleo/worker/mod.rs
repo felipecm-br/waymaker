@@ -43,6 +43,8 @@ pub struct Column<T> {
     pub(super) raw: Option<ColumnRawFn<T>>,
     /// The column text as a shared string, when the item can lend one; see [`Column::haystack`].
     pub(super) shared: Option<ColumnSharedFn<T>>,
+    /// Direct function pointer fast path for `shared` when no closure state is captured (e.g. col 0).
+    pub(super) shared_fn: Option<fn(&T) -> Option<Arc<str>>>,
     /// Whether the column should be passed to nucleo for matching and filtering.
     pub(super) filter: bool,
 }
@@ -55,6 +57,7 @@ impl<T> Column<T> {
             filter: true,
             raw: None,
             shared: None,
+            shared_fn: None,
         }
     }
 
@@ -68,6 +71,7 @@ impl<T> Column<T> {
             filter: true,
             raw: None,
             shared: None,
+            shared_fn: None,
         }
     }
 
@@ -86,6 +90,12 @@ impl<T> Column<T> {
         F: Fn(&T) -> Option<Arc<str>> + SSS,
     {
         self.shared = Some(Box::new(f));
+        self
+    }
+
+    /// Non-capturing function pointer version of [`Column::with_shared`].
+    pub fn with_shared_fn(mut self, f: fn(&T) -> Option<Arc<str>>) -> Self {
+        self.shared_fn = Some(f);
         self
     }
 
@@ -110,7 +120,13 @@ impl<T> Column<T> {
 
     /// The text the matcher stores for this column: the item's own shared string when it has
     /// one (so the text is stored once), otherwise a copy of [`Column::raw`].
+    #[inline]
     pub(super) fn haystack(&self, item: &T) -> nucleo::Utf32String {
+        if let Some(shared_fn) = self.shared_fn
+            && let Some(text) = shared_fn(item)
+        {
+            return text.into();
+        }
         if let Some(shared) = &self.shared
             && let Some(text) = shared(item)
         {

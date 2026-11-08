@@ -23,7 +23,13 @@ pub fn for_each_record<E>(
     let mut count = 0;
     let mut lossy = 0usize;
 
-    let mut emit = |mut record: &[u8], count: &mut usize| -> Result<(), MapReaderError<E>> {
+    fn emit_record<E>(
+        mut record: &[u8],
+        delim: u8,
+        f: &mut impl FnMut(Arc<str>) -> Result<(), E>,
+        count: &mut usize,
+        lossy: &mut usize,
+    ) -> Result<(), MapReaderError<E>> {
         if delim == b'\n'
             && let Some(rest) = record.strip_suffix(b"\r")
         {
@@ -32,14 +38,14 @@ pub fn for_each_record<E>(
         let text: Arc<str> = match std::str::from_utf8(record) {
             Ok(s) => s.into(),
             Err(_) => {
-                lossy += 1;
+                *lossy += 1;
                 String::from_utf8_lossy(record).as_ref().into()
             }
         };
         f(text).map_err(MapReaderError::Custom)?;
         *count += 1;
         Ok(())
-    };
+    }
 
     loop {
         let buf = match reader.fill_buf() {
@@ -51,24 +57,57 @@ pub fn for_each_record<E>(
             break;
         }
         let mut start = 0;
-        for end in memchr::memchr_iter(delim, buf) {
-            if partial.is_empty() {
-                emit(&buf[start..end], &mut count)?;
-            } else {
-                partial.extend_from_slice(&buf[start..end]);
-                emit(&partial, &mut count)?;
+        if !partial.is_empty() {
+            if let Some(end) = memchr::memchr(delim, buf) {
+                partial.extend_from_slice(&buf[..end]);
+                emit_record(&partial, delim, &mut f, &mut count, &mut lossy)?;
                 partial.clear();
+                start = end + 1;
+            } else {
+                partial.extend_from_slice(buf);
+                let len = buf.len();
+                reader.consume(len);
+                continue;
             }
-            start = end + 1;
+        }
+        if let Some(last_rel_end) = memchr::memrchr(delim, &buf[start..]) {
+            let last_end = start + last_rel_end;
+            if let Ok(valid) = std::str::from_utf8(&buf[start..last_end]) {
+                let valid_bytes = valid.as_bytes();
+                let mut rel_start = 0;
+                for rel_end in memchr::memchr_iter(delim, valid_bytes) {
+                    let mut line_end = rel_end;
+                    if delim == b'\n' && line_end > rel_start && valid_bytes[line_end - 1] == b'\r'
+                    {
+                        line_end -= 1;
+                    }
+                    f(valid[rel_start..line_end].into()).map_err(MapReaderError::Custom)?;
+                    count += 1;
+                    rel_start = rel_end + 1;
+                }
+                let mut line_end = valid.len();
+                if delim == b'\n' && line_end > rel_start && valid_bytes[line_end - 1] == b'\r' {
+                    line_end -= 1;
+                }
+                f(valid[rel_start..line_end].into()).map_err(MapReaderError::Custom)?;
+                count += 1;
+                start = last_end + 1;
+            } else {
+                let chunk_start = start;
+                for rel_end in memchr::memchr_iter(delim, &buf[chunk_start..=last_end]) {
+                    let abs_end = chunk_start + rel_end;
+                    emit_record(&buf[start..abs_end], delim, &mut f, &mut count, &mut lossy)?;
+                    start = abs_end + 1;
+                }
+            }
         }
         partial.extend_from_slice(&buf[start..]);
         let len = buf.len();
         reader.consume(len);
     }
     if !partial.is_empty() {
-        emit(&partial, &mut count)?;
+        emit_record(&partial, delim, &mut f, &mut count, &mut lossy)?;
     }
-    drop(emit);
     if lossy > 0 {
         log::warn!("{lossy} input records were not valid UTF-8; invalid bytes shown as U+FFFD");
     }
@@ -108,7 +147,7 @@ pub fn map_reader<E: SSS + std::fmt::Display>(
     })
 }
 
-/// Spawns a tokio task reading records (see [`for_each_record`]) and batching 512 items into `injector.extend()`.
+/// Spawns a tokio task reading records (see [`for_each_record`]) and batching 4,096 items into `injector.extend()`.
 pub fn map_reader_batched(
     reader: impl Read + Send + 'static,
     injector: ConfigInjector,
@@ -116,9 +155,10 @@ pub fn map_reader_batched(
     input_separator: Option<char>,
     abort_empty: Option<RenderSender<MMAction>>,
 ) -> tokio::task::JoinHandle<Result<usize, anyhow::Error>> {
+    const BATCH_SIZE: usize = 4096;
     tokio::task::spawn_blocking(move || {
         let mut total = 0;
-        let mut batch: Vec<(Option<Arc<str>>, Arc<str>)> = Vec::with_capacity(512);
+        let mut batch: Vec<(Option<Arc<str>>, Arc<str>)> = Vec::with_capacity(BATCH_SIZE);
         let mut current_group: Option<std::sync::Arc<str>> = None;
 
         // Inject on a separate thread so reading the next batch overlaps with
@@ -142,8 +182,8 @@ pub fn map_reader_batched(
             }
             total += 1;
             batch.push((current_group.clone(), line));
-            if batch.len() >= 512 {
-                let chunk = std::mem::replace(&mut batch, Vec::with_capacity(512));
+            if batch.len() >= BATCH_SIZE {
+                let chunk = std::mem::replace(&mut batch, Vec::with_capacity(BATCH_SIZE));
                 batch_tx.send(chunk).map_err(|_| ())?;
             }
             Ok(())

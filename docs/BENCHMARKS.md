@@ -25,10 +25,11 @@ Measured on Linux `aarch64` (release build, median of 3 runs, `stdin` redirected
 
 | Query Pattern | Query | Matches | `wm -f` | `fzf -f` | `sk -f` |
 | :--- | :--- | ---: | ---: | ---: | ---: |
-| Narrow | `mod97file12` | 27,305 | 244 ms | 193 ms | 613 ms |
-| Broad | `src/module_5` | 1,559,075 | **550 ms** | 1,193 ms | 2,521 ms |
-| No match | `xyzzy` | 0 | 225 ms | 150 ms | 241 ms |
-| Peak RSS | `mod97file12` | — | 641 MiB | 244 MiB | 296 MiB |
+| Narrow | `mod97file12` | 27,305 | **199 ms** | 202 ms | 613 ms |
+| Broad | `src/module_5` | 1,559,075 | **424 ms** | 1,128 ms | 2,521 ms |
+| No match | `xyzzy` | 0 | **189 ms** | 171 ms | 241 ms |
+| Peak RSS (narrow) | `mod97file12` | — | **357 MiB** | 244 MiB | 296 MiB |
+| Peak RSS (broad) | `src/module_5` | — | **401 MiB** | 534 MiB | — |
 
 ## Interactive Streaming Frametime (`300,000` items)
 

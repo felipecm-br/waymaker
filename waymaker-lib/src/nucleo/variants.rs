@@ -182,9 +182,13 @@ where
         let columns_vec: Vec<Arc<str>> = column_names.into_iter().map(Into::into).collect();
 
         let columns = columns_vec.iter().enumerate().map(|(i, name)| {
-            Column::new(name.clone(), move |item: &T| item.get_text(i))
-                .with_raw(move |item: &T| item.get_str(i))
-                .with_shared(move |item: &T| item.get_shared(i))
+            let col = Column::new(name.clone(), move |item: &T| item.get_text(i))
+                .with_raw(move |item: &T| item.get_str(i));
+            if i == 0 {
+                col.with_shared_fn(|item: &T| item.get_shared(0))
+            } else {
+                col.with_shared(move |item: &T| item.get_shared(i))
+            }
         });
 
         // Find the index of the default column

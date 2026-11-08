@@ -186,8 +186,10 @@ impl ConfigMatchmaker {
 
         let (splitter, splitter_error) = make_splitter(&cc, &worker, col_count);
         has_error |= splitter_error;
+        let is_single_column = matches!(cc.split, Split::None);
         let injector = IndexedInjector::new_globally_indexed(injector);
-        let injector = SegmentedInjector::new(injector, splitter.clone());
+        let injector =
+            SegmentedInjector::new(injector, splitter.clone()).with_single_column(is_single_column);
         let injector = AnsiInjector::new(injector, preprocess_config);
 
         let selection_set = if render_config.results.multi {

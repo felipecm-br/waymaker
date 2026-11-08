@@ -218,6 +218,14 @@ pub type SplitterFn<T> = std::sync::Arc<dyn for<'a> Fn(&'a T) -> ColumnRanges + 
 pub struct SegmentedInjector<T, I: Injector<InputItem = Segmented<T>>> {
     injector: I,
     splitter: SplitterFn<T>,
+    single_column: bool,
+}
+
+impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> SegmentedInjector<T, I> {
+    pub fn with_single_column(mut self, single_column: bool) -> Self {
+        self.single_column = single_column;
+        self
+    }
 }
 
 impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
@@ -231,6 +239,7 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
         Self {
             injector,
             splitter: data,
+            single_column: false,
         }
     }
 
@@ -238,7 +247,13 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
         &self,
         (group, item): Self::InputItem,
     ) -> Result<<Self::Inner as Injector>::InputItem, WorkerError> {
-        let ranges = (self.splitter)(&item);
+        let ranges = if self.single_column
+            && let Some(len) = item.byte_len()
+        {
+            ColumnRanges::single(0, len as u32)
+        } else {
+            (self.splitter)(&item)
+        };
         Ok(Segmented::new(item, ranges, group))
     }
 
@@ -250,6 +265,17 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
         &self,
         items: impl ExactSizeIterator<Item = Self::InputItem>,
     ) -> Result<(), WorkerError> {
+        if self.single_column {
+            let splitter = &self.splitter;
+            let wrapped = items.map(|(group, item)| {
+                let ranges = match item.byte_len() {
+                    Some(len) => ColumnRanges::single(0, len as u32),
+                    None => (splitter)(&item),
+                };
+                Segmented::new(item, ranges, group)
+            });
+            return self.injector.extend(wrapped);
+        }
         let splitter = &self.splitter;
         let wrapped = items.map(|(group, item)| {
             let ranges = (splitter)(&item);
@@ -389,6 +415,10 @@ mod ansi {
                 Either::Right(_) => None,
             }
         }
+        #[inline]
+        fn byte_len(&self) -> Option<usize> {
+            Some(Either::byte_len(self))
+        }
     }
 }
 pub use ansi::*;
@@ -448,6 +478,7 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>> + Clone> Clone
         Self {
             injector: self.injector.clone(),
             splitter: Arc::clone(&self.splitter),
+            single_column: self.single_column,
         }
     }
 }

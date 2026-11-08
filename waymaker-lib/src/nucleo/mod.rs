@@ -29,6 +29,11 @@ pub trait SegmentableItem: SSS {
     fn shared(&self) -> Option<&Arc<str>> {
         None
     }
+    /// Byte length of the full item when known cheaply without splitting.
+    #[inline]
+    fn byte_len(&self) -> Option<usize> {
+        self.shared().map(|s| s.len())
+    }
 }
 
 impl SegmentableItem for String {
@@ -157,6 +162,7 @@ impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
         }
     }
 
+    #[inline]
     fn get_shared(&self, i: usize) -> Option<Arc<str>> {
         let text = self.inner.shared()?;
         match self.ranges.get(i) {
@@ -167,6 +173,7 @@ impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
 }
 
 impl<T: SegmentableItem> Segmented<T> {
+    #[inline]
     pub fn new(inner: T, ranges: impl Into<ColumnRanges>, group: Option<Arc<str>>) -> Self {
         Self {
             inner,
@@ -250,6 +257,7 @@ impl<T: ColumnIndexable> ColumnIndexable for Indexed<T> {
         self.inner.get_text(i)
     }
 
+    #[inline]
     fn get_shared(&self, i: usize) -> Option<Arc<str>> {
         self.inner.get_shared(i)
     }
