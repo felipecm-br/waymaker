@@ -599,22 +599,7 @@ impl Previewer {
     /// `string` (or `image` for a diagram-only file) unless a newer preview made it stale.
     #[allow(clippy::ptr_arg)] // the arm binds `ref path: &String`; kept as moved
     fn start_markdown_preview(&mut self, path: &String, width: Option<usize>) {
-        if !self.config.delay_clear {
-            self.clear_image();
-            self.clear_string();
-            self.lines.clear();
-        }
-        self.dispatch_kill();
-        // Clear any stale diagram offsets from previous preview
-        if let Ok(mut offsets) = self.diagram_offsets.lock() {
-            offsets.clear();
-        }
-        if let Ok(mut sources) = self.diagram_sources.lock() {
-            sources.clear();
-        }
-        self.current_diagram_idx
-            .store(0, std::sync::atomic::Ordering::Release);
-        self.last = format!("{path}:{width:?}");
+        self.reset_markdown_preview_state(path, width);
         let path = path.clone();
         let string_state = self.string.clone();
         let image_state = self.image.clone();
@@ -694,25 +679,15 @@ impl Previewer {
                     if is_stale() {
                         return;
                     }
-                    if let Ok(mut guard) = string_state.lock() {
-                        if is_stale() {
-                            return;
-                        }
-                        *guard = Some(rendered_text);
-                        changed.store(true, Ordering::Release);
-                    }
-                    if let Ok(mut img_guard) = image_state.lock() {
-                        if is_stale() {
-                            return;
-                        }
-                        *img_guard = None;
-                        image_id.fetch_add(1, Ordering::Release);
-                    }
-                    if let Some(ref tx) = event_tx
-                        && !is_stale()
-                    {
-                        let _ = tx.send(crate::message::Event::PreviewChange);
-                    }
+                    finish_mermaid_text_preview(
+                        rendered_text,
+                        &is_stale,
+                        &string_state,
+                        &image_state,
+                        &image_id,
+                        &changed,
+                        event_tx,
+                    );
                     return;
                 }
 
@@ -730,25 +705,15 @@ impl Previewer {
                     }
 
                     if let Some(rendered_img) = img {
-                        if let Ok(mut guard) = image_state.lock() {
-                            if is_stale() {
-                                return;
-                            }
-                            *guard = Some(rendered_img);
-                            image_id.fetch_add(1, Ordering::Release);
-                            changed.store(true, Ordering::Release);
-                        }
-                        if let Ok(mut str_guard) = string_state.lock() {
-                            if is_stale() {
-                                return;
-                            }
-                            *str_guard = None;
-                        }
-                        if let Some(ref tx) = event_tx
-                            && !is_stale()
-                        {
-                            let _ = tx.send(crate::message::Event::PreviewChange);
-                        }
+                        finish_mermaid_image_preview(
+                            rendered_img,
+                            &is_stale,
+                            &image_state,
+                            &image_id,
+                            &changed,
+                            &string_state,
+                            event_tx,
+                        );
                         return;
                     }
                     // Fall through to text rendering if image failed
@@ -774,25 +739,15 @@ impl Previewer {
                 if is_stale() {
                     return;
                 }
-                if let Ok(mut guard) = string_state.lock() {
-                    if is_stale() {
-                        return;
-                    }
-                    *guard = Some(rendered_text);
-                    changed.store(true, Ordering::Release);
-                }
-                if let Ok(mut img_guard) = image_state.lock() {
-                    if is_stale() {
-                        return;
-                    }
-                    *img_guard = None;
-                    image_id.fetch_add(1, Ordering::Release);
-                }
-                if let Some(ref tx) = event_tx
-                    && !is_stale()
-                {
-                    let _ = tx.send(crate::message::Event::PreviewChange);
-                }
+                finish_mermaid_text_preview(
+                    rendered_text,
+                    &is_stale,
+                    &string_state,
+                    &image_state,
+                    &image_id,
+                    &changed,
+                    event_tx,
+                );
             } else {
                 // Markdown file — render with diagram offset tracking
                 let opts = crate::utils::markdown::MarkdownOptions {
@@ -814,68 +769,23 @@ impl Previewer {
                             )
                         });
 
-                if is_stale() {
-                    return;
-                }
-
-                // If media is enabled, extract and prepare diagram image
-                let mut diag_img = None;
-                let mut sources = Vec::new();
-                if media_enabled && let Ok(content) = std::fs::read_to_string(p) {
-                    let diagrams = crate::utils::markdown::extract_mermaid_blocks(&content);
-                    sources = diagrams.into_iter().map(|(_, s)| s).collect();
-                    if let Some(first_diag) = sources.first() {
-                        diag_img = crate::utils::mermaid::render_mermaid_to_image_with_options(
-                            first_diag,
-                            2.0,
-                            diagram_theme,
-                            diagram_background,
-                        );
-                    }
-                }
-
-                if is_stale() {
-                    return;
-                }
-
-                if let Ok(mut img_guard) = image_state.lock() {
-                    if is_stale() {
-                        return;
-                    }
-                    *img_guard = diag_img;
-                    image_id.fetch_add(1, Ordering::Release);
-                }
-                if let Ok(mut src_guard) = diagram_sources_state.lock() {
-                    if is_stale() {
-                        return;
-                    }
-                    *src_guard = sources;
-                }
-                if is_stale() {
-                    return;
-                }
-                current_diagram_idx_state.store(0, std::sync::atomic::Ordering::Release);
-
-                // Store diagram offsets for navigation
-                if let Ok(mut diag_guard) = diagram_offsets_state.lock() {
-                    if is_stale() {
-                        return;
-                    }
-                    *diag_guard = offsets;
-                }
-                if let Ok(mut guard) = string_state.lock() {
-                    if is_stale() {
-                        return;
-                    }
-                    *guard = Some(rendered_text);
-                    changed.store(true, Ordering::Release);
-                }
-
-                if let Some(ref tx) = event_tx
-                    && !is_stale()
-                {
-                    let _ = tx.send(crate::message::Event::PreviewChange);
-                }
+                preview_markdown_file(
+                    p,
+                    media_enabled,
+                    diagram_theme,
+                    diagram_background,
+                    rendered_text,
+                    offsets,
+                    &is_stale,
+                    &string_state,
+                    &image_state,
+                    &image_id,
+                    &diagram_offsets_state,
+                    &diagram_sources_state,
+                    &current_diagram_idx_state,
+                    &changed,
+                    event_tx,
+                );
             }
         });
         self.current_media_task = Some(handle);
@@ -885,18 +795,7 @@ impl Previewer {
     /// (re-rendering ANSI and Mermaid output), unless a newer preview made it stale.
     fn run_command_preview(&mut self, cmd: String, variables: EnvVars) {
         self.last = cmd.clone();
-        let mut cmd_builder = if let Some(s) = &self.config.shell
-            && !s.is_empty()
-        {
-            let mut iter = s.iter();
-            let mut program = Command::new(iter.next().unwrap());
-            program.args(iter).arg(&cmd);
-            program
-        } else if let Some(direct) = try_parse_simple_command(&cmd) {
-            direct
-        } else {
-            Command::from_script(&cmd)
-        };
+        let mut cmd_builder = self.make_preview_command(&cmd);
 
         cmd_builder
             .envs(variables.iter().cloned())
@@ -936,37 +835,21 @@ impl Previewer {
                     // Blocking reads on a thread of their own, so this task can notice a quiet
                     // command: see the timeout below.
                     let (chunk_tx, mut chunk_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
-                    std::thread::spawn(move || {
-                        let mut reader = BufReader::new(stdout);
-                        let mut buf = [0u8; 8192];
-                        while let Ok(n) = std::io::Read::read(&mut reader, &mut buf) {
-                            if n == 0 || chunk_tx.blocking_send(buf[..n].to_vec()).is_err() {
-                                break;
-                            }
-                        }
-                    });
+                    spawn_stdout_reader_thread(stdout, chunk_tx);
                     let mut leftover = Vec::new();
                     let mut staged = Vec::new();
                     let mut has_swapped = false;
                     // What the new output replaces when it is swapped in: the previous text, image
                     // and diagrams.
                     let clear_other_views = || {
-                        if let Ok(mut s) = string_state.lock() {
-                            *s = None;
-                        }
-                        if let Ok(mut img) = image_state.lock()
-                            && img.is_some()
-                        {
-                            *img = None;
-                            image_id.fetch_add(1, Ordering::Release);
-                        }
-                        if let Ok(mut d) = diagram_sources_state.lock() {
-                            d.clear();
-                        }
-                        if let Ok(mut d) = diagram_offsets_state.lock() {
-                            d.clear();
-                        }
-                        current_diagram_idx_state.store(0, Ordering::Release);
+                        reset_other_views(
+                            &string_state,
+                            &image_state,
+                            &image_id,
+                            &diagram_sources_state,
+                            &diagram_offsets_state,
+                            &current_diagram_idx_state,
+                        );
                     };
 
                     loop {
@@ -1083,69 +966,20 @@ impl Previewer {
                         leftover = rest.to_vec();
                     }
 
-                    if current_generation.load(Ordering::Acquire) != task_gen {
-                        return true;
-                    }
-
-                    clean_invalid_utf8_lines(&mut leftover, try_lossy, true);
-                    if !leftover.is_empty() {
-                        match leftover.into_text() {
-                            Ok(text) => {
-                                if delay_clear && !has_swapped {
-                                    staged.extend(text.lines);
-                                } else {
-                                    let has_text = !text.lines.is_empty();
-                                    for line in text {
-                                        if current_generation.load(Ordering::Acquire) != task_gen
-                                            || lines.is_expired(&guard)
-                                        {
-                                            return true;
-                                        }
-                                        guard.push(line);
-                                    }
-                                    if has_text {
-                                        changed.store(true, Ordering::Release);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                if try_lossy {
-                                    let mut has_text = false;
-                                    for bytes in leftover.split(|b| *b == b'\n') {
-                                        let line =
-                                            Line::from(String::from_utf8_lossy(bytes).into_owned());
-                                        if delay_clear && !has_swapped {
-                                            staged.push(line);
-                                        } else {
-                                            if lines.is_expired(&guard) {
-                                                return true;
-                                            }
-                                            guard.push(line);
-                                            has_text = true;
-                                        }
-                                    }
-                                    if has_text && has_swapped {
-                                        changed.store(true, Ordering::Release);
-                                    }
-                                } else {
-                                    error!("Error displaying {cmd_str}: {:?}", e);
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-
-                    if delay_clear && !has_swapped {
-                        if current_generation.load(Ordering::Acquire) != task_gen {
-                            return true;
-                        }
-                        lines.replace_all(staged);
-                        clear_other_views();
-                        changed.store(true, Ordering::Release);
-                    }
-
-                    changed.store(true, Ordering::Release);
-                    true
+                    finish_command_preview_stream(
+                        leftover,
+                        try_lossy,
+                        delay_clear,
+                        has_swapped,
+                        staged,
+                        &current_generation,
+                        task_gen,
+                        &lines,
+                        guard,
+                        &changed,
+                        &cmd_str,
+                        &clear_other_views,
+                    )
                 });
                 self.current = Some((child, handle))
             } else {
@@ -1153,6 +987,302 @@ impl Previewer {
             }
         }
     }
+
+    fn reset_markdown_preview_state(&mut self, path: &String, width: Option<usize>) {
+        if !self.config.delay_clear {
+            self.clear_image();
+            self.clear_string();
+            self.lines.clear();
+        }
+        self.dispatch_kill();
+        // Clear any stale diagram offsets from previous preview
+        if let Ok(mut offsets) = self.diagram_offsets.lock() {
+            offsets.clear();
+        }
+        if let Ok(mut sources) = self.diagram_sources.lock() {
+            sources.clear();
+        }
+        self.current_diagram_idx
+            .store(0, std::sync::atomic::Ordering::Release);
+        self.last = format!("{path}:{width:?}");
+    }
+
+    fn make_preview_command(&self, cmd: &str) -> Command {
+        if let Some(s) = &self.config.shell
+            && !s.is_empty()
+        {
+            let mut iter = s.iter();
+            let mut program = Command::new(iter.next().unwrap());
+            program.args(iter).arg(&cmd);
+            program
+        } else if let Some(direct) = try_parse_simple_command(&cmd) {
+            direct
+        } else {
+            Command::from_script(&cmd)
+        }
+    }
+}
+
+fn finish_mermaid_image_preview(
+    rendered_img: image::DynamicImage,
+    is_stale: &impl Fn() -> bool,
+    image_state: &std::sync::Mutex<Option<image::DynamicImage>>,
+    image_id: &AtomicU64,
+    changed: &std::sync::atomic::AtomicBool,
+    string_state: &std::sync::Mutex<Option<Text<'static>>>,
+    event_tx: Option<EventSender>,
+) {
+    if let Ok(mut guard) = image_state.lock() {
+        if is_stale() {
+            return;
+        }
+        *guard = Some(rendered_img);
+        image_id.fetch_add(1, Ordering::Release);
+        changed.store(true, Ordering::Release);
+    }
+    if let Ok(mut str_guard) = string_state.lock() {
+        if is_stale() {
+            return;
+        }
+        *str_guard = None;
+    }
+    if let Some(ref tx) = event_tx
+        && !is_stale()
+    {
+        let _ = tx.send(crate::message::Event::PreviewChange);
+    }
+}
+
+fn finish_mermaid_text_preview(
+    rendered_text: Text<'static>,
+    is_stale: &impl Fn() -> bool,
+    string_state: &std::sync::Mutex<Option<Text<'static>>>,
+    image_state: &std::sync::Mutex<Option<image::DynamicImage>>,
+    image_id: &AtomicU64,
+    changed: &std::sync::atomic::AtomicBool,
+    event_tx: Option<EventSender>,
+) {
+    if let Ok(mut guard) = string_state.lock() {
+        if is_stale() {
+            return;
+        }
+        *guard = Some(rendered_text);
+        changed.store(true, Ordering::Release);
+    }
+    if let Ok(mut img_guard) = image_state.lock() {
+        if is_stale() {
+            return;
+        }
+        *img_guard = None;
+        image_id.fetch_add(1, Ordering::Release);
+    }
+    if let Some(ref tx) = event_tx
+        && !is_stale()
+    {
+        let _ = tx.send(crate::message::Event::PreviewChange);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn preview_markdown_file(
+    p: &std::path::Path,
+    media_enabled: bool,
+    diagram_theme: crate::config::DiagramTheme,
+    diagram_background: crate::config::DiagramBackground,
+    rendered_text: Text<'static>,
+    offsets: Vec<usize>,
+    is_stale: &impl Fn() -> bool,
+    string_state: &std::sync::Mutex<Option<Text<'static>>>,
+    image_state: &std::sync::Mutex<Option<image::DynamicImage>>,
+    image_id: &AtomicU64,
+    diagram_offsets_state: &std::sync::Mutex<Vec<usize>>,
+    diagram_sources_state: &std::sync::Mutex<Vec<String>>,
+    current_diagram_idx_state: &std::sync::atomic::AtomicUsize,
+    changed: &std::sync::atomic::AtomicBool,
+    event_tx: Option<EventSender>,
+) {
+    if is_stale() {
+        return;
+    }
+
+    // If media is enabled, extract and prepare diagram image
+    let mut diag_img = None;
+    let mut sources = Vec::new();
+    if media_enabled && let Ok(content) = std::fs::read_to_string(p) {
+        let diagrams = crate::utils::markdown::extract_mermaid_blocks(&content);
+        sources = diagrams.into_iter().map(|(_, s)| s).collect();
+        if let Some(first_diag) = sources.first() {
+            diag_img = crate::utils::mermaid::render_mermaid_to_image_with_options(
+                first_diag,
+                2.0,
+                diagram_theme,
+                diagram_background,
+            );
+        }
+    }
+
+    if is_stale() {
+        return;
+    }
+
+    if let Ok(mut img_guard) = image_state.lock() {
+        if is_stale() {
+            return;
+        }
+        *img_guard = diag_img;
+        image_id.fetch_add(1, Ordering::Release);
+    }
+    if let Ok(mut src_guard) = diagram_sources_state.lock() {
+        if is_stale() {
+            return;
+        }
+        *src_guard = sources;
+    }
+    if is_stale() {
+        return;
+    }
+    current_diagram_idx_state.store(0, std::sync::atomic::Ordering::Release);
+
+    // Store diagram offsets for navigation
+    if let Ok(mut diag_guard) = diagram_offsets_state.lock() {
+        if is_stale() {
+            return;
+        }
+        *diag_guard = offsets;
+    }
+    if let Ok(mut guard) = string_state.lock() {
+        if is_stale() {
+            return;
+        }
+        *guard = Some(rendered_text);
+        changed.store(true, Ordering::Release);
+    }
+
+    if let Some(ref tx) = event_tx
+        && !is_stale()
+    {
+        let _ = tx.send(crate::message::Event::PreviewChange);
+    }
+}
+
+fn spawn_stdout_reader_thread(
+    stdout: std::process::ChildStdout,
+    chunk_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+) {
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let mut buf = [0u8; 8192];
+        while let Ok(n) = std::io::Read::read(&mut reader, &mut buf) {
+            if n == 0 || chunk_tx.blocking_send(buf[..n].to_vec()).is_err() {
+                break;
+            }
+        }
+    });
+}
+
+fn reset_other_views(
+    string_state: &std::sync::Mutex<Option<Text<'static>>>,
+    image_state: &std::sync::Mutex<Option<image::DynamicImage>>,
+    image_id: &AtomicU64,
+    diagram_sources_state: &std::sync::Mutex<Vec<String>>,
+    diagram_offsets_state: &std::sync::Mutex<Vec<usize>>,
+    current_diagram_idx_state: &std::sync::atomic::AtomicUsize,
+) {
+    if let Ok(mut s) = string_state.lock() {
+        *s = None;
+    }
+    if let Ok(mut img) = image_state.lock()
+        && img.is_some()
+    {
+        *img = None;
+        image_id.fetch_add(1, Ordering::Release);
+    }
+    if let Ok(mut d) = diagram_sources_state.lock() {
+        d.clear();
+    }
+    if let Ok(mut d) = diagram_offsets_state.lock() {
+        d.clear();
+    }
+    current_diagram_idx_state.store(0, Ordering::Release);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_command_preview_stream(
+    mut leftover: Vec<u8>,
+    try_lossy: bool,
+    delay_clear: bool,
+    has_swapped: bool,
+    mut staged: Vec<Line<'static>>,
+    current_generation: &AtomicU64,
+    task_gen: u64,
+    lines: &AppendOnly<Line<'static>>,
+    guard: arc_swap::Guard<Arc<boxcar::Vec<Line<'static>>>>,
+    changed: &std::sync::atomic::AtomicBool,
+    cmd_str: &str,
+    clear_other_views: &impl Fn(),
+) -> bool {
+    if current_generation.load(Ordering::Acquire) != task_gen {
+        return true;
+    }
+
+    clean_invalid_utf8_lines(&mut leftover, try_lossy, true);
+    if !leftover.is_empty() {
+        match leftover.into_text() {
+            Ok(text) => {
+                if delay_clear && !has_swapped {
+                    staged.extend(text.lines);
+                } else {
+                    let has_text = !text.lines.is_empty();
+                    for line in text {
+                        if current_generation.load(Ordering::Acquire) != task_gen
+                            || lines.is_expired(&guard)
+                        {
+                            return true;
+                        }
+                        guard.push(line);
+                    }
+                    if has_text {
+                        changed.store(true, Ordering::Release);
+                    }
+                }
+            }
+            Err(e) => {
+                if try_lossy {
+                    let mut has_text = false;
+                    for bytes in leftover.split(|b| *b == b'\n') {
+                        let line = Line::from(String::from_utf8_lossy(bytes).into_owned());
+                        if delay_clear && !has_swapped {
+                            staged.push(line);
+                        } else {
+                            if lines.is_expired(&guard) {
+                                return true;
+                            }
+                            guard.push(line);
+                            has_text = true;
+                        }
+                    }
+                    if has_text && has_swapped {
+                        changed.store(true, Ordering::Release);
+                    }
+                } else {
+                    error!("Error displaying {cmd_str}: {:?}", e);
+                    return false;
+                }
+            }
+        }
+    }
+
+    if delay_clear && !has_swapped {
+        if current_generation.load(Ordering::Acquire) != task_gen {
+            return true;
+        }
+        lines.replace_all(staged);
+        clear_other_views();
+        changed.store(true, Ordering::Release);
+    }
+
+    changed.store(true, Ordering::Release);
+    true
 }
 
 fn kill_child(child: &mut Child) {

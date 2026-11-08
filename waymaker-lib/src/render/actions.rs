@@ -144,20 +144,7 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::Become(..)
         | Action::BecomeSilent(..)
         | Action::Reload(..)) => return command_action(a, state, tui, events, bind_tx),
-        Action::ChDir(payload) => {
-            if ui.config.nav.active {
-                state.set_focus(Focus::Results);
-                state.focus_blink = true;
-                state.focus_tick = 0;
-                let prompt = &ui.config.nav.prompt;
-                if !prompt.is_empty() {
-                    picker_ui
-                        .query
-                        .set_prompt(Some(ratatui::text::Line::raw(prompt.clone())));
-                }
-            }
-            state.set_interrupt(Interrupt::ChDir, payload);
-        }
+        Action::ChDir(payload) => chdir_action(payload, state, ui, picker_ui),
         a @ (Action::Print(..)
         | Action::PromptInput(..)
         | Action::LiveInput(..)
@@ -203,32 +190,16 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                 );
             }
         }
-        Action::Char(c) => {
-            if !c.is_ascii_control() {
-                if state.prompt_input_active() {
-                    prompt_input.push_char(c);
-                    tui.redraw();
-                } else {
-                    let is_action_box_input =
-                        *action_visible && state.input_routing.action_box_active();
-                    if is_action_box_input {
-                        action_input.push_char(c)
-                    } else {
-                        if *action_visible {
-                            *action_visible = false;
-                            action_input.cancel();
-                            state.input_routing.set_action_box_active(false);
-                        }
-                        if !(ui.config.nav.active
-                            && !ui.config.nav.passthrough
-                            && state.focus() == Focus::Results)
-                        {
-                            query.push_char(c)
-                        }
-                    }
-                }
-            }
-        }
+        Action::Char(c) => char_action(
+            c,
+            state,
+            ui,
+            tui,
+            query,
+            action_input,
+            action_visible,
+            prompt_input,
+        ),
         Action::SetMode(s) => {
             state.input_routing.set_mode(s);
         }
@@ -249,6 +220,62 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
     }
 
     Flow::Proceed
+}
+
+fn chdir_action<T: SSS, S: Selection>(
+    payload: String,
+    state: &mut State,
+    ui: &UI,
+    picker_ui: &mut PickerUI<'_, T, S>,
+) {
+    if ui.config.nav.active {
+        state.set_focus(Focus::Results);
+        state.focus_blink = true;
+        state.focus_tick = 0;
+        let prompt = &ui.config.nav.prompt;
+        if !prompt.is_empty() {
+            picker_ui
+                .query
+                .set_prompt(Some(ratatui::text::Line::raw(prompt.clone())));
+        }
+    }
+    state.set_interrupt(Interrupt::ChDir, payload);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn char_action<W: Write>(
+    c: char,
+    state: &State,
+    ui: &UI,
+    tui: &mut Tui<W>,
+    query: &mut QueryUI,
+    action_input: &mut QueryUI,
+    action_visible: &mut bool,
+    prompt_input: &mut QueryUI,
+) {
+    if !c.is_ascii_control() {
+        if state.prompt_input_active() {
+            prompt_input.push_char(c);
+            tui.redraw();
+        } else {
+            let is_action_box_input = *action_visible && state.input_routing.action_box_active();
+            if is_action_box_input {
+                action_input.push_char(c)
+            } else {
+                if *action_visible {
+                    *action_visible = false;
+                    action_input.cancel();
+                    state.input_routing.set_action_box_active(false);
+                }
+                if !(ui.config.nav.active
+                    && !ui.config.nav.passthrough
+                    && state.focus() == Focus::Results)
+                {
+                    query.push_char(c)
+                }
+            }
+        }
+    }
 }
 
 /// Query editing: `SetQuery` and the cursor-movement and delete actions, applied to whichever input

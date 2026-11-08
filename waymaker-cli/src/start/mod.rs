@@ -1056,33 +1056,17 @@ pub async fn start(
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| command.clone());
 
-    if sort && !worker.sort.threshold.is_smart() {
-        // Force nucleo to preserve insertion order (stable sort) so the alphabetically
-        // sorted input is displayed in the same order when no query is typed.
-        worker.sort.threshold = waymaker::config::SortThreshold::NEVER;
-    }
+    configure_sort_threshold(sort, &mut worker);
 
     // -------- determine command ------------
-    if let Some(first) = additional_commands.first_mut()
-        && first.is_empty()
-    {
-        *first = command.clone();
-    }
+    fill_first_additional_command(&mut additional_commands, &command);
     let additional_commands = additional_commands;
 
     let initial_index = initial_mode_index(&additional_commands);
 
-    let command = if initial_index > 0 {
-        additional_commands[initial_index].clone()
-    } else {
-        command
-    };
+    let command = select_command(initial_index, &additional_commands, command);
 
-    let initial_cmd = if !command.is_empty() && std::io::stdin().is_terminal() || no_read {
-        command.clone()
-    } else {
-        String::new()
-    };
+    let initial_cmd = select_initial_cmd(&command, no_read);
 
     // -------- set envs/directory -----------
     let envs = prepare_environment(envs, &additional_commands, initial_index, directory);
@@ -1095,23 +1079,14 @@ pub async fn start(
     let output_separator = output_separator.clone().unwrap_or("\n".into());
     let preprocess = (ansi, trim);
 
-    if exit.last_key_path.is_none() {
-        exit.last_key_path = Some(last_key_path().into())
-    }
+    ensure_last_key_path(&mut exit);
 
     let event_loop = EventLoop::with_binds(binds).with_tick_rate(render.tick_rate());
     // Help lists the nav and preview binds under their own headings while nav mode resolves keys.
-    let nav_help = (render.ui.nav.active && !render.ui.nav.passthrough).then(|| {
-        (
-            render.ui.nav.effective_binds(),
-            render.ui.nav.effective_preview_binds(),
-        )
-    });
+    let nav_help = nav_help_binds(&render);
 
     // set event loop mode
-    let mode = bind_mode(mode, &initial_cmd);
-    log::trace!("mode: {}", mode);
-    event_loop.input_state().set_mode(mode);
+    init_event_loop_mode(&event_loop, mode, &initial_cmd);
 
     // make matcher and matchmaker with matchmaker-and-matcher-maker
     let copy_trailing_newline = tui.copy_trailing_newline;
@@ -1133,17 +1108,201 @@ pub async fn start(
     if !event_loop.binds.check_traces() {
         // maybe abort with error
     }
-    let cli_formatter = Either::Right(
+    let cli_formatter = cli_formatter_fn();
+    let binds = event_loop.binds.clone();
+    let semantic_binds = event_loop.semantic_binds.clone();
+    let previewer = build_cli_previewer(&mut mm, previewer, &cli_formatter, binds, nav_help);
+
+    // ---------------------- build options ---------------------------
+
+    let bind_tx = event_loop.bind_controller();
+
+    let envs_ = envs.clone();
+    let mut options = PickOptions::new()
+        .event_loop(event_loop)
+        .matcher(matcher.0)
+        .previewer(previewer)
+        .hidden_columns(hidden_columns)
+        .initializer(move |s| init_picker_state(s, envs_, initial_index));
+
+    let render_tx = options.render_tx();
+    send_initial_mode_index(initial_index, &render_tx);
+    let push_fn = inject_line(
+        header_lines,
+        render_tx.clone(),
+        injector,
+        group_prefix.clone(),
+    );
+
+    maybe_spawn_reload_ticker(reload_interval, &render_tx);
+
+    // ---------------------- register handlers ---------------------------
+    let nav = register_cli_handlers(
+        &mut mm,
+        cli_formatter,
+        &print_handle,
+        &output_separator,
+        copy_trailing_newline,
+        &render_tx,
+        all_rules,
+        default_base_cmd,
+        &walker_config,
+        separator,
+        input_separator,
+        splitter,
+        preprocess,
+        group_prefix,
+    );
+
+    debug!("{mm:?}");
+
+    let mut action_context = new_action_context(
+        bind_tx,
+        &render_tx,
+        additional_commands,
+        initial_index,
+        output_template,
+        &print_handle,
+        &output_separator,
+        nav_notify,
+        nav,
+    );
+
+    options = options
+        .ext_handler(move |x, y| action_handler(x, y, &mut action_context))
+        .ext_aliaser(move |a, state| alias_action(a, &semantic_binds, &state.input_routing.mode()));
+
+    if nav_mode {
+        log::debug!("Navigation mode enabled");
+    }
+
+    // ----------- read -----------------------
+    start_input_ingest(
+        sort,
+        no_read,
+        command,
+        shell,
+        separator,
+        input_separator,
+        abort_empty,
+        envs,
+        push_fn,
+        walker_config,
+        render_tx,
+        sync,
+    )
+    .await;
+
+    let ret = mm.pick(options).await;
+
+    finish_picker_output(ret, print_handle, &output_separator)
+}
+
+fn configure_sort_threshold(sort: bool, worker: &mut waymaker::config::WorkerConfig) {
+    if sort && !worker.sort.threshold.is_smart() {
+        // Force nucleo to preserve insertion order (stable sort) so the alphabetically
+        // sorted input is displayed in the same order when no query is typed.
+        worker.sort.threshold = waymaker::config::SortThreshold::NEVER;
+    }
+}
+
+fn fill_first_additional_command(additional_commands: &mut [String], command: &String) {
+    if let Some(first) = additional_commands.first_mut()
+        && first.is_empty()
+    {
+        *first = command.clone();
+    }
+}
+
+fn select_command(initial_index: usize, additional_commands: &[String], command: String) -> String {
+    if initial_index > 0 {
+        additional_commands[initial_index].clone()
+    } else {
+        command
+    }
+}
+
+fn select_initial_cmd(command: &String, no_read: bool) -> String {
+    if !command.is_empty() && std::io::stdin().is_terminal() || no_read {
+        command.clone()
+    } else {
+        String::new()
+    }
+}
+
+fn ensure_last_key_path(exit: &mut waymaker::config::ExitConfig) {
+    if exit.last_key_path.is_none() {
+        exit.last_key_path = Some(last_key_path().into())
+    }
+}
+
+fn nav_help_binds(
+    render: &waymaker::config::RenderConfig,
+) -> Option<(
+    HashMap<String, waymaker::action::Actions<waymaker::action::NullActionExt>>,
+    HashMap<String, waymaker::action::Actions<waymaker::action::NullActionExt>>,
+)> {
+    (render.ui.nav.active && !render.ui.nav.passthrough).then(|| {
+        (
+            render.ui.nav.effective_binds(),
+            render.ui.nav.effective_preview_binds(),
+        )
+    })
+}
+
+fn init_event_loop_mode(event_loop: &EventLoop<MMAction>, mode: Option<String>, initial_cmd: &str) {
+    let mode = bind_mode(mode, &initial_cmd);
+    log::trace!("mode: {}", mode);
+    event_loop.input_state().set_mode(mode);
+}
+
+fn init_picker_state(
+    s: &mut MMState<'_, '_, waymaker::ConfigMMItem, waymaker::ConfigMMInnerItem>,
+    envs_: HashMap<String, String>,
+    initial_index: usize,
+) {
+    s.envs.extend(envs_);
+    s.picker_ui.query.set_mode_index(initial_index);
+    s.picker_ui.results.set_mode_index(initial_index);
+    s.picker_ui.worker.set_mode_index(initial_index);
+}
+
+fn send_initial_mode_index(initial_index: usize, render_tx: &RenderSender<MMAction>) {
+    if initial_index > 0 {
+        let _ = render_tx.send(waymaker::message::RenderCommand::Action(
+            waymaker::action::Action::Custom(crate::action::MMAction::SetModeIndex(initial_index)),
+        ));
+    }
+}
+
+fn maybe_spawn_reload_ticker(reload_interval: Option<u64>, render_tx: &RenderSender<MMAction>) {
+    if let Some(interval) = reload_interval {
+        spawn_reload_ticker(interval, &render_tx);
+    }
+}
+
+fn cli_formatter_fn() -> CliFormatter {
+    Either::Right(
         crate::formatter::format_cli
             as for<'a, 'b, 'c> fn(
                 &'a MMState<'b, 'c, waymaker::ConfigMMItem, waymaker::ConfigMMInnerItem>,
                 &'a str,
                 Option<&dyn Fn(String)>,
             ) -> String,
-    );
-    let binds = event_loop.binds.clone();
-    let semantic_binds = event_loop.semantic_binds.clone();
-    let previewer = make_previewer(
+    )
+}
+
+fn build_cli_previewer(
+    mut mm: &mut waymaker::ConfigMatchmaker,
+    previewer: waymaker::config::PreviewerConfig,
+    cli_formatter: &CliFormatter,
+    binds: BindMap<MMAction>,
+    nav_help: Option<(
+        HashMap<String, waymaker::action::Actions<waymaker::action::NullActionExt>>,
+        HashMap<String, waymaker::action::Actions<waymaker::action::NullActionExt>>,
+    )>,
+) -> waymaker::preview::previewer::Previewer {
+    make_previewer(
         &mut mm,
         previewer,
         cli_formatter.clone(),
@@ -1159,44 +1318,29 @@ pub async fn start(
             }
             help
         }),
-    );
+    )
+}
 
-    // ---------------------- build options ---------------------------
-
-    let bind_tx = event_loop.bind_controller();
-
-    let envs_ = envs.clone();
-    let mut options = PickOptions::new()
-        .event_loop(event_loop)
-        .matcher(matcher.0)
-        .previewer(previewer)
-        .hidden_columns(hidden_columns)
-        .initializer(move |s| {
-            s.envs.extend(envs_);
-            s.picker_ui.query.set_mode_index(initial_index);
-            s.picker_ui.results.set_mode_index(initial_index);
-            s.picker_ui.worker.set_mode_index(initial_index);
-        });
-
-    let render_tx = options.render_tx();
-    if initial_index > 0 {
-        let _ = render_tx.send(waymaker::message::RenderCommand::Action(
-            waymaker::action::Action::Custom(crate::action::MMAction::SetModeIndex(initial_index)),
-        ));
-    }
-    let push_fn = inject_line(
-        header_lines,
-        render_tx.clone(),
-        injector,
-        group_prefix.clone(),
-    );
-
-    if let Some(interval) = reload_interval {
-        spawn_reload_ticker(interval, &render_tx);
-    }
-
-    // ---------------------- register handlers ---------------------------
-    let nav = register_handlers(
+#[allow(clippy::too_many_arguments)]
+fn register_cli_handlers(
+    mut mm: &mut waymaker::ConfigMatchmaker,
+    cli_formatter: CliFormatter,
+    print_handle: &AppendOnly<String>,
+    output_separator: &String,
+    copy_trailing_newline: bool,
+    render_tx: &RenderSender<MMAction>,
+    all_rules: Vec<crate::config::PathRule>,
+    default_base_cmd: String,
+    walker_config: &waymaker::config::WalkerConfig,
+    separator: Option<char>,
+    input_separator: Option<char>,
+    splitter: waymaker::nucleo::injector::SplitterFn<
+        Either<Arc<str>, Box<waymaker::nucleo::Text<'static>>>,
+    >,
+    preprocess: waymaker::nucleo::injector::PreprocessOptions,
+    group_prefix: Option<String>,
+) -> SharedNav {
+    register_handlers(
         &mut mm,
         HandlerDeps {
             cli_formatter,
@@ -1213,11 +1357,22 @@ pub async fn start(
             preprocess,
             group_prefix,
         },
-    );
+    )
+}
 
-    debug!("{mm:?}");
-
-    let mut action_context = ActionContext {
+#[allow(clippy::too_many_arguments)]
+fn new_action_context(
+    bind_tx: waymaker::event::BindSender<MMAction>,
+    render_tx: &RenderSender<MMAction>,
+    additional_commands: Vec<String>,
+    initial_index: usize,
+    output_template: Option<String>,
+    print_handle: &AppendOnly<String>,
+    output_separator: &String,
+    nav_notify: bool,
+    nav: SharedNav,
+) -> ActionContext {
+    ActionContext {
         bind_tx,
         render_tx: render_tx.clone(),
         additional_commands: (additional_commands, initial_index),
@@ -1232,17 +1387,24 @@ pub async fn start(
         mode_history: std::collections::HashMap::new(),
         last_cwd: std::env::current_dir().ok(),
         nav,
-    };
-
-    options = options
-        .ext_handler(move |x, y| action_handler(x, y, &mut action_context))
-        .ext_aliaser(move |a, state| alias_action(a, &semantic_binds, &state.input_routing.mode()));
-
-    if nav_mode {
-        log::debug!("Navigation mode enabled");
     }
+}
 
-    // ----------- read -----------------------
+#[allow(clippy::too_many_arguments)]
+async fn start_input_ingest(
+    sort: bool,
+    no_read: bool,
+    command: String,
+    shell: Option<Vec<String>>,
+    separator: Option<char>,
+    input_separator: Option<char>,
+    abort_empty: bool,
+    envs: HashMap<String, String>,
+    push_fn: impl FnMut(Arc<str>) -> Result<(), waymaker::nucleo::WorkerError> + SSS,
+    walker_config: waymaker::config::WalkerConfig,
+    render_tx: RenderSender<MMAction>,
+    sync: bool,
+) {
     let handle = spawn_input_reader(
         InputSource {
             sort,
@@ -1262,9 +1424,13 @@ pub async fn start(
     if sync {
         handle.await._wbog(); // warn the mapreader error (?)
     }
+}
 
-    let ret = mm.pick(options).await;
-
+fn finish_picker_output<T>(
+    ret: Result<T, MatchError>,
+    print_handle: AppendOnly<String>,
+    output_separator: &str,
+) -> Result<(), MatchError> {
     print_handle.map_to_vec(|s| {
         log::trace!("{s}"); // this apparently helps with a race condition that erases output?
         print!("{}{}", s, output_separator);

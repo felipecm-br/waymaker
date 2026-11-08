@@ -141,25 +141,20 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     });
 
     if *did_resize {
-        picker_ui.results.update_dimensions(&results);
-        picker_ui.action.update_width(action.width);
-        picker_ui.query.update_width(input.width);
-        footer_ui.update_width(
-            if footer_ui.config.row_connection == RowConnectionStyle::Capped {
-                area.width
-            } else {
-                footer.width
-            },
+        apply_resize_dimensions(
+            ui,
+            picker_ui,
+            footer_ui,
+            preview_ui,
+            &mut overlay_ui_ref,
+            area,
+            results,
+            action,
+            input,
+            footer,
+            header,
+            preview,
         );
-        picker_ui.header.update_width(header.width);
-        // although these only want update when the whole ui change
-        ui.update_dimensions(area);
-        if let Some(x) = overlay_ui_ref.as_deref_mut() {
-            x.update_dimensions(&area);
-        }
-        if let Some(preview_ui) = preview_ui.as_mut() {
-            preview_ui.update_dimensions(&preview);
-        }
     };
 
     let (nav_color, input_focus_info, results_focus_info) = focus_infos(state, ui, picker_ui);
@@ -220,6 +215,42 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
     }
     if crate::ui::no_color() {
         crate::ui::strip_colors(frame.buffer_mut());
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_resize_dimensions<T: SSS, S: Selection, A: ActionExt>(
+    ui: &mut UI,
+    picker_ui: &mut PickerUI<'_, T, S>,
+    footer_ui: &mut DisplayUI,
+    preview_ui: &mut Option<PreviewUI>,
+    overlay_ui_ref: &mut Option<&mut OverlayUI<A>>,
+    area: Rect,
+    results: Rect,
+    action: Rect,
+    input: Rect,
+    footer: Rect,
+    header: Rect,
+    preview: Rect,
+) {
+    picker_ui.results.update_dimensions(&results);
+    picker_ui.action.update_width(action.width);
+    picker_ui.query.update_width(input.width);
+    footer_ui.update_width(
+        if footer_ui.config.row_connection == RowConnectionStyle::Capped {
+            area.width
+        } else {
+            footer.width
+        },
+    );
+    picker_ui.header.update_width(header.width);
+    // although these only want update when the whole ui change
+    ui.update_dimensions(area);
+    if let Some(x) = overlay_ui_ref.as_deref_mut() {
+        x.update_dimensions(&area);
+    }
+    if let Some(preview_ui) = preview_ui.as_mut() {
+        preview_ui.update_dimensions(&preview);
     }
 }
 

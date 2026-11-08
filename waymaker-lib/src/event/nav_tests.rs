@@ -225,6 +225,14 @@ fn test_apply_focus_binds_sequences() {
     assert!(matches!(buffer[0], RenderCommand::Action(Action::Quit(0))));
     assert_eq!(custom_pending, None);
 
+    assert_focus_binds_sort_menu(&focus_binds, &mut pending, &mut sort_menu_active);
+}
+
+fn assert_focus_binds_sort_menu(
+    focus_binds: &HashMap<String, Actions<NullActionExt>>,
+    mut pending: &mut Option<char>,
+    mut sort_menu_active: &mut bool,
+) {
     // Test ',' opens sort menu
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char(','))];
     apply_focus_binds(
@@ -238,7 +246,7 @@ fn test_apply_focus_binds_sequences() {
     );
     assert_eq!(buffer.len(), 1);
     assert!(matches!(buffer[0], RenderCommand::Action(Action::SortMenu)));
-    assert!(sort_menu_active);
+    assert!(*sort_menu_active);
 
     // Test next key 'n' in sort menu dispatches Action::Sort(Natural) and closes menu
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char('n'))];
@@ -256,10 +264,10 @@ fn test_apply_focus_binds_sequences() {
         buffer[0],
         RenderCommand::Action(Action::Sort(Some(crate::action::SortOrder::Natural)))
     ));
-    assert!(!sort_menu_active);
+    assert!(!*sort_menu_active);
 
     // Test next key 'b' in sort menu dispatches Action::Sort(Created) and closes menu
-    sort_menu_active = true;
+    *sort_menu_active = true;
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char('b'))];
     apply_focus_binds(
         &mut buffer,
@@ -275,10 +283,10 @@ fn test_apply_focus_binds_sequences() {
         buffer[0],
         RenderCommand::Action(Action::Sort(Some(crate::action::SortOrder::Created)))
     ));
-    assert!(!sort_menu_active);
+    assert!(!*sort_menu_active);
 
     // Test ',' then 'Esc' cancels without dispatching sort
-    sort_menu_active = true;
+    *sort_menu_active = true;
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Quit(1))];
     apply_focus_binds(
         &mut buffer,
@@ -290,7 +298,7 @@ fn test_apply_focus_binds_sequences() {
         false,
     );
     assert_eq!(buffer.len(), 0);
-    assert!(!sort_menu_active);
+    assert!(!*sort_menu_active);
 }
 
 #[test]
@@ -806,6 +814,14 @@ fn test_preview_fullscreen_key_navigation() {
         RenderCommand::Action(Action::PreviewHalfPageUp)
     ));
 
+    assert_preview_fullscreen_diagram_and_jumps(&focus_binds, &mut pending, &mut sort_menu_active);
+}
+
+fn assert_preview_fullscreen_diagram_and_jumps(
+    focus_binds: &HashMap<String, Actions<NullActionExt>>,
+    mut pending: &mut Option<char>,
+    mut sort_menu_active: &mut bool,
+) {
     // s when preview_fullscreen is true -> ToggleDiagram
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char('s'))];
     apply_focus_binds(
@@ -1058,6 +1074,18 @@ fn test_apply_focus_binds_diagram_mode_navigation_and_zoom_reset() {
         RenderCommand::Action(Action::PreviewHScroll(6))
     ));
 
+    assert_diagram_zoom_reset_and_fallback_scroll(
+        &focus_binds,
+        &mut pending,
+        &mut sort_menu_active,
+    );
+}
+
+fn assert_diagram_zoom_reset_and_fallback_scroll(
+    focus_binds: &HashMap<String, Actions<NullActionExt>>,
+    mut pending: &mut Option<char>,
+    mut sort_menu_active: &mut bool,
+) {
     // 2. '0' resets zoom
     let mut buffer = vec![RenderCommand::<NullActionExt>::Action(Action::Char('0'))];
     apply_focus_binds_mode(

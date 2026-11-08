@@ -10,6 +10,7 @@ use crate::{
 pub mod icons;
 pub mod render;
 pub mod status;
+mod styler;
 pub mod widths;
 
 #[cfg(test)]

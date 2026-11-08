@@ -1,6 +1,6 @@
 use ratatui::{
     layout::Alignment,
-    style::{Modifier, Style},
+    style::Style,
     text::Span,
     widgets::{Row, Table},
 };
@@ -17,6 +17,7 @@ use crate::{
             apply_bookmark_text_style, bookmark_color, extract_col0_name, insert_icon_span,
             maybe_append_symlink_target,
         },
+        styler::{RowCtx, RowStyler, RowsFrame, RowsIter},
     },
     utils::{
         string::{fit_width, substitute_escaped},
@@ -365,7 +366,7 @@ impl ResultsUI {
                         .rev()
                         .find_map(|(i, w)| (*w != 0).then_some(i));
 
-                    let mut row_texts: Vec<_> = row
+                    let row_texts: Vec<_> = row
                         .iter()
                         .take(last_visible.map(|x| x + 1).unwrap_or(0))
                         .cloned()
@@ -400,52 +401,25 @@ impl ResultsUI {
                                     self.config.current_style,
                                     self.config.current_nav_bar_style,
                                 );
-                                if self.config.icons {
-                                    insert_icon_span(
-                                        &mut t,
-                                        &icon_name,
-                                        !is_selected && nav_bar_span.is_some(),
-                                        is_current_row,
-                                        self.config.uncolor_current_icon,
-                                        self.config.invert_current_icon,
-                                        self.config.current_icon_style,
-                                        is_pinned,
-                                        is_yanked,
-                                        is_cut,
-                                        self.mode_index,
-                                        &self.config,
-                                        self.get_flash_op(&icon_name, cwd),
-                                    );
-                                }
-                                if self.config.symlink.active {
-                                    maybe_append_symlink_target(
-                                        &mut t,
-                                        &icon_name,
-                                        self.config.symlink.style.into(),
-                                        widths[target_prefix_col],
-                                    );
-                                }
+                                self.decorate_cut_col_icon_and_symlink(
+                                    &mut t,
+                                    &icon_name,
+                                    is_selected,
+                                    is_current_row,
+                                    is_pinned,
+                                    is_yanked,
+                                    is_cut,
+                                    &nav_bar_span,
+                                    cwd,
+                                    widths,
+                                    target_prefix_col,
+                                );
                             }
                             t
                         })
                         .collect();
 
-                    if self.config.right_align_last && row_texts.len() > 1 {
-                        row_texts.last_mut().unwrap().alignment = Some(Alignment::Right)
-                    }
-
-                    let text_h = row_texts
-                        .iter()
-                        .map(|t| t.lines.len() as u16)
-                        .max()
-                        .unwrap_or(1);
-                    let row = Row::new(row_texts).height(text_h.min(remaining_height));
-                    let row = if is_selected {
-                        row.style(Style::from(self.config.selected_style))
-                    } else {
-                        row
-                    };
-                    rows.push(row);
+                    self.push_styled_cut_cols_row(row_texts, rows, remaining_height, is_selected);
                 } else {
                     let col_count = row.len();
                     let mut push = vec![];
@@ -461,57 +435,23 @@ impl ResultsUI {
                         }
                         remaining_height -= height;
 
-                        if let Some(color) = b_color {
-                            apply_bookmark_text_style(col, color);
-                        }
-
-                        prefix_span(
+                        self.push_cut_stacked_col(
                             col,
-                            prefix.clone(),
-                            self.active_prefix_style(&icon_name, is_selected, is_spinner, cwd),
-                            self.inactive_prefix_style(&icon_name, is_selected, is_spinner, cwd),
+                            &mut push,
+                            col_idx,
+                            height,
+                            b_color,
+                            &prefix,
+                            &icon_name,
+                            is_selected,
+                            is_spinner,
                             is_current_row,
-                            if !is_selected {
-                                nav_bar_span.clone()
-                            } else {
-                                None
-                            },
-                            self.config.current_style,
-                            self.config.current_nav_bar_style,
+                            is_pinned,
+                            is_yanked,
+                            is_cut,
+                            &nav_bar_span,
+                            cwd,
                         );
-                        if self.config.icons && col_idx == 0 {
-                            insert_icon_span(
-                                col,
-                                &icon_name,
-                                !is_selected && nav_bar_span.is_some(),
-                                is_current_row,
-                                self.config.uncolor_current_icon,
-                                self.config.invert_current_icon,
-                                self.config.current_icon_style,
-                                is_pinned,
-                                is_yanked,
-                                is_cut,
-                                self.mode_index,
-                                &self.config,
-                                self.get_flash_op(&icon_name, cwd),
-                            );
-                        }
-                        if self.config.symlink.active && col_idx == 0 {
-                            maybe_append_symlink_target(
-                                col,
-                                &icon_name,
-                                self.config.symlink.style.into(),
-                                self.width,
-                            );
-                        }
-
-                        let row = Row::new(vec![col.clone()]).height(height);
-                        let row = if is_selected {
-                            row.style(Style::from(self.config.selected_style))
-                        } else {
-                            row
-                        };
-                        push.push(row);
                     }
                     rows.extend(push.into_iter().rev());
                 }
@@ -605,126 +545,28 @@ impl ResultsUI {
         total_height += remaining_height;
 
         if as_cols {
-            if self._hr() + remaining_height != h {
-                for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
-                    clip_text_lines(t, remaining_height, !self.reverse());
-                }
-            }
-
-            let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
-            let target_prefix_col =
-                if is_spinner && widths.get(spinner_col_idx).copied().unwrap_or(0) != 0 {
-                    spinner_col_idx
-                } else {
-                    first_visible
-                };
-
-            let last_visible = widths
-                .iter()
-                .enumerate()
-                .rev()
-                .find_map(|(i, w)| (*w != 0).then_some(i));
-
-            let mut row_texts: Vec<_> = row
-                .iter()
-                .take(last_visible.map(|x| x + 1).unwrap_or(0))
-                .cloned()
-                .enumerate()
-                .map(|(x, mut t)| {
-                    t = style_text(t, x, is_current_row);
-                    if let Some(color) = b_color {
-                        apply_bookmark_text_style(&mut t, color);
-                    }
-                    if x == target_prefix_col {
-                        prefix_span(
-                            &mut t,
-                            prefix.clone(),
-                            self.active_prefix_style(&icon_name, is_selected, is_spinner, cwd),
-                            self.inactive_prefix_style(
-                                &icon_name,
-                                is_selected && !is_current_row,
-                                is_spinner,
-                                cwd,
-                            ),
-                            is_current_row,
-                            if !is_selected {
-                                nav_bar_span.clone()
-                            } else {
-                                None
-                            },
-                            self.config.current_style,
-                            self.config.current_nav_bar_style,
-                        );
-                        if self.config.icons {
-                            insert_icon_span(
-                                &mut t,
-                                &icon_name,
-                                !is_selected && nav_bar_span.is_some(),
-                                is_current_row,
-                                self.config.uncolor_current_icon,
-                                self.config.invert_current_icon,
-                                self.config.current_icon_style,
-                                is_pinned,
-                                is_yanked,
-                                is_cut,
-                                self.mode_index,
-                                &self.config,
-                                self.get_flash_op(&icon_name, cwd),
-                            );
-                        }
-                        if self.config.symlink.active {
-                            maybe_append_symlink_target(
-                                &mut t,
-                                &icon_name,
-                                self.config.symlink.style.into(),
-                                widths[target_prefix_col],
-                            );
-                        }
-                    }
-                    t
-                })
-                .collect();
-
-            if self.config.right_align_last && row_texts.len() > 1 {
-                row_texts.last_mut().unwrap().alignment = Some(Alignment::Right)
-            }
-
-            if is_topside_tier_underlined {
-                let total_allocated: u16 = widths.iter().sum();
-                let total_available = self.width.saturating_sub(self.column_spacing_width());
-                let surplus = total_available.saturating_sub(total_allocated);
-                let num_cols = row_texts.len();
-                let has_nav = !is_selected && nav_bar_span.is_some();
-                let prefix_skip = if has_nav { 2 } else { 1 };
-                for (col_idx, t) in row_texts.iter_mut().enumerate() {
-                    let is_last_col = col_idx == num_cols.saturating_sub(1);
-                    let base_w = widths.get(col_idx).copied().unwrap_or(0);
-                    let target_w = if is_last_col {
-                        base_w + surplus
-                    } else {
-                        base_w
-                    } as usize;
-                    let skip = if col_idx == target_prefix_col {
-                        prefix_skip
-                    } else {
-                        0
-                    };
-                    apply_tier_underline(t, target_w, skip);
-                }
-            }
-
-            let text_h = row_texts
-                .iter()
-                .map(|t| t.lines.len() as u16)
-                .max()
-                .unwrap_or(1);
-            let row = Row::new(row_texts).height(text_h.min(remaining_height));
-            let row = if is_selected && !is_current_row {
-                row.style(Style::from(self.config.selected_style))
-            } else {
-                row
-            };
-            rows.push(row);
+            self.push_kept_cols_top_row(
+                row,
+                rows,
+                widths,
+                h,
+                remaining_height,
+                is_spinner,
+                spinner_col_idx,
+                is_current_row,
+                is_topside_tier_underlined,
+                b_color,
+                &prefix,
+                icon_name,
+                is_selected,
+                is_pinned,
+                is_yanked,
+                is_cut,
+                &nav_bar_span,
+                cwd,
+                &style_text,
+                &apply_tier_underline,
+            );
         } else {
             let col_count = row.len();
             let mut push = vec![];
@@ -1552,23 +1394,7 @@ impl ResultsUI {
 
         let i = self.bottom_clip.is_some() as usize;
 
-        let active_group_name: Option<std::sync::Arc<str>> = if !self.cursor_disabled {
-            let mut curr = None;
-            let base_i = self.bottom_clip.is_some() as usize;
-            let cursor_offset = (self.cursor as usize).saturating_sub(base_i);
-            let target_idx = (start_index as usize).saturating_add(cursor_offset);
-            for (k, (g, _, _)) in results.iter().enumerate() {
-                if let Some(crate::nucleo::GroupHeader::Named(name)) = g {
-                    curr = Some(name.clone());
-                }
-                if k == target_idx {
-                    break;
-                }
-            }
-            curr
-        } else {
-            None
-        };
+        let active_group_name = self.active_group_name(&results, start_index);
 
         let (i, remaining_height) = self.push_visible_rows(
             &styler,
@@ -1594,6 +1420,325 @@ impl ResultsUI {
             *click = Click::ResultIdx(self.bottom + i as u32 - 1);
         }
 
+        self.finalize_table(rows, remaining_height, widths, as_cols)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn decorate_cut_col_icon_and_symlink(
+        &self,
+        mut t: &mut ratatui::text::Text<'_>,
+        icon_name: &str,
+        is_selected: bool,
+        is_current_row: bool,
+        is_pinned: bool,
+        is_yanked: bool,
+        is_cut: bool,
+        nav_bar_span: &Option<ratatui::text::Span<'static>>,
+        cwd: &std::path::Path,
+        widths: &[u16],
+        target_prefix_col: usize,
+    ) {
+        if self.config.icons {
+            insert_icon_span(
+                &mut t,
+                &icon_name,
+                !is_selected && nav_bar_span.is_some(),
+                is_current_row,
+                self.config.uncolor_current_icon,
+                self.config.invert_current_icon,
+                self.config.current_icon_style,
+                is_pinned,
+                is_yanked,
+                is_cut,
+                self.mode_index,
+                &self.config,
+                self.get_flash_op(&icon_name, cwd),
+            );
+        }
+        if self.config.symlink.active {
+            maybe_append_symlink_target(
+                &mut t,
+                &icon_name,
+                self.config.symlink.style.into(),
+                widths[target_prefix_col],
+            );
+        }
+    }
+
+    fn active_group_name<'a, T: SSS>(
+        &self,
+        results: &crate::nucleo::WorkerResults<'a, T>,
+        start_index: u16,
+    ) -> Option<std::sync::Arc<str>> {
+        if !self.cursor_disabled {
+            let mut curr = None;
+            let base_i = self.bottom_clip.is_some() as usize;
+            let cursor_offset = (self.cursor as usize).saturating_sub(base_i);
+            let target_idx = (start_index as usize).saturating_add(cursor_offset);
+            for (k, (g, _, _)) in results.iter().enumerate() {
+                if let Some(crate::nucleo::GroupHeader::Named(name)) = g {
+                    curr = Some(name.clone());
+                }
+                if k == target_idx {
+                    break;
+                }
+            }
+            curr
+        } else {
+            None
+        }
+    }
+
+    fn push_styled_cut_cols_row<'a>(
+        &self,
+        mut row_texts: Vec<ratatui::text::Text<'a>>,
+        rows: &mut Vec<Row<'a>>,
+        remaining_height: u16,
+        is_selected: bool,
+    ) {
+        if self.config.right_align_last && row_texts.len() > 1 {
+            row_texts.last_mut().unwrap().alignment = Some(Alignment::Right)
+        }
+
+        let text_h = row_texts
+            .iter()
+            .map(|t| t.lines.len() as u16)
+            .max()
+            .unwrap_or(1);
+        let row = Row::new(row_texts).height(text_h.min(remaining_height));
+        let row = if is_selected {
+            row.style(Style::from(self.config.selected_style))
+        } else {
+            row
+        };
+        rows.push(row);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn push_cut_stacked_col<'a>(
+        &self,
+        col: &mut ratatui::text::Text<'a>,
+        push: &mut Vec<Row<'a>>,
+        col_idx: usize,
+        height: u16,
+        b_color: Option<ratatui::style::Color>,
+        prefix: &String,
+        icon_name: &str,
+        is_selected: bool,
+        is_spinner: bool,
+        is_current_row: bool,
+        is_pinned: bool,
+        is_yanked: bool,
+        is_cut: bool,
+        nav_bar_span: &Option<ratatui::text::Span<'static>>,
+        cwd: &std::path::Path,
+    ) {
+        if let Some(color) = b_color {
+            apply_bookmark_text_style(col, color);
+        }
+
+        prefix_span(
+            col,
+            prefix.clone(),
+            self.active_prefix_style(&icon_name, is_selected, is_spinner, cwd),
+            self.inactive_prefix_style(&icon_name, is_selected, is_spinner, cwd),
+            is_current_row,
+            if !is_selected {
+                nav_bar_span.clone()
+            } else {
+                None
+            },
+            self.config.current_style,
+            self.config.current_nav_bar_style,
+        );
+        if self.config.icons && col_idx == 0 {
+            insert_icon_span(
+                col,
+                &icon_name,
+                !is_selected && nav_bar_span.is_some(),
+                is_current_row,
+                self.config.uncolor_current_icon,
+                self.config.invert_current_icon,
+                self.config.current_icon_style,
+                is_pinned,
+                is_yanked,
+                is_cut,
+                self.mode_index,
+                &self.config,
+                self.get_flash_op(&icon_name, cwd),
+            );
+        }
+        if self.config.symlink.active && col_idx == 0 {
+            maybe_append_symlink_target(
+                col,
+                &icon_name,
+                self.config.symlink.style.into(),
+                self.width,
+            );
+        }
+
+        let row = Row::new(vec![col.clone()]).height(height);
+        let row = if is_selected {
+            row.style(Style::from(self.config.selected_style))
+        } else {
+            row
+        };
+        push.push(row);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn push_kept_cols_top_row<'a>(
+        &self,
+        row: &mut [ratatui::text::Text<'a>],
+        rows: &mut Vec<Row<'a>>,
+        widths: &[u16],
+        h: u16,
+        remaining_height: u16,
+        is_spinner: bool,
+        spinner_col_idx: usize,
+        is_current_row: bool,
+        is_topside_tier_underlined: bool,
+        b_color: Option<ratatui::style::Color>,
+        prefix: &String,
+        icon_name: String,
+        is_selected: bool,
+        is_pinned: bool,
+        is_yanked: bool,
+        is_cut: bool,
+        nav_bar_span: &Option<ratatui::text::Span<'static>>,
+        cwd: &std::path::Path,
+        style_text: &impl Fn(ratatui::text::Text<'a>, usize, bool) -> ratatui::text::Text<'a>,
+        apply_tier_underline: &impl Fn(&mut ratatui::text::Text<'_>, usize, usize),
+    ) {
+        if self._hr() + remaining_height != h {
+            for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
+                clip_text_lines(t, remaining_height, !self.reverse());
+            }
+        }
+
+        let first_visible = widths.iter().position(|&w| w != 0).unwrap_or(0);
+        let target_prefix_col =
+            if is_spinner && widths.get(spinner_col_idx).copied().unwrap_or(0) != 0 {
+                spinner_col_idx
+            } else {
+                first_visible
+            };
+
+        let last_visible = widths
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(i, w)| (*w != 0).then_some(i));
+
+        let mut row_texts: Vec<_> = row
+            .iter()
+            .take(last_visible.map(|x| x + 1).unwrap_or(0))
+            .cloned()
+            .enumerate()
+            .map(|(x, mut t)| {
+                t = style_text(t, x, is_current_row);
+                if let Some(color) = b_color {
+                    apply_bookmark_text_style(&mut t, color);
+                }
+                if x == target_prefix_col {
+                    prefix_span(
+                        &mut t,
+                        prefix.clone(),
+                        self.active_prefix_style(&icon_name, is_selected, is_spinner, cwd),
+                        self.inactive_prefix_style(
+                            &icon_name,
+                            is_selected && !is_current_row,
+                            is_spinner,
+                            cwd,
+                        ),
+                        is_current_row,
+                        if !is_selected {
+                            nav_bar_span.clone()
+                        } else {
+                            None
+                        },
+                        self.config.current_style,
+                        self.config.current_nav_bar_style,
+                    );
+                    if self.config.icons {
+                        insert_icon_span(
+                            &mut t,
+                            &icon_name,
+                            !is_selected && nav_bar_span.is_some(),
+                            is_current_row,
+                            self.config.uncolor_current_icon,
+                            self.config.invert_current_icon,
+                            self.config.current_icon_style,
+                            is_pinned,
+                            is_yanked,
+                            is_cut,
+                            self.mode_index,
+                            &self.config,
+                            self.get_flash_op(&icon_name, cwd),
+                        );
+                    }
+                    if self.config.symlink.active {
+                        maybe_append_symlink_target(
+                            &mut t,
+                            &icon_name,
+                            self.config.symlink.style.into(),
+                            widths[target_prefix_col],
+                        );
+                    }
+                }
+                t
+            })
+            .collect();
+
+        if self.config.right_align_last && row_texts.len() > 1 {
+            row_texts.last_mut().unwrap().alignment = Some(Alignment::Right)
+        }
+
+        if is_topside_tier_underlined {
+            let total_allocated: u16 = widths.iter().sum();
+            let total_available = self.width.saturating_sub(self.column_spacing_width());
+            let surplus = total_available.saturating_sub(total_allocated);
+            let num_cols = row_texts.len();
+            let has_nav = !is_selected && nav_bar_span.is_some();
+            let prefix_skip = if has_nav { 2 } else { 1 };
+            for (col_idx, t) in row_texts.iter_mut().enumerate() {
+                let is_last_col = col_idx == num_cols.saturating_sub(1);
+                let base_w = widths.get(col_idx).copied().unwrap_or(0);
+                let target_w = if is_last_col {
+                    base_w + surplus
+                } else {
+                    base_w
+                } as usize;
+                let skip = if col_idx == target_prefix_col {
+                    prefix_skip
+                } else {
+                    0
+                };
+                apply_tier_underline(t, target_w, skip);
+            }
+        }
+
+        let text_h = row_texts
+            .iter()
+            .map(|t| t.lines.len() as u16)
+            .max()
+            .unwrap_or(1);
+        let row = Row::new(row_texts).height(text_h.min(remaining_height));
+        let row = if is_selected && !is_current_row {
+            row.style(Style::from(self.config.selected_style))
+        } else {
+            row
+        };
+        rows.push(row);
+    }
+
+    fn finalize_table<'a>(
+        &mut self,
+        mut rows: Vec<Row<'a>>,
+        remaining_height: u16,
+        widths: Vec<u16>,
+        as_cols: bool,
+    ) -> Table<'a> {
         if self.reverse() {
             rows.reverse();
             if remaining_height > 0 {
@@ -1693,251 +1838,5 @@ impl ResultsUI {
 
     fn _hr(&self) -> u16 {
         !matches!(self.config.separator, HorizontalSeparator::None) as u16
-    }
-}
-
-/// The nav-bar glyph for a border type.
-fn nav_border_char(border_type: ratatui::widgets::BorderType) -> &'static str {
-    match border_type {
-        ratatui::widgets::BorderType::Plain | ratatui::widgets::BorderType::Rounded => "│",
-        ratatui::widgets::BorderType::Double => "║",
-        ratatui::widgets::BorderType::Thick => "█",
-        ratatui::widgets::BorderType::QuadrantOutside => "▌",
-        ratatui::widgets::BorderType::QuadrantInside => "▐",
-        _ => "│",
-    }
-}
-
-/// What make_table needs, per frame, to style a row: copied out of the config so the row code
-/// can take it alongside `&mut self`.
-/// Values the same for every row of one table, read by both row layouts.
-#[derive(Clone, Copy)]
-struct RowsFrame<'f> {
-    styler: &'f RowStyler,
-    widths: &'f [u16],
-    cwd: &'f std::path::Path,
-    is_underline_mode: bool,
-    active_column: usize,
-}
-
-/// One item's values, computed once by `push_visible_rows` and read by both row layouts.
-struct RowCtx {
-    i: usize,
-    prefix: String,
-    icon_name_hz: String,
-    is_spinner: bool,
-    spinner_col_idx: usize,
-    is_yanked: bool,
-    is_cut: bool,
-    is_selected: bool,
-    is_current_row: bool,
-    is_pinned: bool,
-    b_color: Option<ratatui::style::Color>,
-    nav_bar_span: Option<ratatui::text::Span<'static>>,
-}
-
-/// The rest of a frame's results, peeked to see whether a tier separator follows a row.
-type RowsIter<'d, 'a, T> = std::iter::Peekable<
-    std::vec::Drain<
-        'd,
-        (
-            Option<crate::nucleo::GroupHeader>,
-            Vec<ratatui::text::Text<'a>>,
-            &'a T,
-        ),
-    >,
->;
-
-struct RowStyler {
-    nav_bar_style: Option<(ratatui::widgets::BorderType, Style)>,
-    current_nav_bar: Option<ratatui::widgets::BorderType>,
-    multi_prefix: String,
-    /// The multi-select prefix with the nav bar as its first cell: (both, first, last, mid).
-    nav_bar_multi_prefixes: Option<(String, String, String, String)>,
-    tier_sep_style: crate::config::StyleSetting,
-    tier_separator: HorizontalSeparator,
-    row_connection: RowConnectionStyle,
-    style: crate::config::StyleSetting,
-    current_style: crate::config::StyleSetting,
-    inactive_style: crate::config::StyleSetting,
-    inactive_current_style: crate::config::StyleSetting,
-    effective_active_col: usize,
-    as_cols: bool,
-    hr: u16,
-}
-
-impl RowStyler {
-    fn new(
-        config: &crate::config::ResultsConfig,
-        nav_bar_style: Option<(ratatui::widgets::BorderType, Style)>,
-        effective_active_col: usize,
-        as_cols: bool,
-        hr: u16,
-    ) -> Self {
-        let multi_prefix = config.multi_prefix.clone();
-        let nav_bar_multi_prefixes = nav_bar_style.as_ref().map(|(border_type, _)| {
-            let rest: String = multi_prefix.chars().skip(1).collect();
-            let make = |_is_first: bool, _is_last: bool| -> String {
-                let border_char = nav_border_char(*border_type);
-                if multi_prefix.chars().next().is_some() {
-                    format!("{}{}", border_char, rest)
-                } else {
-                    format!("{} ", border_char)
-                }
-            };
-            (
-                make(true, true),
-                make(true, false),
-                make(false, true),
-                make(false, false),
-            )
-        });
-        Self {
-            nav_bar_style,
-            current_nav_bar: config.current_nav_bar,
-            multi_prefix,
-            nav_bar_multi_prefixes,
-            tier_sep_style: config.tier.style,
-            tier_separator: config.tier.separator,
-            row_connection: config.row_connection.clone(),
-            style: config.style,
-            current_style: config.current_style,
-            inactive_style: config.inactive_style,
-            inactive_current_style: config.inactive_current_style,
-            effective_active_col,
-            as_cols,
-            hr,
-        }
-    }
-
-    fn nav_bar_span(
-        &self,
-        _is_first: bool,
-        _is_last: bool,
-        is_current: bool,
-        is_yanked: bool,
-        is_cut: bool,
-    ) -> Option<ratatui::text::Span<'static>> {
-        self.nav_bar_style.as_ref().map(|(border_type, style)| {
-            let bt = if is_current {
-                self.current_nav_bar.unwrap_or(*border_type)
-            } else {
-                *border_type
-            };
-            let mut st = *style;
-            if is_cut {
-                st = st.fg(ratatui::style::Color::Red);
-            } else if is_yanked {
-                st = st.fg(ratatui::style::Color::Yellow);
-            }
-            let ch = nav_border_char(bt);
-            ratatui::text::Span::styled(ch, st)
-        })
-    }
-
-    fn dynamic_multi_prefix(&self, is_first: bool, is_last: bool) -> String {
-        if let Some((both, first, last, mid)) = &self.nav_bar_multi_prefixes {
-            if is_first && is_last {
-                both.clone()
-            } else if is_first {
-                first.clone()
-            } else if is_last {
-                last.clone()
-            } else {
-                mid.clone()
-            }
-        } else {
-            self.multi_prefix.clone()
-        }
-    }
-
-    /// Underlines the last line of `t` (padded to `target_w`) to mark a tier boundary.
-    fn tier_underline(&self, t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize) {
-        let tier_sep_style = self.tier_sep_style;
-        if let Some(last_line) = t.lines.last_mut() {
-            let cur_w = last_line.width();
-            if cur_w < target_w {
-                let pad_style = if let Some(fg) = tier_sep_style.fg {
-                    Style::default()
-                        .fg(fg)
-                        .underline_color(fg)
-                        .add_modifier(Modifier::UNDERLINED)
-                } else {
-                    Style::default().add_modifier(Modifier::UNDERLINED)
-                };
-                last_line
-                    .spans
-                    .push(Span::styled(" ".repeat(target_w - cur_w), pad_style));
-            }
-            for span in last_line.spans.iter_mut().skip(skip_spans) {
-                span.style = span.style.add_modifier(Modifier::UNDERLINED);
-                if let Some(fg) = tier_sep_style.fg {
-                    span.style = span.style.underline_color(fg);
-                }
-            }
-        }
-    }
-
-    /// Rows a result takes: its group header, the row separator, and its columns.
-    fn height_of(
-        &self,
-        group: &Option<crate::nucleo::GroupHeader>,
-        cols: &[ratatui::text::Text<'_>],
-    ) -> u16 {
-        let group_h = match group {
-            Some(crate::nucleo::GroupHeader::Named(_)) => 1,
-            Some(crate::nucleo::GroupHeader::TierSeparator) => u16::from(!matches!(
-                self.tier_separator,
-                HorizontalSeparator::None | HorizontalSeparator::Underline
-            )),
-            None => 0,
-        };
-        group_h
-            + self.hr
-            + if self.as_cols {
-                cols.iter()
-                    .map(|t| t.height() as u16)
-                    .max()
-                    .unwrap_or_default()
-            } else {
-                cols.iter().map(|t| t.height() as u16).sum::<u16>()
-            }
-    }
-
-    fn style_text<'t>(
-        &self,
-        mut t: ratatui::text::Text<'t>,
-        x: usize,
-        is_current_row: bool,
-    ) -> ratatui::text::Text<'t> {
-        let is_active_col = self.effective_active_col == x;
-        match self.row_connection {
-            RowConnectionStyle::Disjoint => {
-                if is_active_col {
-                    t = t.style(if is_current_row {
-                        self.current_style
-                    } else {
-                        self.style
-                    });
-                } else {
-                    t = t.style(if is_current_row {
-                        self.inactive_current_style
-                    } else {
-                        self.inactive_style
-                    });
-                }
-            }
-            RowConnectionStyle::Capped => {
-                if is_active_col {
-                    t = t.style(if is_current_row {
-                        self.current_style
-                    } else {
-                        self.style
-                    });
-                }
-            }
-            RowConnectionStyle::Full => {}
-        }
-        t
     }
 }
