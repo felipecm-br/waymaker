@@ -25,13 +25,13 @@ Measured on Linux `aarch64` (release build, median of 3 runs, `stdin` redirected
 
 | Query Pattern | Query | Matches | `wm -f` | `fzf -f` | `sk -f` |
 | :--- | :--- | ---: | ---: | ---: | ---: |
-| Narrow | `mod97file12` | 27,305 | **199 ms** | 202 ms | 613 ms |
-| Broad | `src/module_5` | 1,559,075 | **424 ms** | 1,128 ms | 2,521 ms |
-| No match | `xyzzy` | 0 | **189 ms** | 171 ms | 241 ms |
-| Peak RSS (narrow) | `mod97file12` | — | **321 MiB** | 244 MiB | 296 MiB |
-| Peak RSS (broad) | `src/module_5` | — | **373 MiB** | 544 MiB | — |
+| Narrow | `mod97file12` | 27,305 | **120 ms** | 331 ms | 613 ms |
+| Broad | `src/module_5` | 1,559,075 | **386 ms** | 1,181 ms | 2,521 ms |
+| No match | `xyzzy` | 0 | **111 ms** | 175 ms | 241 ms |
+| Peak RSS (narrow) | `mod97file12` | — | **318 MiB** | 245 MiB | 296 MiB |
+| Peak RSS (broad) | `src/module_5` | — | **364 MiB** | 533 MiB | — |
 
-CPU time (user) on the same corpus, 8 cores: `wm -f` uses about 1.3 s on narrow and no-match queries against `fzf`'s 0.2–0.6 s, and 2.3 s against 3.9 s on the broad one. Pinned to one core it is 0.42 s against 0.52 s, so the difference is the parallel matcher's overhead per thread (nucleo's rayon pool), not per-item work.
+`sk` figures are from an earlier run. CPU time (user) on 8 cores: `wm -f` uses about 0.35 s on the narrow and no-match queries (`fzf`: 0.25–0.55 s) and 2.3 s on the broad one (`fzf`: 3.9 s). Until nucleo `041465e`, every worker thread bumped one shared counter per unmatched item, which cost about 0.9 s of CPU on these queries.
 
 ## Interactive Streaming Frametime (`300,000` items)
 
