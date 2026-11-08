@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### ✨ Features
+
+- `matcher.track = true` keeps the cursor on the same item while the query changes, like fzf's `--track`. The item is followed until matching finishes; moving the cursor by hand stops following it
+
 ### ⚡ Performance
 
 - Selective queries use far less CPU: nucleo (`041465e`) counts unmatched items after sorting instead of having every worker thread bump one shared atomic per item. On the 2M-line corpus, `wm -f` with a narrow query takes 120 ms instead of 199 ms (fzf: 331 ms) and with no match 111 ms instead of 189 ms (fzf: 175 ms); CPU time drops from about 1.3 s to 0.35 s. Rescoring while typing takes the same path
@@ -8,6 +12,8 @@
 
 ### 🐛 Fixed
 
+- Changing the query moves the cursor to the best match. It used to keep its row, so after moving down, typing and pressing `enter` could accept a worse match (with `apple`, `foobar`, `banana`: two `down`s, then `ba` and `enter` printed `foobar` instead of `banana`)
+- `matcher.raw` is removed: it was documented as unimplemented and did nothing; a config that sets it now gets an unknown-key warning. `matcher.reverse` was also documented as unimplemented but works (fzf's `--tac`); the docs say so now
 - `#[partial]` on a tuple or unit struct reports a compile error at the struct's fields instead of panicking inside the proc macro
 
 ### 🔄 Changed

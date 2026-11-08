@@ -173,6 +173,7 @@ impl ConfigMatchmaker {
         worker.typo_tolerance = worker_config.typo_tolerance;
         worker.engine = worker_config.engine;
         worker.dir_first = worker_config.dir_first;
+        worker.track = worker_config.track;
         if worker_config.frecency.active {
             let store = crate::frecency::FrecencyStore::open();
             worker.frecency_snapshot =

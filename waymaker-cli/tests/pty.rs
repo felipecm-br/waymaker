@@ -103,6 +103,30 @@ fn down_moves_the_cursor() {
     assert_eq!(wm.finish(), (0, "foobar\n".to_string()));
 }
 
+// Cursor on `xab` (row 2); the query `ab` ranks `ab1`, `ab2`, `xab`. Keeping the row would pick
+// `ab2`, the best match is `ab1`, and following the item picks `xab`.
+const TRACK: &str = "q\nxab\nab1\nab2\n";
+
+#[test]
+fn typing_moves_the_cursor_to_the_best_match() {
+    let wm = Session::start(TRACK, &[]);
+    wm.send(DOWN);
+    wm.send("ab");
+    wm.wait_for_screen(|s| s.contains("3/4"));
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "ab1\n".to_string()));
+}
+
+#[test]
+fn track_keeps_the_cursor_on_its_item_when_typing() {
+    let wm = Session::start(TRACK, &["matcher.track=true"]);
+    wm.send(DOWN);
+    wm.send("ab");
+    wm.wait_for_screen(|s| s.contains("3/4"));
+    wm.send(ENTER);
+    assert_eq!(wm.finish(), (0, "xab\n".to_string()));
+}
+
 #[test]
 fn backspace_edits_the_query() {
     let wm = Session::start(FRUIT, &[]);

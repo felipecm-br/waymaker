@@ -55,6 +55,9 @@ pub struct ResultsUI {
     cursor_above: u16,
 
     pub cursor_disabled: bool,
+    /// With `matcher.track`, the identifier of the item the cursor follows after a query
+    /// change, until matching finishes or the cursor is moved by hand.
+    pub tracked: Option<u32>,
 
     /// Set of col-0 names whose prefix should be rendered with `yank_prefix_style`.
     /// Populated externally via `Action::Custom(FmSetYankPaths(...))`.
@@ -89,6 +92,7 @@ impl ResultsUI {
             config,
 
             cursor_disabled: false,
+            tracked: None,
             bottom_clip: None,
             cursor_above: 0,
             yank_paths: HashSet::new(),
@@ -216,6 +220,7 @@ impl ResultsUI {
 
     /// Returns whether scroll wrap caused it to jump to the end
     pub fn cursor_prev(&mut self) -> bool {
+        self.tracked = None;
         self.reset_current_scroll();
 
         if (self.cursor_above <= self.scroll_padding() || self.cursor <= self.scroll_padding())
@@ -246,6 +251,7 @@ impl ResultsUI {
 
     /// Returns whether scroll wrap caused it to jump to start
     pub fn cursor_next(&mut self) -> bool {
+        self.tracked = None;
         self.reset_current_scroll();
 
         if self.cursor_disabled {
@@ -266,6 +272,7 @@ impl ResultsUI {
     }
 
     pub fn cursor_jump(&mut self, index: u32) {
+        self.tracked = None;
         self.reset_current_scroll();
 
         self.cursor_disabled = false;
@@ -286,6 +293,23 @@ impl ResultsUI {
             self.cursor = (index - self.bottom) as u16;
         }
         log::debug!("cursor jumped to {}: {index}, end: {end}", self.cursor);
+    }
+
+    /// Puts the cursor on the first row, as after a query change; unlike
+    /// [`Self::cursor_jump`] it leaves a disabled cursor disabled.
+    pub fn cursor_to_top(&mut self) {
+        self.tracked = None;
+        self.reset_current_scroll();
+        self.bottom_clip = None;
+        self.bottom = 0;
+        self.cursor = 0;
+    }
+
+    /// Moves the cursor to `index` while it keeps following [`Self::tracked`].
+    pub fn cursor_jump_tracked(&mut self, index: u32) {
+        let tracked = self.tracked;
+        self.cursor_jump(index);
+        self.tracked = tracked;
     }
 
     pub fn current_scroll(&mut self, x: i8, horizontal: bool) {

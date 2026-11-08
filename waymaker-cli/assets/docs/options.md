@@ -162,9 +162,8 @@ All colors and modifiers come from ratatui:
 - `sort_cap`, `sc`: (number) Maximum number of top matched items to re-sort by frecency/depth penalty. Default `1000`. Set to `0` for unlimited.
 - `typo_tolerance`, `tt`: (bool) Enable typo-tolerant fuzzy matching for queries >= 3 characters. Default `false`.
 - `dir_first`, `df`: (bool) Prioritize direct child directories over files and deeper paths, putting local subfolders at the top for interactive directory navigation. Default `false`.
-- `raw`: Enable raw mode where non-matching items are also displayed in a dimmed color. (unimplemented)
-- `track`: Track the current selection when the result list is updated. (unimplemented)
-- `reverse`: Reverse the order of the input (unimplemented)
+- `track`: (bool) Keep the cursor on the same item when the query changes, instead of moving it to the best match (fzf's `--track`). Default `false`.
+- `reverse`: (bool) Reverse the order of the input (fzf's `--tac`). Default `false`.
 
 ### Columns (`columns.`, `c`)
 

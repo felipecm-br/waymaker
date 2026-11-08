@@ -169,13 +169,11 @@ pub struct WorkerConfig {
     /// Prioritize direct child directories over files and deeper paths.
     #[partial(alias = "df")]
     pub dir_first: bool,
-    /// TODO: Enable raw mode where non-matching items are also displayed in a dimmed color.
-    #[partial(alias = "r")]
-    pub raw: bool,
-    /// TODO: Track the current selection when the result list is updated.
+    /// Keep the cursor on the same item when the query changes, instead of moving it to the
+    /// best match (fzf's `--track`). Default `false`.
     pub track: bool,
-    /// Reverse the order of the input
-    pub reverse: bool, // TODO: test with sort_threshold
+    /// Reverse the order of the input (fzf's `--tac`).
+    pub reverse: bool,
     /// Percentage bonus boost for items located inside or relative to current working directory (CWD). Default is 30 (i.e. +30%).
     #[partial(alias = "lb")]
     pub location_bias: u32,
@@ -201,7 +199,6 @@ impl Default for WorkerConfig {
             frecency: WorkerFrecencyConfig::default(),
             typo_tolerance: false,
             dir_first: false,
-            raw: false,
             track: false,
             reverse: false,
             location_bias: 30,

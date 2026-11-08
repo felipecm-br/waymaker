@@ -163,6 +163,8 @@ where
     pub engine: crate::config::MatcherEngineType,
     pub frizbee_cache: std::sync::Mutex<FrizbeeWorkerCache>,
     pub dir_first: bool,
+    /// Keep the cursor on its item when the query changes (`matcher.track`).
+    pub track: bool,
     pub sort_order: Option<crate::action::SortOrder>,
     pub mode_index: usize,
     pub matcher_dirty: Arc<AtomicBool>,
@@ -236,6 +238,7 @@ impl<T: SSS> Worker<T> {
             engine: crate::config::MatcherEngineType::default(),
             frizbee_cache: std::sync::Mutex::new(FrizbeeWorkerCache::default()),
             dir_first: false,
+            track: false,
             sort_order: None,
             mode_index: 0,
             version: Arc::new(AtomicU32::new(0)),
@@ -285,7 +288,8 @@ impl<T: SSS> Worker<T> {
         }
     }
 
-    pub fn find(&mut self, line: &str) {
+    /// Matches `line`; returns whether the parsed query changed.
+    pub fn find(&mut self, line: &str) -> bool {
         // With no query every item scores the same, and nucleo would break the tie by length,
         // listing the shortest first; like fzf, an empty query keeps the input order instead.
         // A query sorts by the configured threshold as before.
@@ -297,7 +301,7 @@ impl<T: SSS> Worker<T> {
         }
         let old_query = self.query.parse(line);
         if self.query == old_query {
-            return;
+            return false;
         }
         #[cfg(feature = "frizbee")]
         if self.engine == crate::config::MatcherEngineType::Frizbee {
@@ -305,7 +309,7 @@ impl<T: SSS> Worker<T> {
             if let Some(cb) = self.notify_callback.load().as_ref() {
                 (cb.0)();
             }
-            return;
+            return true;
         }
         for (i, column) in self
             .columns
@@ -353,6 +357,7 @@ impl<T: SSS> Worker<T> {
                 is_append,
             );
         }
+        true
     }
 
     /// Force reparsing the pattern on all filter columns regardless of whether

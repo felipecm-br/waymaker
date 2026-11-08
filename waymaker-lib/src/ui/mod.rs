@@ -283,8 +283,39 @@ impl<'a, T: SSS, O: Selection> PickerUI<'a, T, O> {
         (table, width)
     }
 
+    /// Runs the query. When it changed, the cursor moves to the best match, or with
+    /// `matcher.track` follows the item it was on until matching finishes.
     pub fn update(&mut self) {
-        self.worker.find(&self.query.input);
+        // A target not yet resolved carries over: the cursor sits at the top meanwhile.
+        let current = if self.results.tracked.is_some() {
+            self.results.tracked
+        } else if self.worker.track && !self.results.cursor_disabled {
+            self.worker
+                .get_nth(self.results.index())
+                .map(|item| (self.selector.identifier)(item).0)
+        } else {
+            None
+        };
+        if self.worker.find(&self.query.input) {
+            self.results.cursor_to_top();
+            // Resolved from the next frame on, once the matcher has seen the new query.
+            self.results.tracked = current;
+            return;
+        }
+        self.follow_tracked();
+    }
+
+    fn follow_tracked(&mut self) {
+        let Some(id) = self.results.tracked else {
+            return;
+        };
+        let identifier = self.selector.identifier;
+        if let Some(pos) = self.worker.find_item_index(|item| identifier(item).0 == id) {
+            self.results.cursor_jump_tracked(pos as u32);
+        }
+        if !self.results.status.running {
+            self.results.tracked = None;
+        }
     }
     pub fn tick(&mut self) {
         self.worker.find(&self.query.input);
