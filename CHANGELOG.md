@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### ⚡ Performance
+
+- Faster input ingestion and headless filtering (`wm -f`): `for_each_record` validates each 256 KB read chunk up to its last delimiter in a single SIMD `std::str::from_utf8` pass (falling back to per-record lossy decoding only when a chunk contains invalid UTF-8), `map_reader_batched` batches 4,096 records per channel send (matching the 256 KB buffer), `SegmentedInjector` builds single-column ranges inline without calling the splitter closure, and `Column::haystack` uses a direct function pointer for column 0. On the 2M-line (113 MB) corpus, `wm -f` drops from 230 ms to 199 ms on narrow queries (faster than `fzf -f` at 202 ms), 576 ms to 424 ms on broad queries (`fzf -f`: 1,128 ms), and 228 ms to 189 ms when nothing matches
+
+### 🔄 Changed
+
+- Internal modular decomposition with no behaviour change (verified by `scripts/verify_move.py`): split `nucleo/worker.rs` into `nucleo/worker/{mod,sort,frizbee,cell,tests}.rs`, `config.rs` into `config/{mod,nav,results,tests}.rs`, `ui/preview.rs`, `utils/markdown.rs` and `utils/mermaid.rs` into `mod.rs` + `tests.rs`, extracted `ui/results/styler.rs`, and decomposed `Results::render_rows`, `Previewer::with_config`, `start::start` and `waymaker-partial-macros` so every file in the workspace is `< 2,000` lines and every function across all 4 crates is `< 200` lines
+
 ## [0.9.0] - 2026-11-07
 
 ### ✨ Features

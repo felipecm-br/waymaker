@@ -126,7 +126,7 @@ delay_clear = true
   Evaluating row icons and symlink targets issued 30-90 `stat()`, `lstat()`, and `readlink()` disk system calls per frame during UI rendering and cursor navigation.
 
 - **The Solution**:
-  Added thread-local `ICON_CACHE` and `SYMLINK_CACHE` maps in `waymaker-lib/src/ui/results.rs`, caching disk metadata lookups after first evaluation and eliminating 100% of disk syscalls from subsequent frame renders.
+  Added thread-local `ICON_CACHE` and `SYMLINK_CACHE` maps in `waymaker-lib/src/ui/results/styler.rs`, caching disk metadata lookups after first evaluation and eliminating 100% of disk syscalls from subsequent frame renders.
 
 ---
 
@@ -146,8 +146,8 @@ delay_clear = true
   During results pane rendering, prefix and icon styling formatted prefix markers on every frame. When `cut_paths` and `yank_paths` were empty (99.9% of normal browsing), `get_item_prefix` still performed span allocations. In `Worker::results()`, tie-breaking lowercase conversions allocated `String` instances per row.
 
 - **The Solution**:
-  1. Added early-exit fast paths in `waymaker-lib/src/ui/results.rs`: if `cut_paths.is_empty() && yank_paths.is_empty()`, prefix rendering returns static `Span::raw("")` with 0 heap allocations.
-  2. Implemented `cmp_ascii_case_insensitive` in `Worker` comparator, eliminating `lower_path: Option<String>` heap allocations during tie-break sorting.
+  1. Added early-exit fast paths in `waymaker-lib/src/ui/results/styler.rs`: if `cut_paths.is_empty() && yank_paths.is_empty()`, prefix rendering returns static `Span::raw("")` with 0 heap allocations.
+  2. Implemented `cmp_ascii_case_insensitive` in `Worker` comparator (`waymaker-lib/src/nucleo/worker/sort.rs`), eliminating `lower_path: Option<String>` heap allocations during tie-break sorting.
 
 ---
 
@@ -179,7 +179,7 @@ delay_clear = true
   Navigating back to parent directories with `h` or `..` previously triggered cold filesystem re-walks and synchronous blocking `block_on(handle)`, freezing the TUI for 100-300ms.
 
 - **The Solution**:
-  1. **Speculative In-Memory Parent Caching**: `Interrupt::ChDir` in `start.rs` caches the previous directory's items in memory before changing directories. Navigating back returns cached items instantly in **0 ms**.
+  1. **Speculative In-Memory Parent Caching**: `Interrupt::ChDir` in `waymaker-cli/src/start/handlers.rs` caches the previous directory's items in memory before changing directories. Navigating back returns cached items instantly in **0 ms**.
   2. **`DirCacheStore` Fast-Path on Reload**: `Interrupt::Reload` queries the persistent `redb` cache store first, rendering warm directory structures in **< 1 ms**.
   3. **Non-Blocking Frame 0 Streaming**: Walker misses stream the first batch immediately without blocking the event loop.
 
@@ -192,7 +192,7 @@ delay_clear = true
 
 - **The Solution**:
   Hardened `Cargo.toml` with `[profile.release]` optimizations:
-  - `opt-level = 3`
+  - `opt-level = "s"`
   - `lto = "fat"` (Full cross-crate link-time optimization and dead-code stripping)
   - `codegen-units = 1` (Maximum compiler optimizations and aggressive inlining)
   - `panic = "abort"` (Removes unwinding landing pads, reducing binary size and branch table bloat)
@@ -236,6 +236,23 @@ delay_clear = true
 
 ---
 
+### Case Study P: Shared `Arc<str>` Haystacks & Zero-Dispatch 2M-Line Ingestion
+
+- **The Problem**:
+  On a 2,000,000-line (113 MB) corpus, `wm -f` originally consumed 770 MiB of Peak RSS (3× `fzf`) and spent significant CPU overhead per record:
+  1. Each line's text was stored twice (once in the item and once in Nucleo's `Utf32String` haystack), and Nucleo pre-initialized `active` flags across empty preallocated buckets.
+  2. `for_each_record` invoked `std::str::from_utf8` on each individual line (2,000,000 calls) instead of validating 256 KB read chunks in bulk.
+  3. `SegmentedInjector` and `Column::haystack` invoked `Arc<dyn Fn>` and `Box<dyn Fn>` trait objects 2,000,000 times even in default single-column mode.
+
+- **The Solution**:
+  1. **Shared `Arc<str>` Haystacks (`Utf32String::Shared`) & Compact Bucket Headers**: Plain ASCII lines are read into a single `Arc<str>` shared between the item and the Nucleo haystack, and Nucleo's bucket `active` flags live in a compact header. Peak RSS on 2M lines dropped from **770 MiB → 357 MiB** (and **401 MiB** vs `fzf`'s **534 MiB** on broad queries).
+  2. **Buffer-Level SIMD UTF-8 Validation & 4,096-Item Batches**: `for_each_record` in `waymaker-cli/src/start/ingest.rs` validates each 256 KB buffer up to its last delimiter in a single SIMD `std::str::from_utf8` call (~400 calls total instead of 2,000,000), and `map_reader_batched` sends 4,096 items per batch.
+  3. **Zero-Virtual-Dispatch Single-Column Fast Path**: `SegmentedInjector::with_single_column` computes single-column ranges inline and `Column::with_shared_fn` uses a direct function pointer for column 0.
+
+  **Outcome**: On 2,000,000 lines, `wm -f` completes in **189 ms** (no match), **199 ms** (narrow query, beating `fzf`'s 202 ms), and **424 ms** (broad query, **2.66× faster** than `fzf`'s 1,128 ms).
+
+---
+
 ## 3. Performance Summary Matrix
 
 | Optimization Technique | Before | After | Impact |
@@ -251,8 +268,9 @@ delay_clear = true
 | **Release LTO** | Multi codegen units without full LTO | Fat LTO + `codegen-units = 1` + `panic = abort` | Maximum binary optimization and inlining |
 | **`ColumnRanges` Zero-Copy** | 100,000 heap `Box<[(u32, u32)]>` allocations | Inline `ArrayVec` up to 2 columns (**0 heap allocs**) | 100k allocations eliminated per 100k items |
 | **Multi-Injector Parallelism** | Single-thread `mpsc::channel` funnel | Direct worker thread pushing (`spawn_walk_parallel`) | Full multi-core disk tree saturation |
-| **Batched Ingestion (`extend`)** | 100,000 individual queue lock contentions | Lazy exact-size iterators in 512-item chunks | Lock contention reduced by 500x |
-| **Filter Throughput (100k items)** | `wm -f` 42ms vs `fzf -f` 49ms on fuzzy | `wm -f` **33ms** vs `fzf -f` **49ms** (1.45x faster) | **1.45x–1.54x faster than fzf** on fuzzy/prefix |
-| **Streaming Frametime** | Unverified under 100k streaming | `--benchmark-input`: **p95 ~1.5ms**, **p50 ~0.2ms** | Proven 60 FPS continuous sub-16ms SLA |
+| **Batched Ingestion (`extend`)** | 100,000 individual queue lock contentions | Lazy exact-size iterators in 4,096-item chunks | Lock contention reduced by 4,000x |
+| **Shared `Arc<str>` Haystacks** | 770 MiB RSS on 2M lines (duplicated text) | `Utf32String::Shared` + compact bucket headers | **357 MiB RSS** on 2M lines (54% reduction) |
+| **2M-Line Filter Throughput** | 264 ms narrow / 625 ms broad / 249 ms no-match | **199 ms** narrow / **424 ms** broad / **189 ms** no-match | Faster than `fzf` on both narrow and broad queries |
+| **Streaming Frametime** | Unverified under 300k streaming | `--benchmark-input`: **p99 7.6ms**, **p50 0.17ms** | Proven 60 FPS continuous sub-16ms SLA |
 
 
