@@ -28,8 +28,10 @@ Measured on Linux `aarch64` (release build, median of 3 runs, `stdin` redirected
 | Narrow | `mod97file12` | 27,305 | **199 ms** | 202 ms | 613 ms |
 | Broad | `src/module_5` | 1,559,075 | **424 ms** | 1,128 ms | 2,521 ms |
 | No match | `xyzzy` | 0 | **189 ms** | 171 ms | 241 ms |
-| Peak RSS (narrow) | `mod97file12` | — | **357 MiB** | 244 MiB | 296 MiB |
-| Peak RSS (broad) | `src/module_5` | — | **401 MiB** | 534 MiB | — |
+| Peak RSS (narrow) | `mod97file12` | — | **321 MiB** | 244 MiB | 296 MiB |
+| Peak RSS (broad) | `src/module_5` | — | **373 MiB** | 544 MiB | — |
+
+CPU time (user) on the same corpus, 8 cores: `wm -f` uses about 1.3 s on narrow and no-match queries against `fzf`'s 0.2–0.6 s, and 2.3 s against 3.9 s on the broad one. Pinned to one core it is 0.42 s against 0.52 s, so the difference is the parallel matcher's overhead per thread (nucleo's rayon pool), not per-item work.
 
 ## Interactive Streaming Frametime (`300,000` items)
 
