@@ -75,18 +75,7 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
         | Action::CycleAll
         | Action::ClearSelections) => return selection_action(a, results, worker, selections),
         a @ (Action::Accept | Action::Abort(..) | Action::Quit(..) | Action::Unwind(..)) => {
-            let unwind = matches!(a, Action::Unwind(_));
-            let flow = exit_action(a, state, picker_ui, tui, overlay_ui, exit_config);
-            // With nothing left to unwind in the filter, navigation mode takes the keys
-            // instead of the picker exiting; unwinding again from there exits.
-            if unwind
-                && matches!(flow, Flow::Exit(Err(_)))
-                && ui.config.nav.active
-                && state.focus() == Focus::Input
-            {
-                return focus_action(Action::<A>::FocusNav, state, ui, picker_ui, tui);
-            }
-            return flow;
+            return exit_or_nav(a, state, ui, picker_ui, tui, overlay_ui, exit_config);
         }
 
         // Results
@@ -983,6 +972,30 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
 }
 
 /// /// Accept, Abort, Quit and Unwind: confirm or close an open input or box first, then exit (Quit and Unwind unwind one step per press).
+/// Runs an exit action. With nothing left to unwind in the filter, navigation mode takes the
+/// keys instead of the picker exiting; unwinding again from there exits.
+#[allow(clippy::too_many_arguments)]
+fn exit_or_nav<W: Write, T: SSS, S: Selection, A: ActionExt>(
+    action: Action<A>,
+    state: &mut State,
+    ui: &mut UI,
+    picker_ui: &mut PickerUI<'_, T, S>,
+    tui: &mut Tui<W>,
+    overlay_ui: &mut Option<OverlayUI<A>>,
+    exit_config: &ExitConfig,
+) -> Flow<S> {
+    let unwind = matches!(action, Action::Unwind(_));
+    let flow = exit_action(action, state, picker_ui, tui, overlay_ui, exit_config);
+    if unwind
+        && matches!(flow, Flow::Exit(Err(_)))
+        && ui.config.nav.active
+        && state.focus() == Focus::Input
+    {
+        return focus_action(Action::<A>::FocusNav, state, ui, picker_ui, tui);
+    }
+    flow
+}
+
 fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
     action: Action<A>,
     state: &mut State,

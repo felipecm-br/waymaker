@@ -55,17 +55,12 @@ pub fn partial(attr: TokenStream, item: TokenStream) -> TokenStream {
         build_final_struct_attrs(&input, manual_derives, has_manual_attrs, manual_attrs);
 
     // --- 4. Process fields ---
-    let fields = match &mut input.fields {
-        Fields::Named(fields) => &mut fields.named,
-        other => {
-            return syn::Error::new(
-                other.span(),
-                "Partial only supports structs with named fields",
-            )
-            .to_compile_error()
-            .into();
-        }
+    let Fields::Named(fields) = &mut input.fields else {
+        let msg = "Partial only supports structs with named fields";
+        let err = syn::Error::new(input.fields.span(), msg);
+        return err.to_compile_error().into();
     };
+    let fields = &mut fields.named;
 
     let mut partial_field_defs = Vec::new();
     let mut apply_field_stmts = Vec::new();
