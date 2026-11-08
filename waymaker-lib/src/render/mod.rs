@@ -194,15 +194,15 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
         });
         if state.iterations == 0 {
             log::debug!("Render loop started");
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         let has_non_tick = buffer.iter().any(|cmd| !matches!(cmd, RenderCommand::Tick));
         if has_non_tick {
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         if let Some(p) = preview_ui.as_mut() {
             if p.is_pan_settling() {
-                state.needs_redraw = true;
+                state.request_redraw();
             }
             if p.visible() && !p.command().is_empty() {
                 let poll_interval = p.poll_interval();
@@ -223,7 +223,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                         .changed
                         .store(true, std::sync::atomic::Ordering::Release);
                     state.insert(crate::message::Event::PreviewChange);
-                    state.needs_redraw = true;
+                    state.request_redraw();
                 }
             }
         }
@@ -335,7 +335,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                             .store(true, std::sync::atomic::Ordering::Release);
                     }
                     state.insert(crate::message::Event::PreviewChange);
-                    state.needs_redraw = true;
+                    state.request_redraw();
                 }
                 RenderCommand::HeaderTable(columns) => {
                     picker_ui.header.header_table(columns);
@@ -472,11 +472,11 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             tui.return_execute(clear)
                 .map_err(|e| MatchError::TUIError(e.to_string()))?;
             tui.redraw();
-            state.needs_redraw = true;
+            state.request_redraw();
         }
 
         if did_reload || did_resize {
-            state.needs_redraw = true;
+            state.request_redraw();
         }
 
         if picker_ui
@@ -484,21 +484,21 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             .matcher_dirty
             .swap(false, std::sync::atomic::Ordering::AcqRel)
         {
-            state.needs_redraw = true;
+            state.request_redraw();
         }
 
         if picker_ui.results.status.changed || picker_ui.results.status.running {
-            state.needs_redraw = true;
+            state.request_redraw();
         }
 
         if preview_ui.as_ref().is_some_and(|p| p.view.changed()) {
-            state.needs_redraw = true;
+            state.request_redraw();
         }
 
         if !picker_ui.results.config.spinner_prefix.is_empty()
             || !picker_ui.results.config.slow_spinner_prefix.is_empty()
         {
-            state.needs_redraw = true;
+            state.request_redraw();
         }
 
         if !picker_ui.results.flash_targets.is_empty() {
@@ -510,7 +510,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             if !picker_ui.results.flash_targets.is_empty()
                 || prev_len != picker_ui.results.flash_targets.len()
             {
-                state.needs_redraw = true;
+                state.request_redraw();
             }
         }
 
@@ -523,7 +523,7 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                 state.focus_blink = !state.focus_blink;
             }
             if prev_blink != state.focus_blink {
-                state.needs_redraw = true;
+                state.request_redraw();
             }
         }
 

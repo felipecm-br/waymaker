@@ -131,7 +131,7 @@ pub(super) fn handle_reload(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut 
                 }
             }
 
-            state.needs_redraw = true;
+            state.request_redraw();
         }
 
         _ => unreachable!("handle_reload got a non-reload action"),

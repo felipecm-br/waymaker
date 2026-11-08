@@ -80,7 +80,8 @@ pub struct State {
     pub(crate) overlay_index: Option<usize>,
     pub(crate) synced: [bool; 2], // ran, synced
     pub reloading: bool,
-    pub needs_redraw: bool,
+    /// Set through [`State::request_redraw`]; cleared by the render loop after drawing.
+    pub(crate) needs_redraw: bool,
     /// Current blink phase for the navigation indicator.
     pub(crate) focus_blink: bool,
     /// Tick counter driving the blink half-cycle.
@@ -274,6 +275,7 @@ impl State {
     }
     // ------ properties -----------
 
+    /// Draws the picker again on the next pass of the render loop.
     pub fn request_redraw(&mut self) {
         self.needs_redraw = true;
     }

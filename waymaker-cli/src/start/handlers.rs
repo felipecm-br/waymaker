@@ -174,7 +174,7 @@ pub(super) fn synced_handler(
                 let _ = render_tx.send(waymaker::message::RenderCommand::Action(
                     waymaker::action::Action::Pos(i as i32),
                 ));
-                state.needs_redraw = true;
+                state.request_redraw();
                 nav.lock().unwrap().target_item = None;
             } else if !state.picker_ui.results.status.running {
                 nav.lock().unwrap().target_item = None;
@@ -182,7 +182,7 @@ pub(super) fn synced_handler(
                 let _ = render_tx.send(waymaker::message::RenderCommand::Action(
                     waymaker::action::Action::Pos(0),
                 ));
-                state.needs_redraw = true;
+                state.request_redraw();
             }
         }
     }

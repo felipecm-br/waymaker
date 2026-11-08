@@ -152,7 +152,7 @@ pub(super) fn handle_mouse<T: SSS, S: Selection>(
                     None => {}
                 }
                 state.dragging = Some(pos);
-                state.needs_redraw = true;
+                state.request_redraw();
             }
         }
         MouseEventKind::Up(MouseButton::Left) => {
@@ -165,7 +165,7 @@ pub(super) fn handle_mouse<T: SSS, S: Selection>(
             let was_over_gap = prev_hover.is_some_and(|p| gap_rect.contains(p));
             let is_over_gap = gap_rect.contains(pos);
             if was_over_gap != is_over_gap {
-                state.needs_redraw = true;
+                state.request_redraw();
             }
         }
         _ => {}

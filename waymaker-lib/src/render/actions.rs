@@ -540,7 +540,7 @@ fn preview_action<W: Write, S: Selection, A: ActionExt>(
             if let Some(p) = preview_ui.as_mut() {
                 p.toggle_diagram();
                 state.preview_diagram_mode = p.is_diagram_mode();
-                state.needs_redraw = true;
+                state.request_redraw();
             }
         }
         Action::PreviewHalfPageUp | Action::PreviewHalfPageDown => {
@@ -682,11 +682,11 @@ fn mode_action<T: SSS, A: ActionExt>(action: Action<A>, state: &mut State, worke
         Action::Sort(order) => {
             worker.set_sort_order(order);
             state.sort_menu_active = false;
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         Action::SortMenu => {
             state.sort_menu_active = !state.sort_menu_active;
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         _ => {}
     }

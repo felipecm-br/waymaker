@@ -18,15 +18,15 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         MMAction::FmRemoveYankPaths(raw) => {
             remove_paths(&mut state.picker_ui.results.yank_paths, &raw);
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         MMAction::FmRemoveCutPaths(raw) => {
             remove_paths(&mut state.picker_ui.results.cut_paths, &raw);
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         MMAction::FmSetCutPaths(raw) => {
             state.picker_ui.results.cut_paths = raw
@@ -34,7 +34,7 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         MMAction::FmSetPinPaths(raw) => {
             state.picker_ui.results.pin_paths = raw
@@ -42,21 +42,21 @@ pub(super) fn handle_fm(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Acti
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         MMAction::FmSetFlashCopy(raw) => {
             state
                 .picker_ui
                 .results
                 .set_flash_target(raw, waymaker::ui::results::FlashOp::Copy);
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         MMAction::FmSetFlashCut(raw) => {
             state
                 .picker_ui
                 .results
                 .set_flash_target(raw, waymaker::ui::results::FlashOp::Cut);
-            state.needs_redraw = true;
+            state.request_redraw();
         }
         MMAction::FmCreateStart => {
             *fm_action = Some(FmActionMode::Create);
@@ -223,7 +223,7 @@ pub(super) fn show_styled_info_box(state: &mut MMState<'_, '_>, message: &str) {
         .picker_ui
         .action
         .set_prompt_line(StatusUI::parse_template_to_status_line(message));
-    state.needs_redraw = true;
+    state.request_redraw();
 }
 
 pub(crate) fn abbreviate_target_dir_display(dest_display_name: &str) -> String {
