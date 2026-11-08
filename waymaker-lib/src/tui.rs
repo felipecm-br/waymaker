@@ -92,7 +92,6 @@ where
                     available_height.min(request).max(layout.min),
                 );
 
-                // options.viewport = Viewport::Inline(available_height.min(request));
                 options.viewport = Viewport::Fixed(area);
 
                 area
@@ -176,13 +175,6 @@ where
             self.config.layout = None;
         }
 
-        // somehow this scroll amount is wrong. Also previously rendered execute are not visible.
-        // if let Some(y) = Self::get_cursor_y(self.sleep())._elog() {
-        //     let lines = y.saturating_sub(self.area.y);
-        //     if lines > 0 {
-        //         Self::scroll_up(self.terminal.backend_mut(), lines)._elog();
-        //     }
-        // }
         self.enter()?;
 
         // not sure if clear does anything
@@ -215,9 +207,6 @@ where
 
     pub fn exit(&mut self, mut clear: Option<bool>) {
         if self.in_execute {
-            // let backend = self.terminal.backend_mut();
-            // execute!(backend, LeaveAlternateScreen, DisableMouseCapture)._wlog();
-            // disable_raw_mode()._wlog();
             log::debug!("Skipped teardown after already having left");
             return;
         }
@@ -271,8 +260,6 @@ where
 
     pub fn exit_lite(&mut self) {
         let backend = self.terminal.backend_mut();
-
-        // execute!(backend, LeaveAlternateScreen, DisableMouseCapture)._wlog();
 
         if self.config.extended_keys {
             execute!(backend, PopKeyboardEnhancementFlags)._elog();

@@ -112,16 +112,7 @@ impl Matchmaker<ConfigMMItem, ConfigMMInnerItem> {
                     .stdout(maybe_tty_out())
                     .stderr(maybe_tty_out())
                     ._spawn()
-                {
-                    // match child.wait() {
-                    //     Ok(i) => {
-                    //         info!("Command [{cmd}] exited with {i}")
-                    //     }
-                    //     Err(e) => {
-                    //         info!("Failed to wait on command [{cmd}]: {e}")
-                    //     }
-                    // }
-                }
+                {}
             };
         });
     }

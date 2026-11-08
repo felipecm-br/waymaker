@@ -172,17 +172,11 @@ where
 
     // Background tasks which push to the injector check their version matches this or exit
     pub(super) version: Arc<AtomicU32>,
-    // pub settings: WorkerSettings,
     pub group_header: Option<Box<dyn for<'a> Fn(&'a T) -> Option<Arc<str>> + Send + Sync>>,
     column_options: Vec<ColumnOptions>,
 }
 
 struct NotifyFn(Box<dyn Fn() + Send + Sync>);
-
-// #[derive(Debug, Default)]
-// pub struct WorkerSettings {
-//     pub stable: bool,
-// }
 
 bitflags! {
     #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

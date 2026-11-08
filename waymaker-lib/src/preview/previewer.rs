@@ -1297,124 +1297,14 @@ fn kill_child(child: &mut Child) {
     let _ = child.kill();
 }
 
-// ---------- NON ANSI VARIANT
-// let reader = BufReader::new(stdout);
-// if self.config.try_lossy {
-// for line_result in reader.split(b'\n') {
-//     match line_result {
-//         Ok(bytes) => {
-//             let line =
-//             String::from_utf8_lossy(&bytes).into_owned();
-//             lines.push(Line::from(line));
-//         }
-//         Err(e) => error!("Failed to read line: {:?}", e),
-//     }
-// }
-// } else {
-//     for line_result in reader.lines() {
-//         match line_result {
-//             Ok(line) => lines.push(Line::from(line)),
-//             Err(e) => {
-//                 // todo: don't know why that even with an explicit ratatui clear, garbage sometimes stays on the screen
-//                 error!("Error displaying {cmd}: {:?}", e);
-//                 break;
-//             }
-//         }
-//     }
-// }
-
-// trait Resettable: Default {
-//     fn reset(&mut self) {}
-// }
-// impl<T> Resettable for AppendOnly<T> {
-//     fn reset(&mut self) {
-//         self.clear();
-//     }
-// }
-
-// use std::ops::{Deref, DerefMut};
-
-// #[derive(Debug)]
-// struct Queue<V: Resettable> {
-//     entries: Vec<(String, V)>,
-//     order: Vec<usize>, // indices ordered by recency (0 = most recent)
-// }
-
-// impl<V: Resettable> Queue<V> {
-//     pub fn new(len: usize) -> Self {
-//         Self {
-//             entries: (0..len)
-//             .map(|_| (String::default(), V::default()))
-//             .collect(),
-//             order: vec![len; len],
-//         }
-//     }
-
-//     fn find_key_pos(&self, key: &str) -> Option<(usize, usize)> {
-//         for (order_idx, &entries_idx) in self.order.iter().enumerate() {
-//             if order_idx == self.entries.len() {
-//                 return None
-//             }
-//             if self.entries[entries_idx].0 == key {
-//                 return Some((order_idx, entries_idx));
-//             }
-//         }
-//         None
-//     }
-
 //     /// Try to get a key; if found, move it to the top.
 //     /// If not found, replace the oldest, clear its vec, set new key.
 //     pub fn try_get(&mut self, key: &str) -> bool {
 //         let n = self.entries.len();
 
-//         if !key.is_empty() && let Some((order_idx, idx)) = self.find_key_pos(key) {
-//             self.order.copy_within(0..order_idx, 1);
-//             self.order[0] = idx;
-//             true
-//         } else {
-//             let order_idx = (0..n)
-//             .rfind(|&i| self.order[i] < n)
-//             .map(|i| i + 1)
-//             .unwrap_or(0);
-
-//             let idx = if self.order[order_idx] < self.entries.len() {
-//                 order_idx
-//             } else {
-//                 *self.order.last().unwrap()
-//             };
-
 //             // shift and insert at front
 //             self.order.copy_within(0..order_idx, 1);
 //             self.order[0] = idx;
-
-//             // reset and assign new key
-//             let (ref mut k, ref mut v) = self.entries[idx];
-//             *k = key.to_owned();
-//             v.reset();
-
-//             false
-//         }
-//     }
-// }
-
-// impl<V: Resettable> Deref for Queue<V> {
-//     type Target = V;
-//     fn deref(&self) -> &Self::Target {
-//         &self.entries[self.order[0]].1
-//     }
-// }
-
-// impl<V: Resettable> DerefMut for Queue<V> {
-//     fn deref_mut(&mut self) -> &mut Self::Target {
-//         &mut self.entries[self.order[0]].1
-//     }
-// }
-
-// impl<V: Resettable> Default for Queue<V> {
-//     fn default() -> Self {
-//         Self::new(1)
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

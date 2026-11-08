@@ -344,7 +344,6 @@ impl ResultsUI {
 
                 total_height += remaining_height;
 
-                // log::debug!("r: {remaining_height}");
                 if as_cols {
                     if remaining_height < h - self._hr() {
                         for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
@@ -1291,27 +1290,10 @@ impl ResultsUI {
         );
         let results_len = results.len();
 
-        // log::trace!(
-        //     "len: {}, hscroll: {},  offset: {}, end: {}, limits: {:?}, medians: {:?}, last_widths: {:?}",
-        //     results.len(),
-        //     self.hscroll,
-        //     offset,
-        //     end,
-        //     width_limits,
-        //     medians,
-        //     self.widths
-        // );
-
         self.status = status.clone();
         self.medians = medians;
         self.adjust_widths(&mut widths, &results);
 
-        // should generally be true already, but act as a safeguard
-        // for x in widths.iter_mut().zip(&self.hidden_columns) {
-        //     if *x.1 {
-        //         *x.0 = 0
-        //     }
-        // }
         let widths = widths;
 
         let match_count = status.matched_count;
@@ -1351,7 +1333,6 @@ impl ResultsUI {
             _,
         )| styler.height_of(&t.0, &t.1);
 
-        // log::trace!("results initial: {}, {}, {}, {}, {}", self.bottom, self.cursor, total_height, self.height, results.len());
         let h_at_cursor = height_of(&results[self.cursor as usize]);
         let h_after_cursor = results[self.cursor as usize + 1..]
             .iter()
@@ -1362,12 +1343,6 @@ impl ResultsUI {
             .map(height_of)
             .sum::<u16>();
         let cursor_end_should_lte = self.height - self.scroll_padding().min(h_after_cursor);
-        // let cursor_start_should_gt = self.scroll_padding().min(h_to_cursor);
-
-        // log::trace!(
-        //     "Computed heights: {}, {h_at_cursor}, {h_to_cursor}, {h_after_cursor}, {cursor_end_should_lte}",
-        //     self.cursor
-        // );
 
         // begin adjustment
         let start_index = 0; // the index in results of the first complete item
@@ -1777,12 +1752,6 @@ impl ResultsUI {
             vec![self.width]
         };
 
-        // log::trace!(
-        //     "limits: {width_limits:?}, widths: {widths:?}, {:?}, medians {:?}",
-        //     self.width,
-        //     self.medians
-        // );
-
         let mut table = Table::new(rows, table_widths).column_spacing(self.config.column_spacing.0);
 
         table = match self.config.row_connection {
@@ -1790,8 +1759,6 @@ impl ResultsUI {
             RowConnectionStyle::Capped => table.style(self.config.inactive_style),
             _ => table,
         };
-
-        // log::trace!("{table:?}");
 
         if !self.config.border.is_empty() {
             table = table.block(self.config.border.as_static_block());
@@ -1829,7 +1796,6 @@ impl ResultsUI {
 
         // todo: support non_stacked properly by doing a seperate rendering pass
         if !self.config.stacked_columns && self.widths.len() > 1 {
-            // Some(Row::new(vec![vec![]]))
             Some(Row::new(vec![line; self.widths().len()]).style(self.config.separator_style))
         } else {
             Some(Row::new(vec![line]).style(self.config.separator_style))

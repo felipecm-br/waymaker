@@ -375,35 +375,6 @@ pub struct Trigger {
     pub mode: String,
 }
 
-// impl Ord for TriggerKind {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         use TriggerKind::*;
-
-//         match (self, other) {
-//             (Key(a), Key(b)) => a.to_string().cmp(&b.to_string()),
-//             (Mouse(a), Mouse(b)) => a.cmp(b),
-//             (Event(a), Event(b)) => a.cmp(b),
-//             (Semantic(a), Semantic(b)) => a.cmp(b),
-
-//             // define variant order
-//             (Key(_), _) => Ordering::Less,
-//             (Mouse(_), Key(_)) => Ordering::Greater,
-//             (Mouse(_), Event(_)) => Ordering::Less,
-//             (Mouse(_), Semantic(_)) => Ordering::Less,
-//             (Event(_), Key(_)) => Ordering::Greater,
-//             (Event(_), Mouse(_)) => Ordering::Greater,
-//             (Event(_), Semantic(_)) => Ordering::Less,
-//             (Semantic(_), _) => Ordering::Greater,
-//         }
-//     }
-// }
-
-// impl PartialOrd for TriggerKind {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
-
 /// Crossterm mouse event without location
 #[derive(Debug, Eq, Clone, PartialEq, Hash)]
 pub struct SimpleMouseEvent {

@@ -1090,8 +1090,6 @@ impl Default for OverlayLayoutSettings {
     }
 }
 
-// pub struct OverlaySize
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 #[partial(path, derive(Debug, Clone, PartialEq, Deserialize, Serialize))]

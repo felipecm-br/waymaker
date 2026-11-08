@@ -188,15 +188,6 @@ impl<T, S: Selection> Selector<T, S> {
         #[cfg(not(feature = "parallelism"))]
         toggle_all(&selections, results);
     }
-
-    // ---------- wrappers (?) -----------
-
-    // pub fn insert(&mut self, (k, v): (u32, S)) -> bool {
-    //     let Some(selections) = &mut self.selections else {
-    //         return false;
-    //     };
-    //     selections.insert(k, v)
-    // }
 }
 
 /// Selects all of `results`, or deselects them all if every one is already selected.
@@ -234,16 +225,6 @@ impl<K: Eq + Hash + Clone, S> SelectorImpl<K, S>
 where
     S: Selection,
 {
-    // pub fn indices(&self) -> Vec<K> {
-    //     self.set
-    //         .lock()
-    //         .unwrap()
-    //         .iter()
-    //         .enumerate()
-    //         .map(|(_, (k, _))| k.clone())
-    //         .collect()
-    // }
-
     pub fn new() -> Self {
         Self {
             set: Arc::new(Mutex::new(IndexMap::with_hasher(FxBuildHasher))),

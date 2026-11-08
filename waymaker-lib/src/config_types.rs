@@ -22,10 +22,8 @@ use serde::{
 )]
 pub struct StyleSetting {
     #[serde(default)]
-    // #[serde(deserialize_with = "cba::serde::transform::camelcase_normalized")]
     pub fg: Option<Color>,
     #[serde(default)]
-    // #[serde(deserialize_with = "cba::serde::transform::camelcase_normalized")]
     pub bg: Option<Color>,
     pub modifier: Modifier,
 }
@@ -298,12 +296,6 @@ impl<'de> Deserialize<'de> for Padding {
 
 // ---------------------------------------------------------------------------------
 
-// define_restricted_wrapper!(
-//     #[derive(Clone, serde::Serialize, serde::Deserialize)]
-//     #[serde(transparent)]
-//     FormatString: String
-// );
-
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Side {
@@ -363,7 +355,6 @@ impl<'de> Deserialize<'de> for ColumnName {
     }
 }
 
-// #[waymaker_partial_macros::partial(path, derive(Debug, Clone, PartialEq, Deserialize, Serialize))]
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize)]
 pub struct ColumnSetting {
     #[serde(default)]
@@ -560,7 +551,6 @@ impl EnvValue {
 
 // -------------
 
-// #[waymaker_partial_macros::partial(path, derive(Debug, Clone, PartialEq, Deserialize, Serialize))]
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize)]
 pub struct CommandSetting {
     /// Input separator that only applies when not reading from stdin

@@ -445,18 +445,6 @@ fn test_apply_live_input() {
     }
 }
 
-// #[cfg(test)]
-// async fn send_every_second(tx: mpsc::UnboundedSender<RenderCommand>) {
-//     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
-
-//     loop {
-//         interval.tick().await;
-//         if tx.send(RenderCommand::quit()).is_err() {
-//             break;
-//         }
-//     }
-// }
-
 /// With the sort menu open, Esc closes it and is swallowed; another key closes it and its action
 /// still runs.
 /// Each letter in the sort menu picks its order (upper case reverses it).

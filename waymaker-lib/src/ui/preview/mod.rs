@@ -319,7 +319,6 @@ impl PreviewUI {
 
     /// None if not show OR if max = 0 (disabled layour)
     pub fn setting(&self) -> Option<&PreviewSetting> {
-        // if let Some(ret) = self.config.layout.get(self.layout_idx)
         if let ret = &self.config.layout[self.layout_idx]
             && ret.layout.max != 0
         {

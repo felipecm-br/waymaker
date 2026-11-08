@@ -436,7 +436,6 @@ impl State {
                 self.insert(Event::CursorLost);
             }
         }
-        // log::trace!("{self:?}");
     }
 
     // ---------- flush -----------
@@ -517,14 +516,6 @@ impl<'a, 'b: 'a, T: SSS, S: Selection> MMState<'a, 'b, T, S> {
                 .collect()
         }
     }
-
-    // pub fn selected_indices<U>(&self) -> Vec<u32> {
-    //     if !self.picker_ui.selector.is_empty() {
-    //         self.picker_ui.selector.indices()
-    //     } else {
-    //         get_current(self.picker_ui).iter().map(|s| s.0).collect()
-    //     }
-    // }
 
     pub fn injector(&self) -> WorkerInjector<T> {
         self.picker_ui.worker.injector()

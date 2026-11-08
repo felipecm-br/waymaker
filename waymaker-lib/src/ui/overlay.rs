@@ -30,15 +30,13 @@ pub trait Overlay {
 
     // methods are mutable for flexibility (i.e. render_stateful_widget)
 
-    /// Draw the widget within the rect
+    /// Draw the widget within the rect, clearing what is beneath it first:
     ///
-    /// # Example
-    /// ```rust
-    //  pub fn draw(&self, frame: &mut Frame, area: Rect) {
-    //      let widget = self.make_widget();
-    //      frame.render_widget(Clear, area);
-    //      frame.render_widget(widget, area);
-    // }
+    /// ```ignore
+    /// fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    ///     frame.render_widget(Clear, area);
+    ///     frame.render_widget(Paragraph::new("hello"), area);
+    /// }
     /// ```
     fn draw(&mut self, frame: &mut Frame, area: Rect);
 
@@ -297,18 +295,3 @@ pub fn default_area(size: [SizeHint; 2], layout: &OverlayLayoutSettings, ui_area
         height: h,
     }
 }
-
-// ------------------------
-// would be cool if associated types could be recovered from erased traits
-// I think this can be done by wrapping overlay with a fn turning make_widget into draw
-// type Widget: ratatui::widgets::Widget;
-// fn make_widget(&self) -> Self::Widget {
-//     todo!()
-// }
-// // OverlayUI
-// pub fn draw(&self, frame: &mut Frame) {
-//     if let Some(overlay) = &self.inner {
-//         let widget = overlay.make_widget();
-//         frame.render_widget(widget, overlay.area());
-//     }
-// }

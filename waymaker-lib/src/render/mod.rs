@@ -268,8 +268,6 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
 
             if !matches!(event, RenderCommand::Tick) {
                 info!("Received {event:?}");
-            } else {
-                // log::trace!("Recieved {event:?}");
             }
 
             match event {
@@ -442,8 +440,6 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             }
         }
 
-        // debug!("{state:?}");
-
         // ------------- update state + render ------------------------
         if state.filtering {
             picker_ui.update();
@@ -572,13 +568,6 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             &mut preview_ui,
             &controller_tx,
         );
-        // if let Some((signal, handler)) = signal_handler &&
-        // let s = signal.load(std::sync::atomic::Ordering::Acquire) &&
-        // s > 0
-        // {
-        //     handler(s, &mut dispatcher);
-        //     signal.store(0, std::sync::atomic::Ordering::Release);
-        // };
 
         // ping handlers with events
         for e in events.iter() {

@@ -361,11 +361,6 @@ impl<A: ActionExt> EventLoop<A> {
                 }
             }
 
-            // // flush controller events
-            // while let Ok(event) = self.rx.try_recv() {
-            //    self.handle_event(event)
-            // }
-
             let event = if let Some(stream) = &mut self.event_stream {
                 stream.next()
             } else {
@@ -430,10 +425,6 @@ impl<A: ActionExt> EventLoop<A> {
                                         unreachable!()
                                     }
                                 }
-                                // CrosstermEvent::FocusLost => {
-                                // }
-                                // CrosstermEvent::FocusGained => {
-                                // }
                                 _ => {},
                             }
                         }
