@@ -56,6 +56,4 @@ single_match = "allow"
 
 # Tests build configs as `let mut c = X::default(); c.field = ..;`, which reads better than struct-update syntax there.
 field_reassign_with_default = "allow"
-# Large render/worker entry points; revisit when render/mod.rs and nucleo/worker.rs are split up.
-too_many_arguments = "allow"
 type_complexity = "allow"

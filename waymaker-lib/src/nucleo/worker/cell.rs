@@ -10,6 +10,7 @@ use crate::{
 };
 
 #[cfg_attr(not(test), allow(dead_code))]
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_cell<T: SSS>(
     cell: Text<'_>,
     col_idx: usize,
@@ -39,6 +40,7 @@ pub(super) fn render_cell<T: SSS>(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_cell_inner<T: SSS>(
     cell: Text<'_>,
     col_idx: usize,

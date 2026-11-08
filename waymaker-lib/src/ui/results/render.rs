@@ -17,7 +17,7 @@ use crate::{
             apply_bookmark_text_style, bookmark_color, extract_col0_name, insert_icon_span,
             maybe_append_symlink_target,
         },
-        styler::{RowCtx, RowStyler, RowsFrame, RowsIter},
+        styler::{RowCtx, RowPos, RowStyler, RowsFrame, RowsIter},
     },
     utils::{
         string::{fit_width, substitute_escaped},
@@ -190,19 +190,24 @@ impl ResultsUI {
     /// The prefix column of a row (spinner frame, multi-select marker or the default prefix),
     /// plus what it found: the item's name, spinner state and yank/cut marks. Animates or strips
     /// a spinner marker in `row` on the way.
-    #[allow(clippy::too_many_arguments)]
     fn row_prefix<T: SSS>(
         &self,
+        table: &RowsFrame<'_>,
         row: &mut [ratatui::text::Text<'_>],
-        is_selected: bool,
-        idx: usize,
         item: &T,
         columns: &[crate::nucleo::Column<T>],
-        is_first: bool,
-        is_last: bool,
-        cwd: &std::path::Path,
-        get_dynamic_multi_prefix: &impl Fn(bool, bool) -> String,
+        pos: RowPos,
     ) -> (String, String, bool, usize, bool, bool) {
+        let RowPos {
+            i: idx,
+            is_selected,
+            is_first,
+            is_last,
+            ..
+        } = pos;
+        let cwd = table.cwd;
+        let get_dynamic_multi_prefix =
+            |is_first: bool, is_last: bool| table.styler.dynamic_multi_prefix(is_first, is_last);
         let mut icon_name = String::new();
         let mut is_spinner = false;
         let mut spinner_col_idx = 0;
@@ -273,18 +278,56 @@ impl ResultsUI {
         )
     }
 
+    /// The values every row layout reads for one item: its prefix, icon name, marks and colours.
+    fn row_ctx<T: SSS>(
+        &self,
+        frame: &RowsFrame<'_>,
+        row: &mut [ratatui::text::Text<'_>],
+        item: &T,
+        columns: &[crate::nucleo::Column<T>],
+        pos: RowPos,
+    ) -> RowCtx {
+        let (prefix, icon_name_hz, is_spinner, spinner_col_idx, is_yanked, is_cut) =
+            self.row_prefix(frame, row, item, columns, pos);
+        let nav_bar_span = frame.styler.nav_bar_span(
+            pos.is_first,
+            pos.is_last,
+            pos.is_current_row,
+            is_yanked,
+            is_cut,
+        );
+        let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name_hz, frame.cwd);
+        let b_color = if is_pinned || self.mode_index == 2 {
+            Some(bookmark_color(&self.config, &icon_name_hz))
+        } else {
+            None
+        };
+        RowCtx {
+            i: pos.i,
+            prefix,
+            icon_name_hz,
+            is_spinner,
+            spinner_col_idx,
+            is_yanked,
+            is_cut,
+            is_selected: pos.is_selected,
+            is_current_row: pos.is_current_row,
+            is_pinned,
+            b_color,
+            nav_bar_span,
+        }
+    }
+
     /// Scrolling down: moves `bottom` past the rows above the cursor that no longer fit, and
     /// draws the first one cut if it is only partly visible (setting `bottom_clip`).
     #[allow(clippy::too_many_arguments)]
     fn cut_top_row_scrolling_down<'a, T: SSS, S: Selection>(
         &mut self,
-        styler: &RowStyler,
+        frame: &RowsFrame<'_>,
         results: &mut crate::nucleo::WorkerResults<'a, T>,
         rows: &mut Vec<Row<'a>>,
         selector: &Selector<T, S>,
         columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
-        cwd: &std::path::Path,
-        widths: &[u16],
         results_len: usize,
         as_cols: bool,
         h_to_cursor_end: u16,
@@ -292,12 +335,12 @@ impl ResultsUI {
         mut start_index: u16,
         mut total_height: u16,
     ) -> (u16, u16) {
-        let get_nav_bar_span =
-            |is_first: bool, is_last: bool, is_current: bool, is_yanked: bool, is_cut: bool| {
-                styler.nav_bar_span(is_first, is_last, is_current, is_yanked, is_cut)
-            };
-        let get_dynamic_multi_prefix =
-            |is_first: bool, is_last: bool| styler.dynamic_multi_prefix(is_first, is_last);
+        let RowsFrame {
+            styler,
+            widths,
+            cwd,
+            ..
+        } = *frame;
         let height_of = |t: &(
             Option<crate::nucleo::GroupHeader>,
             Vec<ratatui::text::Text<'a>>,
@@ -321,26 +364,23 @@ impl ResultsUI {
                 let is_first = rows.is_empty();
                 let is_last = (self.height <= total_height + remaining_height)
                     || (start_index as usize >= results_len);
-                let (prefix, icon_name, is_spinner, spinner_col_idx, is_yanked, is_cut) = self
-                    .row_prefix(
-                        row,
+                let ctx = self.row_ctx(
+                    frame,
+                    row,
+                    *item,
+                    columns,
+                    RowPos {
+                        i: 0,
                         is_selected,
-                        0,
-                        *item,
-                        columns,
                         is_first,
                         is_last,
-                        cwd,
-                        &get_dynamic_multi_prefix,
-                    );
-                let nav_bar_span =
-                    get_nav_bar_span(is_first, is_last, is_current_row, is_yanked, is_cut);
-                let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name, cwd);
-                let b_color = if is_pinned || self.mode_index == 2 {
-                    Some(bookmark_color(&self.config, &icon_name))
-                } else {
-                    None
-                };
+                        is_current_row,
+                    },
+                );
+                let (prefix, icon_name, nav_bar_span) =
+                    (&ctx.prefix, &ctx.icon_name_hz, &ctx.nav_bar_span);
+                let (is_spinner, spinner_col_idx, b_color) =
+                    (ctx.is_spinner, ctx.spinner_col_idx, ctx.b_color);
 
                 total_height += remaining_height;
 
@@ -380,13 +420,13 @@ impl ResultsUI {
                                     &mut t,
                                     prefix.clone(),
                                     self.active_prefix_style(
-                                        &icon_name,
+                                        icon_name,
                                         is_selected,
                                         is_spinner,
                                         cwd,
                                     ),
                                     self.inactive_prefix_style(
-                                        &icon_name,
+                                        icon_name,
                                         is_selected,
                                         is_spinner,
                                         cwd,
@@ -402,13 +442,7 @@ impl ResultsUI {
                                 );
                                 self.decorate_cut_col_icon_and_symlink(
                                     &mut t,
-                                    &icon_name,
-                                    is_selected,
-                                    is_current_row,
-                                    is_pinned,
-                                    is_yanked,
-                                    is_cut,
-                                    &nav_bar_span,
+                                    &ctx,
                                     cwd,
                                     widths,
                                     target_prefix_col,
@@ -434,23 +468,7 @@ impl ResultsUI {
                         }
                         remaining_height -= height;
 
-                        self.push_cut_stacked_col(
-                            col,
-                            &mut push,
-                            col_idx,
-                            height,
-                            b_color,
-                            &prefix,
-                            &icon_name,
-                            is_selected,
-                            is_spinner,
-                            is_current_row,
-                            is_pinned,
-                            is_yanked,
-                            is_cut,
-                            &nav_bar_span,
-                            cwd,
-                        );
+                        self.push_cut_stacked_col(col, &mut push, col_idx, height, &ctx, cwd);
                     }
                     rows.extend(push.into_iter().rev());
                 }
@@ -475,26 +493,23 @@ impl ResultsUI {
     #[allow(clippy::too_many_arguments)]
     fn redraw_kept_top_row<'a, T: SSS, S: Selection>(
         &mut self,
-        styler: &RowStyler,
+        frame: &RowsFrame<'_>,
         results: &mut crate::nucleo::WorkerResults<'a, T>,
         rows: &mut Vec<Row<'a>>,
         selector: &Selector<T, S>,
         columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
-        cwd: &std::path::Path,
-        widths: &[u16],
         results_len: usize,
         as_cols: bool,
-        is_underline_mode: bool,
         mut remaining_height: u16,
         mut start_index: u16,
         mut total_height: u16,
     ) -> (u16, u16) {
-        let get_nav_bar_span =
-            |is_first: bool, is_last: bool, is_current: bool, is_yanked: bool, is_cut: bool| {
-                styler.nav_bar_span(is_first, is_last, is_current, is_yanked, is_cut)
-            };
-        let get_dynamic_multi_prefix =
-            |is_first: bool, is_last: bool| styler.dynamic_multi_prefix(is_first, is_last);
+        let RowsFrame {
+            styler,
+            cwd,
+            is_underline_mode,
+            ..
+        } = *frame;
         let apply_tier_underline =
             |t: &mut ratatui::text::Text<'_>, target_w: usize, skip_spans: usize| {
                 styler.tier_underline(t, target_w, skip_spans)
@@ -504,9 +519,6 @@ impl ResultsUI {
             Vec<ratatui::text::Text<'a>>,
             &'a T,
         )| styler.height_of(&t.0, &t.1);
-        let style_text = |t: ratatui::text::Text<'a>, x: usize, is_current_row: bool| {
-            styler.style_text(t, x, is_current_row)
-        };
         let is_current_row = false;
         start_index += 1;
         let is_topside_tier_underlined = is_underline_mode
@@ -522,24 +534,27 @@ impl ResultsUI {
         let is_first = rows.is_empty();
         let is_last = (self.height <= total_height + remaining_height)
             || (start_index as usize >= results_len);
-        let (prefix, icon_name, is_spinner, spinner_col_idx, is_yanked, is_cut) = self.row_prefix(
+        let ctx = self.row_ctx(
+            frame,
             row,
-            is_selected,
-            0,
             *item,
             columns,
-            is_first,
-            is_last,
-            cwd,
-            &get_dynamic_multi_prefix,
+            RowPos {
+                i: 0,
+                is_selected,
+                is_first,
+                is_last,
+                is_current_row,
+            },
         );
-        let nav_bar_span = get_nav_bar_span(is_first, is_last, is_current_row, is_yanked, is_cut);
-        let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name, cwd);
-        let b_color = if is_pinned || self.mode_index == 2 {
-            Some(bookmark_color(&self.config, &icon_name))
-        } else {
-            None
-        };
+        let (prefix, icon_name, nav_bar_span) = (&ctx.prefix, &ctx.icon_name_hz, &ctx.nav_bar_span);
+        let (is_spinner, is_pinned, is_yanked, is_cut, b_color) = (
+            ctx.is_spinner,
+            ctx.is_pinned,
+            ctx.is_yanked,
+            ctx.is_cut,
+            ctx.b_color,
+        );
 
         total_height += remaining_height;
 
@@ -547,24 +562,11 @@ impl ResultsUI {
             self.push_kept_cols_top_row(
                 row,
                 rows,
-                widths,
+                frame,
                 h,
                 remaining_height,
-                is_spinner,
-                spinner_col_idx,
-                is_current_row,
                 is_topside_tier_underlined,
-                b_color,
-                &prefix,
-                icon_name,
-                is_selected,
-                is_pinned,
-                is_yanked,
-                is_cut,
-                &nav_bar_span,
-                cwd,
-                &style_text,
-                &apply_tier_underline,
+                &ctx,
             );
         } else {
             let col_count = row.len();
@@ -588,8 +590,8 @@ impl ResultsUI {
                 prefix_span(
                     col,
                     prefix.clone(),
-                    self.active_prefix_style(&icon_name, is_selected, is_spinner, cwd),
-                    self.inactive_prefix_style(&icon_name, is_selected, is_spinner, cwd),
+                    self.active_prefix_style(icon_name, is_selected, is_spinner, cwd),
+                    self.inactive_prefix_style(icon_name, is_selected, is_spinner, cwd),
                     is_current_row,
                     if !is_selected {
                         nav_bar_span.clone()
@@ -602,7 +604,7 @@ impl ResultsUI {
                 if self.config.icons && col_idx == 0 {
                     insert_icon_span(
                         col,
-                        &icon_name,
+                        icon_name,
                         !is_selected && nav_bar_span.is_some(),
                         is_current_row,
                         self.config.uncolor_current_icon,
@@ -613,13 +615,13 @@ impl ResultsUI {
                         is_cut,
                         self.mode_index,
                         &self.config,
-                        self.get_flash_op(&icon_name, cwd),
+                        self.get_flash_op(icon_name, cwd),
                     );
                 }
                 if self.config.symlink.active && col_idx == 0 {
                     maybe_append_symlink_target(
                         col,
-                        &icon_name,
+                        icon_name,
                         self.config.symlink.style.into(),
                         self.width,
                     );
@@ -652,16 +654,13 @@ impl ResultsUI {
     #[allow(clippy::too_many_arguments)]
     fn scroll_to_cursor_rows<'a, T: SSS, S: Selection>(
         &mut self,
-        styler: &RowStyler,
+        frame: &RowsFrame<'_>,
         results: &mut crate::nucleo::WorkerResults<'a, T>,
         rows: &mut Vec<Row<'a>>,
         selector: &Selector<T, S>,
         columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
-        cwd: &std::path::Path,
-        widths: &[u16],
         results_len: usize,
         as_cols: bool,
-        is_underline_mode: bool,
         h_at_cursor: u16,
         h_to_cursor: u16,
         cursor_end_should_lte: u16,
@@ -680,13 +679,11 @@ impl ResultsUI {
             && h_to_cursor_end > cursor_end_should_lte
         {
             (start_index, total_height) = self.cut_top_row_scrolling_down(
-                styler,
+                frame,
                 results,
                 rows,
                 selector,
                 columns,
-                cwd,
-                widths,
                 results_len,
                 as_cols,
                 h_to_cursor_end,
@@ -696,16 +693,13 @@ impl ResultsUI {
             );
         } else if let Some(remaining_height) = self.bottom_clip {
             (start_index, total_height) = self.redraw_kept_top_row(
-                styler,
+                frame,
                 results,
                 rows,
                 selector,
                 columns,
-                cwd,
-                widths,
                 results_len,
                 as_cols,
-                is_underline_mode,
                 remaining_height,
                 start_index,
                 total_height,
@@ -719,35 +713,23 @@ impl ResultsUI {
     #[allow(clippy::too_many_arguments)]
     fn push_visible_rows<'a, T: SSS, S: Selection>(
         &mut self,
-        styler: &RowStyler,
+        frame: &RowsFrame<'_>,
         results: &mut crate::nucleo::WorkerResults<'a, T>,
         start_index: u16,
         rows: &mut Vec<Row<'a>>,
         click: &mut Click,
         selector: &Selector<T, S>,
         columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
-        cwd: &std::path::Path,
-        widths: &[u16],
         as_cols: bool,
-        is_underline_mode: bool,
         active_group_name: &Option<std::sync::Arc<str>>,
-        active_column: usize,
         mut i: usize,
         mut remaining_height: u16,
     ) -> (usize, u16) {
+        let RowsFrame { styler, widths, .. } = *frame;
         let get_nav_bar_span =
             |is_first: bool, is_last: bool, is_current: bool, is_yanked: bool, is_cut: bool| {
                 styler.nav_bar_span(is_first, is_last, is_current, is_yanked, is_cut)
             };
-        let get_dynamic_multi_prefix =
-            |is_first: bool, is_last: bool| styler.dynamic_multi_prefix(is_first, is_last);
-        let frame = &RowsFrame {
-            styler,
-            widths,
-            cwd,
-            is_underline_mode,
-            active_column,
-        };
 
         let mut drain_iter = results.drain(start_index as usize..).peekable();
         while let Some((group, mut row, item)) = drain_iter.next() {
@@ -816,41 +798,19 @@ impl ResultsUI {
             };
             let is_last = is_last_in_results || (remaining_height <= h);
             let is_current_row = self.is_current(i);
-            let (prefix, icon_name_hz, is_spinner, spinner_col_idx, is_yanked, is_cut) = self
-                .row_prefix(
-                    &mut row,
-                    is_selected,
+            let row_ctx = self.row_ctx(
+                frame,
+                &mut row,
+                item,
+                columns,
+                RowPos {
                     i,
-                    item,
-                    columns,
+                    is_selected,
                     is_first,
                     is_last,
-                    cwd,
-                    &get_dynamic_multi_prefix,
-                );
-            let nav_bar_span =
-                get_nav_bar_span(is_first, is_last, is_current_row, is_yanked, is_cut);
-            let is_pinned = Self::is_path_in_set(&self.pin_paths, &icon_name_hz, cwd);
-            let b_color = if is_pinned || self.mode_index == 2 {
-                Some(bookmark_color(&self.config, &icon_name_hz))
-            } else {
-                None
-            };
-
-            let row_ctx = RowCtx {
-                i,
-                prefix,
-                icon_name_hz,
-                is_spinner,
-                spinner_col_idx,
-                is_yanked,
-                is_cut,
-                is_selected,
-                is_current_row,
-                is_pinned,
-                b_color,
-                nav_bar_span,
-            };
+                    is_current_row,
+                },
+            );
             remaining_height = if as_cols {
                 self.push_columns_row(frame, &mut drain_iter, rows, row, row_ctx, remaining_height)
             } else {
@@ -1233,6 +1193,7 @@ impl ResultsUI {
         remaining_height
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn make_table<'a, T: SSS>(
         &mut self,
         active_column: usize,
@@ -1346,17 +1307,21 @@ impl ResultsUI {
 
         // begin adjustment
         let start_index = 0; // the index in results of the first complete item
+        let frame = &RowsFrame {
+            styler: &styler,
+            widths: &widths,
+            cwd: &cwd,
+            is_underline_mode,
+            active_column,
+        };
         let (start_index, total_height) = self.scroll_to_cursor_rows(
-            &styler,
+            frame,
             &mut results,
             &mut rows,
             selector,
             &columns,
-            &cwd,
-            &widths,
             results_len,
             as_cols,
-            is_underline_mode,
             h_at_cursor,
             h_to_cursor,
             cursor_end_should_lte,
@@ -1372,19 +1337,15 @@ impl ResultsUI {
         let active_group_name = self.active_group_name(&results, start_index);
 
         let (i, remaining_height) = self.push_visible_rows(
-            &styler,
+            frame,
             &mut results,
             start_index,
             &mut rows,
             click,
             selector,
             &columns,
-            &cwd,
-            &widths,
             as_cols,
-            is_underline_mode,
             &active_group_name,
-            active_column,
             i,
             remaining_height,
         );
@@ -1398,21 +1359,17 @@ impl ResultsUI {
         self.finalize_table(rows, remaining_height, widths, as_cols)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn decorate_cut_col_icon_and_symlink(
         &self,
         t: &mut ratatui::text::Text<'_>,
-        icon_name: &str,
-        is_selected: bool,
-        is_current_row: bool,
-        is_pinned: bool,
-        is_yanked: bool,
-        is_cut: bool,
-        nav_bar_span: &Option<ratatui::text::Span<'static>>,
+        ctx: &RowCtx,
         cwd: &std::path::Path,
         widths: &[u16],
         target_prefix_col: usize,
     ) {
+        let (icon_name, nav_bar_span) = (ctx.icon_name_hz.as_str(), &ctx.nav_bar_span);
+        let (is_selected, is_current_row) = (ctx.is_selected, ctx.is_current_row);
+        let (is_pinned, is_yanked, is_cut) = (ctx.is_pinned, ctx.is_yanked, ctx.is_cut);
         if self.config.icons {
             insert_icon_span(
                 t,
@@ -1489,25 +1446,24 @@ impl ResultsUI {
         rows.push(row);
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn push_cut_stacked_col<'a>(
         &self,
         col: &mut ratatui::text::Text<'a>,
         push: &mut Vec<Row<'a>>,
         col_idx: usize,
         height: u16,
-        b_color: Option<ratatui::style::Color>,
-        prefix: &str,
-        icon_name: &str,
-        is_selected: bool,
-        is_spinner: bool,
-        is_current_row: bool,
-        is_pinned: bool,
-        is_yanked: bool,
-        is_cut: bool,
-        nav_bar_span: &Option<ratatui::text::Span<'static>>,
+        ctx: &RowCtx,
         cwd: &std::path::Path,
     ) {
+        let (prefix, icon_name, nav_bar_span) = (
+            ctx.prefix.as_str(),
+            ctx.icon_name_hz.as_str(),
+            &ctx.nav_bar_span,
+        );
+        let (is_selected, is_spinner, is_current_row) =
+            (ctx.is_selected, ctx.is_spinner, ctx.is_current_row);
+        let (is_pinned, is_yanked, is_cut, b_color) =
+            (ctx.is_pinned, ctx.is_yanked, ctx.is_cut, ctx.b_color);
         if let Some(color) = b_color {
             apply_bookmark_text_style(col, color);
         }
@@ -1566,25 +1522,27 @@ impl ResultsUI {
         &self,
         row: &mut [ratatui::text::Text<'a>],
         rows: &mut Vec<Row<'a>>,
-        widths: &[u16],
+        frame: &RowsFrame<'_>,
         h: u16,
         remaining_height: u16,
-        is_spinner: bool,
-        spinner_col_idx: usize,
-        is_current_row: bool,
         is_topside_tier_underlined: bool,
-        b_color: Option<ratatui::style::Color>,
-        prefix: &str,
-        icon_name: String,
-        is_selected: bool,
-        is_pinned: bool,
-        is_yanked: bool,
-        is_cut: bool,
-        nav_bar_span: &Option<ratatui::text::Span<'static>>,
-        cwd: &std::path::Path,
-        style_text: &impl Fn(ratatui::text::Text<'a>, usize, bool) -> ratatui::text::Text<'a>,
-        apply_tier_underline: &impl Fn(&mut ratatui::text::Text<'_>, usize, usize),
+        ctx: &RowCtx,
     ) {
+        let RowsFrame {
+            styler,
+            widths,
+            cwd,
+            ..
+        } = *frame;
+        let (prefix, icon_name, nav_bar_span) = (&ctx.prefix, &ctx.icon_name_hz, &ctx.nav_bar_span);
+        let (is_spinner, spinner_col_idx, is_current_row, is_selected) = (
+            ctx.is_spinner,
+            ctx.spinner_col_idx,
+            ctx.is_current_row,
+            ctx.is_selected,
+        );
+        let (is_pinned, is_yanked, is_cut, b_color) =
+            (ctx.is_pinned, ctx.is_yanked, ctx.is_cut, ctx.b_color);
         if self._hr() + remaining_height != h {
             for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
                 clip_text_lines(t, remaining_height, !self.reverse());
@@ -1611,7 +1569,7 @@ impl ResultsUI {
             .cloned()
             .enumerate()
             .map(|(x, mut t)| {
-                t = style_text(t, x, is_current_row);
+                t = styler.style_text(t, x, is_current_row);
                 if let Some(color) = b_color {
                     apply_bookmark_text_style(&mut t, color);
                 }
@@ -1619,9 +1577,9 @@ impl ResultsUI {
                     prefix_span(
                         &mut t,
                         prefix.to_owned(),
-                        self.active_prefix_style(&icon_name, is_selected, is_spinner, cwd),
+                        self.active_prefix_style(icon_name, is_selected, is_spinner, cwd),
                         self.inactive_prefix_style(
-                            &icon_name,
+                            icon_name,
                             is_selected && !is_current_row,
                             is_spinner,
                             cwd,
@@ -1638,7 +1596,7 @@ impl ResultsUI {
                     if self.config.icons {
                         insert_icon_span(
                             &mut t,
-                            &icon_name,
+                            icon_name,
                             !is_selected && nav_bar_span.is_some(),
                             is_current_row,
                             self.config.uncolor_current_icon,
@@ -1649,13 +1607,13 @@ impl ResultsUI {
                             is_cut,
                             self.mode_index,
                             &self.config,
-                            self.get_flash_op(&icon_name, cwd),
+                            self.get_flash_op(icon_name, cwd),
                         );
                     }
                     if self.config.symlink.active {
                         maybe_append_symlink_target(
                             &mut t,
-                            &icon_name,
+                            icon_name,
                             self.config.symlink.style.into(),
                             widths[target_prefix_col],
                         );
@@ -1689,7 +1647,7 @@ impl ResultsUI {
                 } else {
                     0
                 };
-                apply_tier_underline(t, target_w, skip);
+                styler.tier_underline(t, target_w, skip);
             }
         }
 

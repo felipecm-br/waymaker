@@ -87,6 +87,7 @@ impl Preview {
         self.changed.swap(false, Ordering::Relaxed)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         lines: AppendOnly<Line<'static>>,
         string: Arc<Mutex<Option<Text<'static>>>>,

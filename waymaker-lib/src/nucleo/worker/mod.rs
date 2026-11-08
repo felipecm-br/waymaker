@@ -483,6 +483,7 @@ impl<T: SSS> Worker<T> {
     ///
     /// # Notes
     /// - Final column width is at least header width
+    #[allow(clippy::too_many_arguments)]
     pub fn results(
         &mut self,
         start: u32,

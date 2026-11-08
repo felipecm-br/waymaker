@@ -45,6 +45,16 @@ pub(super) struct RowCtx {
     pub(super) nav_bar_span: Option<ratatui::text::Span<'static>>,
 }
 
+/// Where one item sits in the table, from which [`RowCtx`] is computed.
+#[derive(Clone, Copy)]
+pub(super) struct RowPos {
+    pub(super) i: usize,
+    pub(super) is_selected: bool,
+    pub(super) is_first: bool,
+    pub(super) is_last: bool,
+    pub(super) is_current_row: bool,
+}
+
 /// The rest of a frame's results, peeked to see whether a tier separator follows a row.
 pub(super) type RowsIter<'d, 'a, T> = std::iter::Peekable<
     std::vec::Drain<

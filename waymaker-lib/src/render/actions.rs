@@ -974,7 +974,6 @@ fn focus_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
 /// /// Accept, Abort, Quit and Unwind: confirm or close an open input or box first, then exit (Quit and Unwind unwind one step per press).
 /// Runs an exit action. With nothing left to unwind in the filter, navigation mode takes the
 /// keys instead of the picker exiting; unwinding again from there exits.
-#[allow(clippy::too_many_arguments)]
 fn exit_or_nav<W: Write, T: SSS, S: Selection, A: ActionExt>(
     action: Action<A>,
     state: &mut State,

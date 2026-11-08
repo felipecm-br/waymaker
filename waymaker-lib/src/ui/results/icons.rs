@@ -309,6 +309,7 @@ pub(super) fn invert_color(c: Color) -> Color {
 /// - `invert_current` inverts the icon's natural color (e.g. Blue <-> Yellow).
 /// - `uncolor_current` drops the color so it inherits line text highlight.
 /// - Otherwise, natural icon color is preserved.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn insert_icon_span(
     col: &mut ratatui::text::Text<'_>,
     name: &str,

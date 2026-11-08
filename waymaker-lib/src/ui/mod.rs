@@ -154,6 +154,7 @@ pub struct PickerUI<'a, T: SSS, S: Selection> {
 }
 
 impl<'a, T: SSS, S: Selection> PickerUI<'a, T, S> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         results_config: ResultsConfig,
         status_config: StatusConfig,

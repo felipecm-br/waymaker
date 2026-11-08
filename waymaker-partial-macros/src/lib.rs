@@ -560,7 +560,6 @@ fn collection_field_stmts(
     current_field_ty
 }
 
-#[allow(clippy::too_many_arguments)]
 fn collection_apply_stmt(
     is_opt: bool,
     field_name: &Option<proc_macro2::Ident>,

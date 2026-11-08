@@ -60,6 +60,7 @@ pub(super) fn count_slashes(s: &str) -> u64 {
     count
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn compute_item_score(
     total: u32,
     idx: usize,

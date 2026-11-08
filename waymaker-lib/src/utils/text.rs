@@ -70,6 +70,7 @@ pub fn apply_style_at(mut text: Text<'_>, start: usize, len: usize, style: Style
 use crate::config_types::StyleSetting;
 
 /// Add a prefix span to all lines of the original text, applying the appropriate style.
+#[allow(clippy::too_many_arguments)]
 pub fn prefix_span<'a, 'b: 'a>(
     original: &'a mut Text<'b>,
     prefix: String,
