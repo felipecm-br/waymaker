@@ -17,7 +17,7 @@ use crate::{
             apply_bookmark_text_style, bookmark_color, extract_col0_name, insert_icon_span,
             maybe_append_symlink_target,
         },
-        styler::{RowCtx, RowPos, RowStyler, RowsFrame, RowsIter},
+        styler::{RowCtx, RowPos, RowStyler, RowsFrame, RowsIter, TablePass},
     },
     utils::{
         string::{fit_width, substitute_escaped},
@@ -320,21 +320,23 @@ impl ResultsUI {
 
     /// Scrolling down: moves `bottom` past the rows above the cursor that no longer fit, and
     /// draws the first one cut if it is only partly visible (setting `bottom_clip`).
-    #[allow(clippy::too_many_arguments)]
     fn cut_top_row_scrolling_down<'a, T: SSS, S: Selection>(
         &mut self,
-        frame: &RowsFrame<'_>,
-        results: &mut crate::nucleo::WorkerResults<'a, T>,
-        rows: &mut Vec<Row<'a>>,
-        selector: &Selector<T, S>,
-        columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
-        results_len: usize,
-        as_cols: bool,
+        pass: &mut TablePass<'_, 'a, T, S>,
         h_to_cursor_end: u16,
         cursor_end_should_lte: u16,
         mut start_index: u16,
         mut total_height: u16,
     ) -> (u16, u16) {
+        let TablePass {
+            ref frame,
+            ref mut results,
+            ref mut rows,
+            selector,
+            columns,
+            results_len,
+            as_cols,
+        } = *pass;
         let RowsFrame {
             styler,
             widths,
@@ -490,20 +492,22 @@ impl ResultsUI {
     }
 
     /// The first row stayed cut since the last frame (`bottom_clip`): draws its visible part.
-    #[allow(clippy::too_many_arguments)]
     fn redraw_kept_top_row<'a, T: SSS, S: Selection>(
         &mut self,
-        frame: &RowsFrame<'_>,
-        results: &mut crate::nucleo::WorkerResults<'a, T>,
-        rows: &mut Vec<Row<'a>>,
-        selector: &Selector<T, S>,
-        columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
-        results_len: usize,
-        as_cols: bool,
+        pass: &mut TablePass<'_, 'a, T, S>,
         mut remaining_height: u16,
         mut start_index: u16,
         mut total_height: u16,
     ) -> (u16, u16) {
+        let TablePass {
+            ref frame,
+            ref mut results,
+            ref mut rows,
+            selector,
+            columns,
+            results_len,
+            as_cols,
+        } = *pass;
         let RowsFrame {
             styler,
             cwd,
@@ -651,16 +655,9 @@ impl ResultsUI {
     /// Moves `bottom` so the cursor row stays inside the scroll padding, and draws the rows above
     /// the cursor that are cut by the move (when the first visible row is only partly shown).
     /// Returns the index in `results` of the first complete row and the height used so far.
-    #[allow(clippy::too_many_arguments)]
     fn scroll_to_cursor_rows<'a, T: SSS, S: Selection>(
         &mut self,
-        frame: &RowsFrame<'_>,
-        results: &mut crate::nucleo::WorkerResults<'a, T>,
-        rows: &mut Vec<Row<'a>>,
-        selector: &Selector<T, S>,
-        columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
-        results_len: usize,
-        as_cols: bool,
+        pass: &mut TablePass<'_, 'a, T, S>,
         h_at_cursor: u16,
         h_to_cursor: u16,
         cursor_end_should_lte: u16,
@@ -679,52 +676,39 @@ impl ResultsUI {
             && h_to_cursor_end > cursor_end_should_lte
         {
             (start_index, total_height) = self.cut_top_row_scrolling_down(
-                frame,
-                results,
-                rows,
-                selector,
-                columns,
-                results_len,
-                as_cols,
+                pass,
                 h_to_cursor_end,
                 cursor_end_should_lte,
                 start_index,
                 total_height,
             );
         } else if let Some(remaining_height) = self.bottom_clip {
-            (start_index, total_height) = self.redraw_kept_top_row(
-                frame,
-                results,
-                rows,
-                selector,
-                columns,
-                results_len,
-                as_cols,
-                remaining_height,
-                start_index,
-                total_height,
-            );
+            (start_index, total_height) =
+                self.redraw_kept_top_row(pass, remaining_height, start_index, total_height);
         }
         (start_index, total_height)
     }
 
     /// Pushes the rows from `start_index` on, with their group headers, separators, prefixes and
     /// styles, until the table is full. Returns the row counter and the height left over.
-    #[allow(clippy::too_many_arguments)]
     fn push_visible_rows<'a, T: SSS, S: Selection>(
         &mut self,
-        frame: &RowsFrame<'_>,
-        results: &mut crate::nucleo::WorkerResults<'a, T>,
+        pass: &mut TablePass<'_, 'a, T, S>,
         start_index: u16,
-        rows: &mut Vec<Row<'a>>,
         click: &mut Click,
-        selector: &Selector<T, S>,
-        columns: &std::sync::Arc<[crate::nucleo::Column<T>]>,
-        as_cols: bool,
         active_group_name: &Option<std::sync::Arc<str>>,
         mut i: usize,
         mut remaining_height: u16,
     ) -> (usize, u16) {
+        let TablePass {
+            ref frame,
+            ref mut results,
+            ref mut rows,
+            selector,
+            columns,
+            as_cols,
+            ..
+        } = *pass;
         let RowsFrame { styler, widths, .. } = *frame;
         let get_nav_bar_span =
             |is_first: bool, is_last: bool, is_current: bool, is_yanked: bool, is_cut: bool| {
@@ -1228,7 +1212,7 @@ impl ResultsUI {
         };
 
         let columns = worker.columns.clone();
-        let (mut results, mut widths, medians, status) = worker.results(
+        let (results, mut widths, medians, status) = worker.results(
             offset,
             end,
             &width_limits,
@@ -1269,7 +1253,7 @@ impl ResultsUI {
 
         let is_underline_mode = self.config.tier.separator == HorizontalSeparator::Underline;
 
-        let mut rows = vec![];
+        let rows = vec![];
         let total_height = 0;
 
         if results.is_empty() {
@@ -1307,21 +1291,23 @@ impl ResultsUI {
 
         // begin adjustment
         let start_index = 0; // the index in results of the first complete item
-        let frame = &RowsFrame {
-            styler: &styler,
-            widths: &widths,
-            cwd: &cwd,
-            is_underline_mode,
-            active_column,
-        };
-        let (start_index, total_height) = self.scroll_to_cursor_rows(
-            frame,
-            &mut results,
-            &mut rows,
+        let mut pass = TablePass {
+            frame: RowsFrame {
+                styler: &styler,
+                widths: &widths,
+                cwd: &cwd,
+                is_underline_mode,
+                active_column,
+            },
+            results,
+            rows,
             selector,
-            &columns,
+            columns: &columns,
             results_len,
             as_cols,
+        };
+        let (start_index, total_height) = self.scroll_to_cursor_rows(
+            &mut pass,
             h_at_cursor,
             h_to_cursor,
             cursor_end_should_lte,
@@ -1334,17 +1320,12 @@ impl ResultsUI {
 
         let i = self.bottom_clip.is_some() as usize;
 
-        let active_group_name = self.active_group_name(&results, start_index);
+        let active_group_name = self.active_group_name(&pass.results, start_index);
 
         let (i, remaining_height) = self.push_visible_rows(
-            frame,
-            &mut results,
+            &mut pass,
             start_index,
-            &mut rows,
             click,
-            selector,
-            &columns,
-            as_cols,
             &active_group_name,
             i,
             remaining_height,
@@ -1356,7 +1337,7 @@ impl ResultsUI {
             *click = Click::ResultIdx(self.bottom + i as u32 - 1);
         }
 
-        self.finalize_table(rows, remaining_height, widths, as_cols)
+        self.finalize_table(pass.rows, remaining_height, widths, as_cols)
     }
 
     fn decorate_cut_col_icon_and_symlink(

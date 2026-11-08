@@ -29,6 +29,18 @@ pub(super) struct RowsFrame<'f> {
     pub(super) active_column: usize,
 }
 
+/// One `make_table` pass: what the row helpers read (the frame, the selection, the columns) and
+/// what they consume and build (the frame's results and the table rows).
+pub(super) struct TablePass<'p, 'a, T: crate::SSS, S: crate::Selection> {
+    pub(super) frame: RowsFrame<'p>,
+    pub(super) results: crate::nucleo::WorkerResults<'a, T>,
+    pub(super) rows: Vec<ratatui::widgets::Row<'a>>,
+    pub(super) selector: &'p crate::Selector<T, S>,
+    pub(super) columns: &'p std::sync::Arc<[crate::nucleo::Column<T>]>,
+    pub(super) results_len: usize,
+    pub(super) as_cols: bool,
+}
+
 /// One item's values, computed once by `push_visible_rows` and read by both row layouts.
 pub(super) struct RowCtx {
     pub(super) i: usize,
