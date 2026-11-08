@@ -1135,7 +1135,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                                 let _ = tx.send(RenderCommand::Action(Action::Redraw));
                             }
                         } else if let Some(clip_cmd) = clip_cmd {
-                            // discriminant 2: use CLIPcmd
+                            // not OSC 52: use CLIPcmd
                             if !clip_cmd.is_empty() {
                                 let Some(mut child) = Command::from_script(&clip_cmd)
                                     .stdin(Stdio::piped())

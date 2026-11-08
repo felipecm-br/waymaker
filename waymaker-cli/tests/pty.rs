@@ -939,12 +939,25 @@ fn default_f2_renames_the_current_file() {
 /// An override file binding `ctrl-y` to `actions` (a TOML value), a counter file the commands
 /// can append to, and the `-o` argument naming the override.
 fn bind_ctrl_y(actions: &str) -> (tempfile::TempDir, std::path::PathBuf, String) {
+    bind_ctrl_y_with(actions, "")
+}
+
+/// [`bind_ctrl_y`] with more TOML appended to the override (`COUNT` is replaced there too).
+fn bind_ctrl_y_with(actions: &str, extra: &str) -> (tempfile::TempDir, std::path::PathBuf, String) {
     let dir = tempfile::tempdir().unwrap();
     let count = dir.path().join("count");
     std::fs::write(&count, "").unwrap();
-    let actions = actions.replace("COUNT", &count.display().to_string());
+    let path = count.display().to_string();
+    let (actions, extra) = (
+        actions.replace("COUNT", &path),
+        extra.replace("COUNT", &path),
+    );
     let config = dir.path().join("binds.toml");
-    std::fs::write(&config, format!("[binds]\n\"ctrl-y\" = {actions}\n")).unwrap();
+    std::fs::write(
+        &config,
+        format!("{extra}\n[binds]\n\"ctrl-y\" = {actions}\n"),
+    )
+    .unwrap();
     (dir, count, config.display().to_string())
 }
 
@@ -1064,4 +1077,41 @@ fn become_or_finishes_on_success_and_asks_after_a_failure() {
 
     let out = run_failing_command_and_confirm(r#""BecomeOr(false)""#);
     assert_eq!(out, "");
+}
+
+/// With `tui.osc52` (the default), a copy reaches the terminal's clipboard as an OSC 52 sequence
+/// holding the command's output (without its trailing newline), written once.
+#[test]
+fn copy_sends_the_output_to_the_terminal_clipboard_once() {
+    for action in ["Copy", "CopyAsync"] {
+        let (_dir, _count, config) = bind_ctrl_y(&format!(r#""{action}(echo text)""#));
+        let wm = Session::start(FRUIT, &["-o", &config]);
+        wm.send(CTRL_Y);
+        let osc52 = "\x1b]52;c;dGV4dA==\x07"; // base64("text")
+        wm.wait_for(|_| wm.screen_text().contains(osc52));
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(wm.screen_text().matches(osc52).count(), 1, "{action}");
+        wm.send(ESC);
+        wm.send(ESC);
+        assert_eq!(wm.finish().0, 130);
+    }
+}
+
+/// Without OSC 52, the output is piped to `CLIPcmd` instead.
+#[test]
+fn copy_without_osc52_pipes_the_output_to_clipcmd() {
+    for action in ["Copy", "CopyAsync"] {
+        let (_dir, count, config) = bind_ctrl_y_with(
+            &format!(r#""{action}(echo text)""#),
+            "[tui]\nosc52 = false\n[envs]\nCLIPcmd = \"cat >> COUNT\"",
+        );
+        let wm = Session::start(FRUIT, &["-o", &config]);
+        wm.send(CTRL_Y);
+        wait_for_lines(&count, 1);
+        assert_eq!(std::fs::read_to_string(&count).unwrap(), "text", "{action}");
+        assert!(!wm.screen_text().contains("\x1b]52;"), "{action}");
+        wm.send(ESC);
+        wm.send(ESC);
+        assert_eq!(wm.finish().0, 130);
+    }
 }
