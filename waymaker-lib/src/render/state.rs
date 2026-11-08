@@ -49,6 +49,31 @@ pub struct ParentPeekCache {
 /// In the "standard implementation", None represents unset, String: command, Text: display
 pub type PreviewSetPayload = Option<Result<String, Text<'static>>>;
 
+/// What a command step is for. Several handlers listen for the same interrupt (`ExecuteAsync`:
+/// background copy and execute-then; `ExecuteSilent`: copy and plain silent execution; `Execute`:
+/// the CLI's variants), and this tells them apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandKind {
+    /// `Copy`/`CopyAsync`: copy the command's output, through the terminal (OSC 52) when `osc52`.
+    Copy { osc52: bool },
+    /// `ExecuteAsync`/`ExecuteThen`: run in the background, then the actions stashed in `slot`,
+    /// whatever the exit status or only if the command succeeds.
+    ThenActions { slot: u8, only_on_success: bool },
+    /// A foreground command, and what follows when it exits.
+    Execute(AfterExecute),
+}
+
+/// What follows a foreground command (the CLI's `ExecuteOrConfirm`, `ExecuteAndQuit`, `BecomeOr`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AfterExecute {
+    /// Wait for enter if it failed.
+    ConfirmOnFailure,
+    /// Finish the picker if it succeeded.
+    FinishOnSuccess,
+    /// Finish if it succeeded, wait for enter if it failed.
+    FinishOrConfirm,
+}
+
 /// How an action asked the picker to end, acted on once the current batch of actions is done.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitRequest {
@@ -112,20 +137,9 @@ pub struct State {
     exit_request: Option<ExitRequest>,
     pub filtering: bool,
 
-    /// This field is never touched by the rendering loop and is reserved for
-    /// callers to use to store values, such as distinguishing between multiple
-    /// sources of a payload for an interrupt. The responsibility is on the caller
-    /// to ensure the value is emptied by the handler corresponding to an interrupt.
-    /// Update: This field is set by the rendering loop for ExecuteAsync and ExecuteThen. See [`crate::Matchmaker::_register_execute_handler`], which registers a handler that immediately consumes it.
-    ///
-    /// # Discriminants
-    /// - (ExecuteAsync, 0): Copy (Async, Normal)
-    /// - (ExecuteAsync, 1): Copy (Async, OSC52)
-    /// - (ExecuteAsync, 2*id): ExecuteAsync (Async, remainder)
-    /// - (ExecuteAsync, 2*id + 1): ExecuteThen (Async, remainder)
-    /// - (ExecuteSilent, 2): Copy (Sync, Normal)
-    /// - (ExecuteSilent, 3): Copy (Sync, OSC52)
-    pub discriminant_payload: Option<u8>,
+    /// What the pending command step is for; see [`CommandKind`]. Cleared once its interrupt's
+    /// handlers have run.
+    command_kind: Option<CommandKind>,
 
     pub async_actions: [Option<Box<dyn FnOnce() + Send + Sync>>; 128],
 }
@@ -151,6 +165,20 @@ impl Default for State {
 }
 
 impl State {
+    /// Says what the command step being raised is for; read by the interrupt's handlers.
+    pub fn set_command_kind(&mut self, kind: CommandKind) {
+        self.command_kind = Some(kind);
+    }
+
+    /// What the pending command step is for, if it is not a plain command.
+    pub fn command_kind(&self) -> Option<CommandKind> {
+        self.command_kind
+    }
+
+    pub(crate) fn clear_command_kind(&mut self) {
+        self.command_kind = None;
+    }
+
     /// Ends the picker with the selection, or the current item when selecting is disabled, once
     /// the current actions are done; the query is saved to history as on `Accept`.
     pub fn request_finish(&mut self) {
@@ -227,7 +255,7 @@ impl State {
             exit_request: None,
             filtering: true,
 
-            discriminant_payload: None,
+            command_kind: None,
             async_actions: std::array::from_fn(|_| None),
         }
     }

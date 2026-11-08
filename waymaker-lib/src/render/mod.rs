@@ -426,6 +426,8 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
                 for h in dynamic_handlers.1.get_mut(interrupt) {
                     h(&mut dispatcher);
                 }
+                // Every handler of this interrupt has seen it; it must not leak into the next.
+                state.clear_command_kind();
 
                 if matches!(interrupt, Interrupt::ChDir) {
                     state.refresh_parent_peek_cache();

@@ -1,3 +1,4 @@
+use crate::render::CommandKind;
 use std::{
     env,
     fmt::{self, Debug, Formatter},
@@ -902,8 +903,10 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
     /// Causes [`Action::ExecuteAsync`] and [`Action::ExecuteThen`] to execute their payload without blocking, and for the remaining actions in the batch to depend on the execution result.
     pub fn _register_execute_async_handler(&mut self, formatter: AttachmentFormatter<T, S>) {
         self.register_interrupt_handler(Interrupt::ExecuteAsync, move |state| {
-            if state.discriminant_payload.as_ref().is_some_and(|p| *p >= 2)
-                && let payload = state.discriminant_payload.take().unwrap()
+            if let Some(CommandKind::ThenActions {
+                slot,
+                only_on_success,
+            }) = state.command_kind()
                 && let template = state.payload()
                 && !template.is_empty()
             {
@@ -912,10 +915,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                     return;
                 }
 
-                let id = payload / 2;
-                let require_success = (payload % 2) == 1;
-
-                let closure_opt = state.take_actions(id);
+                let closure_opt = state.take_actions(slot);
 
                 let mut vars = state.make_env_vars();
 
@@ -945,7 +945,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                     match child.wait().await {
                         Ok(s) => {
                             info!("Async command [{}] exited with {}", cmd, s);
-                            if (require_success || s.success())
+                            if (!only_on_success || s.success())
                                 && let Some(closure) = closure_opt
                             {
                                 closure();
@@ -1018,8 +1018,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
         let formatter_1 = formatter.clone();
         let render_tx_1 = render_tx.clone();
         self.register_interrupt_handler(Interrupt::ExecuteAsync, move |state| {
-            if state.discriminant_payload.as_ref().is_some_and(|p| *p <= 1)
-                && let payload = state.discriminant_payload.take().unwrap()
+            if let Some(CommandKind::Copy { osc52 }) = state.command_kind()
                 && let template = state.payload()
                 && !template.is_empty()
             {
@@ -1063,7 +1062,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                     let _ = child.wait().await;
 
                     if !text.is_empty() {
-                        if payload == 1 {
+                        if osc52 {
                             if let Err(e) = set_host_clipboard_universal(&text) {
                                 log::warn!("Failed to set host clipboard: {}", e);
                             }
@@ -1072,7 +1071,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                                 let _ = tx.send(RenderCommand::Action(Action::Redraw));
                             }
                         } else if let Some(clip_cmd) = clip_cmd {
-                            // discriminant 0: use CLIPcmd
+                            // not OSC 52: use CLIPcmd
                             if !clip_cmd.is_empty() {
                                 let mut child = match tokio_command_from_script(&clip_cmd)
                                     .stdin(Stdio::piped())
@@ -1099,11 +1098,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
         });
 
         self.register_interrupt_handler(Interrupt::ExecuteSilent, move |state| {
-            if state
-                .discriminant_payload
-                .as_ref()
-                .is_some_and(|p| *p == 2 || *p == 3)
-                && let payload = state.discriminant_payload.take().unwrap()
+            if let Some(CommandKind::Copy { osc52 }) = state.command_kind()
                 && let template = state.payload()
                 && !template.is_empty()
             {
@@ -1131,7 +1126,7 @@ impl<T: SSS, S: Selection + 'static> Matchmaker<T, S> {
                     }
 
                     if !text.is_empty() {
-                        if payload == 3 {
+                        if osc52 {
                             if let Err(e) = set_host_clipboard_universal(&text) {
                                 log::warn!("Failed to set host clipboard: {}", e);
                             }

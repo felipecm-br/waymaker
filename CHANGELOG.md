@@ -13,6 +13,7 @@
 
 ### 🐛 Fixed
 
+- `Copy` (used by the `dict/unicode`, `dict/emoji` and `ssh/keys` presets) ran its command twice: once to copy, and once more by the plain silent-execute handler, which also wrote the output to the terminal under the picker
 - `ExecuteOrConfirm` and `BecomeOr` did not wait at "Press enter to continue" after a failed command when the items came from a pipe (`ls | wm`): the prompt read its answer from stdin, which holds the items, and was printed to stdout, so it also ended up in the output. It now uses the terminal
 - A line wider than 65,535 cells was laid out by its width modulo 65,536, so a 65,546-cell line (minified JS, a long log line) was cut to a 10-cell sliver; debug builds panicked on the overflow instead. Widths now saturate at 2,048 cells (`utils::cells`) wherever item, query or header text is measured
 - Changing the query moves the cursor to the best match. It used to keep its row, so after moving down, typing and pressing `enter` could accept a worse match (with `apple`, `foobar`, `banana`: two `down`s, then `ba` and `enter` printed `foobar` instead of `banana`)
@@ -21,7 +22,7 @@
 
 ### 🔄 Changed
 
-- Library API: `State::should_quit` and `State::should_quit_nomatch` are replaced by `State::request_finish()` and `State::request_no_match()` (read back with `exit_request()`), and `State::needs_redraw` is no longer public: call `State::request_redraw()`. Every finish now goes through one exit (`requested_exit`, then `PickerUI::finish`), which also saves the query to history
+- Library API: `State::should_quit` and `State::should_quit_nomatch` are replaced by `State::request_finish()` and `State::request_no_match()` (read back with `exit_request()`), and `State::needs_redraw` is no longer public: call `State::request_redraw()`. `State::discriminant_payload` (an `Option<u8>` whose numbers meant different things to different handlers) is replaced by `State::set_command_kind(CommandKind)`/`command_kind()`; the kind lasts for one interrupt and is cleared after its handlers run Every finish now goes through one exit (`requested_exit`, then `PickerUI::finish`), which also saves the query to history
 - The default layout gives the preview 60% of the width (list 40%, preview 60%), and the footer spans both panes (`footer.row_connection = "Full"`), so its hints are no longer cut to the list's width. Set `percentage = 40` in the first `[[preview.layout]]` for the old split
 - The default picker has navigation mode: `esc` unwinds as before, but with nothing left to unwind it moves to the results instead of exiting, so exiting from a clean prompt takes `esc esc` (still code 130). In navigation mode, letters are keys: `?` help, `/` or `I` back to the query, `j`/`k`, `gt`/`gb`, `+`/`-` and `}`/`{` resize the preview, `'` preview jump, `o`/`O` open, `w`/`W` print, `c`/`C` copy. These give home-row paths to actions that were only on `alt-*` chords. The footer's help hint, which named `?` while `?` typed into the query, now reads `esc nav │ ? help`. Set `ui.nav.active = false` for the old single-`esc` exit
 - `Unwind` with navigation mode active moves focus to the results as its last step in the filter, instead of exiting. This also applies to the `workspace`, `tmux/scrollback`, `pr` and `downloads` presets, which inherit `esc = @unwind`

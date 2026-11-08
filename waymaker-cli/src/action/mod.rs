@@ -1,4 +1,5 @@
 use std::{path::PathBuf, process::Command, str::FromStr};
+use waymaker::render::{AfterExecute, CommandKind};
 
 use cba::{
     StringError, bait::ResultExt, bring::split::split_on_unescaped_delimiter, broc::CommandExt,
@@ -302,15 +303,15 @@ pub fn action_handler(a: MMAction, state: &mut MMState<'_, '_>, ctx: &mut Action
             state.picker_ui.query.set_prompt(s.map(Line::raw));
         }
         MMAction::ExecuteOrConfirm(s) => {
-            state.discriminant_payload = Some(0);
+            state.set_command_kind(CommandKind::Execute(AfterExecute::ConfirmOnFailure));
             state.set_interrupt(Interrupt::Execute, s);
         }
         MMAction::ExecuteAndQuit(s) => {
-            state.discriminant_payload = Some(1);
+            state.set_command_kind(CommandKind::Execute(AfterExecute::FinishOnSuccess));
             state.set_interrupt(Interrupt::Execute, s);
         }
         MMAction::BecomeOr(s) | MMAction::BecomeOrConfirm(s) | MMAction::BecomeOrResume(s) => {
-            state.discriminant_payload = Some(2);
+            state.set_command_kind(CommandKind::Execute(AfterExecute::FinishOrConfirm));
             state.set_interrupt(Interrupt::Execute, s);
         }
         MMAction::Transform(payload) => transform(payload, state, ctx),

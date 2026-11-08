@@ -965,7 +965,6 @@ fn wait_for_lines(path: &std::path::Path, lines: usize) {
 }
 
 #[test]
-#[ignore = "Copy runs its command twice; fixed by the next commit"]
 fn copy_runs_its_command_once() {
     let (_dir, count, config) = bind_ctrl_y(r#""Copy(echo run >> COUNT; echo text)""#);
     let wm = Session::start(FRUIT, &["-o", &config]);

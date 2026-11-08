@@ -1,5 +1,6 @@
 //! Applying a single bound action inside the render loop.
 
+use crate::render::CommandKind;
 use std::io::Write;
 
 use super::{Flow, Focus, State, get_current};
@@ -879,11 +880,15 @@ fn command_action<W: Write, S: Selection, A: ActionExt>(
         }
         Action::CopyAsync(ref payload) => {
             state.set_interrupt(Interrupt::ExecuteAsync, payload.clone());
-            state.discriminant_payload = Some(if tui.config.osc52 { 1 } else { 0 });
+            state.set_command_kind(CommandKind::Copy {
+                osc52: tui.config.osc52,
+            });
         }
         Action::Copy(ref payload) => {
             state.set_interrupt(Interrupt::ExecuteSilent, payload.clone());
-            state.discriminant_payload = Some(if tui.config.osc52 { 3 } else { 2 });
+            state.set_command_kind(CommandKind::Copy {
+                osc52: tui.config.osc52,
+            });
         }
         Action::ExecuteAsync(ref payload) | Action::ExecuteThen(ref payload) => {
             let is_async = matches!(action, Action::ExecuteAsync(_));
@@ -898,7 +903,10 @@ fn command_action<W: Write, S: Selection, A: ActionExt>(
 
             if let Some(id) = state.stash_actions(remainder, bind_tx.clone()) {
                 state.set_interrupt(Interrupt::ExecuteAsync, payload);
-                state.discriminant_payload = Some(2 * id + (if is_async { 1 } else { 0 }));
+                state.set_command_kind(CommandKind::ThenActions {
+                    slot: id,
+                    only_on_success: !is_async,
+                });
             } else {
                 log::error!("No free slots left: remaining actions dropped");
             }
@@ -1095,7 +1103,10 @@ fn exit_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
                 if let Some(template) = state.prompt_input_template.take() {
                     let id = state.prompt_input_stash_id.take().unwrap_or(1);
                     state.set_interrupt(Interrupt::ExecuteAsync, template);
-                    state.discriminant_payload = Some(2 * id + 1);
+                    state.set_command_kind(CommandKind::ThenActions {
+                        slot: id,
+                        only_on_success: false,
+                    });
                 }
                 tui.redraw();
                 return Flow::Continue;

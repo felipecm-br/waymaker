@@ -1,4 +1,5 @@
 use std::process::{Command, Stdio};
+use waymaker::render::{AfterExecute, CommandKind};
 
 use cba::{broc::CommandExt, env_vars};
 use log::info;
@@ -19,7 +20,10 @@ impl Matchmaker<ConfigMMItem, ConfigMMInnerItem> {
     ) {
         let formatter_ = formatter.clone();
         self.register_interrupt_handler(Interrupt::Execute, move |state| {
-            let discriminant = state.discriminant_payload.take();
+            let after = match state.command_kind() {
+                Some(CommandKind::Execute(after)) => Some(after),
+                _ => None,
+            };
             let template = state.payload();
 
             if !template.is_empty() {
@@ -59,15 +63,17 @@ impl Matchmaker<ConfigMMItem, ConfigMMInnerItem> {
                     match child.wait() {
                         Ok(i) => {
                             info!("Command [{cmd}] exited with {i}");
-                            match discriminant {
+                            match after {
                                 // signal termination don't prompt
-                                Some(0) if i.code().is_some_and(|c| c != 0) => {
+                                Some(AfterExecute::ConfirmOnFailure)
+                                    if i.code().is_some_and(|c| c != 0) =>
+                                {
                                     press_enter_to_continue();
                                 }
-                                Some(1) if i.success() => {
+                                Some(AfterExecute::FinishOnSuccess) if i.success() => {
                                     state.request_finish();
                                 }
-                                Some(2) => {
+                                Some(AfterExecute::FinishOrConfirm) => {
                                     if i.success() {
                                         state.request_finish();
                                     } else if i.code().is_some() {
@@ -86,6 +92,10 @@ impl Matchmaker<ConfigMMItem, ConfigMMInnerItem> {
         });
 
         self.register_interrupt_handler(Interrupt::ExecuteSilent, move |state| {
+            // `Copy` raises ExecuteSilent too; its own handler runs the command.
+            if matches!(state.command_kind(), Some(CommandKind::Copy { .. })) {
+                return;
+            }
             let template = state.payload().clone();
             if !template.is_empty() {
                 let cmd = use_formatter(&formatter_, state, &template, None);
