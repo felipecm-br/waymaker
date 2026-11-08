@@ -4,6 +4,10 @@
 
 - Faster input ingestion and headless filtering (`wm -f`): `for_each_record` validates each 256 KB read chunk up to its last delimiter in a single SIMD `std::str::from_utf8` pass (falling back to per-record lossy decoding only when a chunk contains invalid UTF-8), `map_reader_batched` batches 4,096 records per channel send (matching the 256 KB buffer), `SegmentedInjector` builds single-column ranges inline without calling the splitter closure, and `Column::haystack` uses a direct function pointer for column 0. On the 2M-line (113 MB) corpus, `wm -f` drops from 230 ms to 199 ms on narrow queries (faster than `fzf -f` at 202 ms), 576 ms to 424 ms on broad queries (`fzf -f`: 1,128 ms), and 228 ms to 189 ms when nothing matches
 
+### 🐛 Fixed
+
+- `#[partial]` on a tuple or unit struct reports a compile error at the struct's fields instead of panicking inside the proc macro
+
 ### 🔄 Changed
 
 - The navigation-mode cursor indicator (`ui.nav.color`) defaults to cyan instead of yellow, keeping warm colours for state (yank, cut, bookmarks); `reference.config.toml` listed the default as `Darkgray`. Set `ui.nav.color = "yellow"` to keep the old look
