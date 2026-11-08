@@ -1141,9 +1141,8 @@ pub async fn start(
     }
     // make previewer
 
-    if !event_loop.binds.check_traces() {
-        // maybe abort with error
-    }
+    // Warns about binds whose trace markers do not pair up; startup goes on regardless.
+    let _ = event_loop.binds.check_traces();
     let cli_formatter = cli_formatter_fn();
     let binds = event_loop.binds.clone();
     let semantic_binds = event_loop.semantic_binds.clone();
@@ -1173,47 +1172,52 @@ pub async fn start(
     maybe_spawn_reload_ticker(reload_interval, &render_tx);
 
     // ---------------------- register handlers ---------------------------
-    let nav = register_cli_handlers(
+    let nav = register_handlers(
         &mut mm,
-        cli_formatter,
-        &print_handle,
-        &output_separator,
-        copy_trailing_newline,
-        &render_tx,
-        all_rules,
-        default_base_cmd,
-        &walker_config,
-        separator,
-        input_separator,
-        splitter,
-        preprocess,
-        group_prefix,
+        HandlerDeps {
+            cli_formatter,
+            print_handle: print_handle.clone(),
+            output_separator: output_separator.clone(),
+            copy_trailing_newline,
+            render_tx: render_tx.clone(),
+            all_rules,
+            default_base_cmd,
+            walker_config: walker_config.clone(),
+            separator,
+            input_separator,
+            splitter,
+            preprocess,
+            group_prefix,
+        },
     );
 
     debug!("{mm:?}");
 
-    let mut action_context = new_action_context(
+    let mut action_context = ActionContext {
         bind_tx,
-        &render_tx,
-        additional_commands,
-        initial_index,
+        render_tx: render_tx.clone(),
+        additional_commands: (additional_commands, initial_index),
         output_template,
-        &print_handle,
-        &output_separator,
-        nav_notify,
+        print_handle: print_handle.clone(),
+        output_separator: output_separator.clone(),
+        clipboard: Arc::new(Mutex::new(None)),
+        fm_notify: nav_notify,
+        undo_stack: Arc::new(Mutex::new(Vec::new())),
+        redo_stack: Arc::new(Mutex::new(Vec::new())),
+        fm_action: None,
+        mode_history: std::collections::HashMap::new(),
+        last_cwd: std::env::current_dir().ok(),
         nav,
-    );
+    };
 
     options = options
         .ext_handler(move |x, y| action_handler(x, y, &mut action_context))
         .ext_aliaser(move |a, state| alias_action(a, &semantic_binds, &state.input_routing.mode()));
 
-    if nav_mode {
-        log::debug!("Navigation mode enabled");
-    }
+    log::debug!("Navigation mode: {nav_mode}");
 
     // ----------- read -----------------------
-    start_input_ingest(
+    let input = InputSource {
         sort,
         no_read,
         command,
@@ -1222,12 +1226,11 @@ pub async fn start(
         input_separator,
         abort_empty,
         envs,
-        push_fn,
-        walker_config,
-        render_tx,
-        sync,
-    )
-    .await;
+    };
+    let reader = spawn_input_reader(input, push_fn, walker_config, render_tx);
+    if sync {
+        reader.await._wbog(); // warn the mapreader error (?)
+    }
 
     let ret = mm.pick(options).await;
 
@@ -1355,111 +1358,6 @@ fn build_cli_previewer(
             help
         }),
     )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn register_cli_handlers(
-    mm: &mut waymaker::ConfigMatchmaker,
-    cli_formatter: CliFormatter,
-    print_handle: &AppendOnly<String>,
-    output_separator: &str,
-    copy_trailing_newline: bool,
-    render_tx: &RenderSender<MMAction>,
-    all_rules: Vec<crate::config::PathRule>,
-    default_base_cmd: String,
-    walker_config: &waymaker::config::WalkerConfig,
-    separator: Option<char>,
-    input_separator: Option<char>,
-    splitter: waymaker::nucleo::injector::SplitterFn<
-        Either<Arc<str>, Box<waymaker::nucleo::Text<'static>>>,
-    >,
-    preprocess: waymaker::nucleo::injector::PreprocessOptions,
-    group_prefix: Option<String>,
-) -> SharedNav {
-    register_handlers(
-        mm,
-        HandlerDeps {
-            cli_formatter,
-            print_handle: print_handle.clone(),
-            output_separator: output_separator.to_owned(),
-            copy_trailing_newline,
-            render_tx: render_tx.clone(),
-            all_rules,
-            default_base_cmd,
-            walker_config: walker_config.clone(),
-            separator,
-            input_separator,
-            splitter,
-            preprocess,
-            group_prefix,
-        },
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn new_action_context(
-    bind_tx: waymaker::event::BindSender<MMAction>,
-    render_tx: &RenderSender<MMAction>,
-    additional_commands: Vec<String>,
-    initial_index: usize,
-    output_template: Option<String>,
-    print_handle: &AppendOnly<String>,
-    output_separator: &str,
-    nav_notify: bool,
-    nav: SharedNav,
-) -> ActionContext {
-    ActionContext {
-        bind_tx,
-        render_tx: render_tx.clone(),
-        additional_commands: (additional_commands, initial_index),
-        output_template,
-        print_handle: print_handle.clone(),
-        output_separator: output_separator.to_owned(),
-        clipboard: Arc::new(Mutex::new(None)),
-        fm_notify: nav_notify,
-        undo_stack: Arc::new(Mutex::new(Vec::new())),
-        redo_stack: Arc::new(Mutex::new(Vec::new())),
-        fm_action: None,
-        mode_history: std::collections::HashMap::new(),
-        last_cwd: std::env::current_dir().ok(),
-        nav,
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn start_input_ingest(
-    sort: bool,
-    no_read: bool,
-    command: String,
-    shell: Option<Vec<String>>,
-    separator: Option<char>,
-    input_separator: Option<char>,
-    abort_empty: bool,
-    envs: HashMap<String, String>,
-    push_fn: impl FnMut(Arc<str>) -> Result<(), waymaker::nucleo::WorkerError> + SSS,
-    walker_config: waymaker::config::WalkerConfig,
-    render_tx: RenderSender<MMAction>,
-    sync: bool,
-) {
-    let handle = spawn_input_reader(
-        InputSource {
-            sort,
-            no_read,
-            command,
-            shell,
-            separator,
-            input_separator,
-            abort_empty,
-            envs,
-        },
-        push_fn,
-        walker_config,
-        render_tx,
-    );
-
-    if sync {
-        handle.await._wbog(); // warn the mapreader error (?)
-    }
 }
 
 fn finish_picker_output<T>(
