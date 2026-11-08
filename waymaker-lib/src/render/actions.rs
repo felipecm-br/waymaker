@@ -84,25 +84,11 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             return exit_or_nav(a, state, ui, picker_ui, tui, overlay_ui, exit_config);
         }
 
-        // Results
-        Action::ToggleWrap => {
-            results.wrap(!results.is_wrap());
-        }
-        Action::ToggleActionBox => {
-            picker_ui.action_visible = !picker_ui.action_visible;
-            state
-                .input_routing
-                .set_action_box_active(picker_ui.action_visible);
-        }
-        Action::ToggleParentPeek => {
-            ui.config.parent_peek.enabled = !ui.config.parent_peek.enabled;
-        }
-        Action::ToggleFooter => {
-            footer_ui.show = !footer_ui.show;
-        }
-        Action::ToggleHeader => {
-            picker_ui.header.show = !picker_ui.header.show;
-        }
+        a @ (Action::ToggleWrap
+        | Action::ToggleActionBox
+        | Action::ToggleParentPeek
+        | Action::ToggleFooter
+        | Action::ToggleHeader) => toggle_action(a, state, ui, picker_ui, footer_ui),
         a @ (Action::Up(..)
         | Action::Down(..)
         | Action::Pos(..)
@@ -206,17 +192,8 @@ pub(super) fn handle_action<W: Write, T: SSS, S: Selection, A: ActionExt>(
             action_visible,
             prompt_input,
         ),
-        Action::SetMode(s) => {
-            state.input_routing.set_mode(s);
-        }
-        Action::Sort(order) => {
-            picker_ui.worker.set_sort_order(order);
-            state.sort_menu_active = false;
-            state.needs_redraw = true;
-        }
-        Action::SortMenu => {
-            state.sort_menu_active = !state.sort_menu_active;
-            state.needs_redraw = true;
+        a @ (Action::SetMode(..) | Action::Sort(..) | Action::SortMenu) => {
+            mode_action(a, state, worker)
         }
 
         // unreachable
@@ -664,6 +641,57 @@ fn selection_action<T: SSS, S: Selection, A: ActionExt>(
 }
 
 /// /// Cursor and scroll movement in the results and the query: Up/Down, Pos, QueryPos, HScroll/VScroll, half pages.
+/// Shows or hides a part of the layout: wrapping, the action box, parent peek, footer, header.
+fn toggle_action<T: SSS, S: Selection, A: ActionExt>(
+    action: Action<A>,
+    state: &mut State,
+    ui: &mut UI,
+    picker_ui: &mut PickerUI<'_, T, S>,
+    footer_ui: &mut DisplayUI,
+) {
+    match action {
+        Action::ToggleWrap => {
+            let results = &mut picker_ui.results;
+            results.wrap(!results.is_wrap());
+        }
+        Action::ToggleActionBox => {
+            picker_ui.action_visible = !picker_ui.action_visible;
+            state
+                .input_routing
+                .set_action_box_active(picker_ui.action_visible);
+        }
+        Action::ToggleParentPeek => {
+            ui.config.parent_peek.enabled = !ui.config.parent_peek.enabled;
+        }
+        Action::ToggleFooter => {
+            footer_ui.show = !footer_ui.show;
+        }
+        Action::ToggleHeader => {
+            picker_ui.header.show = !picker_ui.header.show;
+        }
+        _ => {}
+    }
+}
+
+/// The input mode, the sort order and the sort menu.
+fn mode_action<T: SSS, A: ActionExt>(action: Action<A>, state: &mut State, worker: &mut Worker<T>) {
+    match action {
+        Action::SetMode(s) => {
+            state.input_routing.set_mode(s);
+        }
+        Action::Sort(order) => {
+            worker.set_sort_order(order);
+            state.sort_menu_active = false;
+            state.needs_redraw = true;
+        }
+        Action::SortMenu => {
+            state.sort_menu_active = !state.sort_menu_active;
+            state.needs_redraw = true;
+        }
+        _ => {}
+    }
+}
+
 /// Query history in the filter. The `*OrHistory` forms recall only from the first row, so the
 /// arrows still move the cursor through the list; in a reversed layout the first row is not next
 /// to the filter.
