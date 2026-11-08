@@ -78,7 +78,7 @@ fn fetch_presets(temp_dir: &Path) -> PathBuf {
         let status = Command::new("unzip")
             .arg("-q")
             .arg(&zip_path)
-            .current_dir(&temp_dir)
+            .current_dir(temp_dir)
             .status();
         if !status.is_ok_and(|x| x.success()) {
             ebog!("unzip failed.");
@@ -156,7 +156,7 @@ fn install_preset_file(subfolder: &str, source_root: &Path, dest: &Path, temp_di
     {
         if plain_path.is_file() {
             if !dest.exists() {
-                fs::create_dir_all(&dest)
+                fs::create_dir_all(dest)
                     .unwrap_or_else(|e| die(format!("Could not create {}: {e}", dest.display())));
             }
             fs::copy(&plain_path, dest.join(subfolder)).unwrap_or_else(|e| {
@@ -169,7 +169,7 @@ fn install_preset_file(subfolder: &str, source_root: &Path, dest: &Path, temp_di
                 "Preset file successfully downloaded to: {}",
                 dest.join(subfolder).display()
             );
-            fs::remove_dir_all(&temp_dir).ok();
+            fs::remove_dir_all(temp_dir).ok();
             exit(0);
         } else if win_path.is_file() {
             ebog!("Source '{}' is not available for your platform.", subfolder);
