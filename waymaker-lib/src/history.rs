@@ -218,6 +218,54 @@ mod tests {
     }
 
     #[test]
+    fn up_after_editing_a_recalled_query_starts_again_from_the_newest() {
+        let mut h = with_entries("reedit", &["one", "two"]);
+        assert_eq!(h.prev(""), Some("two"));
+        // Edited, then up again: the edit is the new draft and browsing restarts.
+        assert_eq!(h.prev("twoX"), Some("two"));
+        assert_eq!(h.next("two").as_deref(), Some("twoX"));
+        let _ = std::fs::remove_file(temp_path("reedit"));
+    }
+
+    #[test]
+    fn record_skips_a_query_spanning_lines() {
+        let mut h = with_entries("multiline", &["a\nb", "ok"]);
+        assert_eq!(h.prev(""), Some("ok"));
+        assert_eq!(h.prev("ok"), None, "the two-line query was not saved");
+        let _ = std::fs::remove_file(temp_path("multiline"));
+    }
+
+    #[test]
+    fn is_empty_until_something_is_recorded() {
+        let path = temp_path("empty");
+        let _ = std::fs::remove_file(&path);
+        let mut h = QueryHistory::load(Some(path.clone()), 10);
+        assert!(h.is_enabled() && h.is_empty());
+        h.record("q").unwrap();
+        assert!(!h.is_empty());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn path_from_config_settings() {
+        assert_eq!(QueryHistory::path_from_config(""), None);
+        assert_eq!(
+            QueryHistory::path_from_config("auto"),
+            None,
+            "only wm resolves auto"
+        );
+        assert_eq!(
+            QueryHistory::path_from_config("/tmp/h"),
+            Some(PathBuf::from("/tmp/h"))
+        );
+        let _env = crate::utils::lock_test_env();
+        assert_eq!(
+            QueryHistory::path_from_config("~/h"),
+            Some(dirs::home_dir().unwrap().join("h"))
+        );
+    }
+
+    #[test]
     fn without_a_path_nothing_is_recalled_or_written() {
         let mut h = QueryHistory::load(None, 10);
         assert!(!h.is_enabled());
