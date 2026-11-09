@@ -379,8 +379,6 @@ impl ResultsUI {
                         is_current_row,
                     },
                 );
-                let (prefix, icon_name, nav_bar_span) =
-                    (&ctx.prefix, &ctx.icon_name_hz, &ctx.nav_bar_span);
                 let (is_spinner, spinner_col_idx, b_color) =
                     (ctx.is_spinner, ctx.spinner_col_idx, ctx.b_color);
 
@@ -418,36 +416,12 @@ impl ResultsUI {
                                 apply_bookmark_text_style(&mut t, color);
                             }
                             if x == target_prefix_col {
-                                prefix_span(
-                                    &mut t,
-                                    prefix.clone(),
-                                    self.active_prefix_style(
-                                        icon_name,
-                                        is_selected,
-                                        is_spinner,
-                                        cwd,
-                                    ),
-                                    self.inactive_prefix_style(
-                                        icon_name,
-                                        is_selected,
-                                        is_spinner,
-                                        cwd,
-                                    ),
-                                    is_current_row,
-                                    if !is_selected {
-                                        nav_bar_span.clone()
-                                    } else {
-                                        None
-                                    },
-                                    self.config.current_style,
-                                    self.config.current_nav_bar_style,
-                                );
-                                self.decorate_cut_col_icon_and_symlink(
+                                self.prefix_cell(&mut t, &ctx, cwd);
+                                self.icon_and_symlink_cell(
                                     &mut t,
                                     &ctx,
                                     cwd,
-                                    widths,
-                                    target_prefix_col,
+                                    widths[target_prefix_col],
                                 );
                             }
                             t
@@ -551,14 +525,7 @@ impl ResultsUI {
                 is_current_row,
             },
         );
-        let (prefix, icon_name, nav_bar_span) = (&ctx.prefix, &ctx.icon_name_hz, &ctx.nav_bar_span);
-        let (is_spinner, is_pinned, is_yanked, is_cut, b_color) = (
-            ctx.is_spinner,
-            ctx.is_pinned,
-            ctx.is_yanked,
-            ctx.is_cut,
-            ctx.b_color,
-        );
+        let (nav_bar_span, b_color) = (&ctx.nav_bar_span, ctx.b_color);
 
         total_height += remaining_height;
 
@@ -591,44 +558,9 @@ impl ResultsUI {
                     apply_bookmark_text_style(col, color);
                 }
 
-                prefix_span(
-                    col,
-                    prefix.clone(),
-                    self.active_prefix_style(icon_name, is_selected, is_spinner, cwd),
-                    self.inactive_prefix_style(icon_name, is_selected, is_spinner, cwd),
-                    is_current_row,
-                    if !is_selected {
-                        nav_bar_span.clone()
-                    } else {
-                        None
-                    },
-                    self.config.current_style,
-                    self.config.current_nav_bar_style,
-                );
-                if self.config.icons && col_idx == 0 {
-                    insert_icon_span(
-                        col,
-                        icon_name,
-                        !is_selected && nav_bar_span.is_some(),
-                        is_current_row,
-                        self.config.uncolor_current_icon,
-                        self.config.invert_current_icon,
-                        self.config.current_icon_style,
-                        is_pinned,
-                        is_yanked,
-                        is_cut,
-                        self.mode_index,
-                        &self.config,
-                        self.get_flash_op(icon_name, cwd),
-                    );
-                }
-                if self.config.symlink.active && col_idx == 0 {
-                    maybe_append_symlink_target(
-                        col,
-                        icon_name,
-                        self.config.symlink.style.into(),
-                        self.width,
-                    );
+                self.prefix_cell(col, &ctx, cwd);
+                if col_idx == 0 {
+                    self.icon_and_symlink_cell(col, &ctx, cwd, self.width);
                 }
 
                 if is_topside_tier_underlined {
@@ -817,17 +749,12 @@ impl ResultsUI {
     ) -> u16 {
         let RowCtx {
             i,
-            prefix,
-            icon_name_hz,
             is_spinner,
             spinner_col_idx,
-            is_yanked,
-            is_cut,
             is_selected,
-            is_current_row,
-            is_pinned,
             b_color,
-            nav_bar_span,
+            ref nav_bar_span,
+            ..
         } = row_ctx;
         let RowsFrame {
             styler,
@@ -902,50 +829,8 @@ impl ResultsUI {
 
                 // prefix after hscroll
                 if x == target_prefix_col {
-                    prefix_span(
-                        &mut t,
-                        prefix.clone(),
-                        self.active_prefix_style(&icon_name_hz, is_selected, is_spinner, cwd),
-                        self.inactive_prefix_style(
-                            &icon_name_hz,
-                            is_selected && !is_current_row,
-                            is_spinner,
-                            cwd,
-                        ),
-                        is_current_row,
-                        if !is_selected {
-                            nav_bar_span.clone()
-                        } else {
-                            None
-                        },
-                        self.config.current_style,
-                        self.config.current_nav_bar_style,
-                    );
-                    if self.config.icons {
-                        insert_icon_span(
-                            &mut t,
-                            &icon_name_hz,
-                            !is_selected && nav_bar_span.is_some(),
-                            is_current_row,
-                            self.config.uncolor_current_icon,
-                            self.config.invert_current_icon,
-                            self.config.current_icon_style,
-                            is_pinned,
-                            is_yanked,
-                            is_cut,
-                            self.mode_index,
-                            &self.config,
-                            self.get_flash_op(&icon_name_hz, cwd),
-                        );
-                    }
-                    if self.config.symlink.active {
-                        maybe_append_symlink_target(
-                            &mut t,
-                            &icon_name_hz,
-                            self.config.symlink.style.into(),
-                            widths[target_prefix_col],
-                        );
-                    }
+                    self.prefix_cell(&mut t, &row_ctx, cwd);
+                    self.icon_and_symlink_cell(&mut t, &row_ctx, cwd, widths[target_prefix_col]);
                 };
                 t
             })
@@ -1013,17 +898,10 @@ impl ResultsUI {
     ) -> u16 {
         let RowCtx {
             i,
-            prefix,
-            icon_name_hz,
-            is_spinner,
-            spinner_col_idx: _,
-            is_yanked,
-            is_cut,
             is_selected,
-            is_current_row: _,
-            is_pinned,
             b_color,
-            nav_bar_span,
+            ref nav_bar_span,
+            ..
         } = row_ctx;
         let RowsFrame {
             styler,
@@ -1070,49 +948,9 @@ impl ResultsUI {
             }
 
             let is_current_row = self.is_current(i);
-            prefix_span(
-                &mut col,
-                prefix.clone(),
-                self.active_prefix_style(&icon_name_hz, is_selected, is_spinner, cwd),
-                self.inactive_prefix_style(
-                    &icon_name_hz,
-                    is_selected && !is_current_row,
-                    is_spinner,
-                    cwd,
-                ),
-                is_current_row,
-                if !is_selected {
-                    nav_bar_span.clone()
-                } else {
-                    None
-                },
-                self.config.current_style,
-                self.config.current_nav_bar_style,
-            );
-            if self.config.icons && x == 0 {
-                insert_icon_span(
-                    &mut col,
-                    &icon_name_hz,
-                    !is_selected && nav_bar_span.is_some(),
-                    is_current_row,
-                    self.config.uncolor_current_icon,
-                    self.config.invert_current_icon,
-                    self.config.current_icon_style,
-                    is_pinned,
-                    is_yanked,
-                    is_cut,
-                    self.mode_index,
-                    &self.config,
-                    self.get_flash_op(&icon_name_hz, cwd),
-                );
-            }
-            if self.config.symlink.active && x == 0 {
-                maybe_append_symlink_target(
-                    &mut col,
-                    &icon_name_hz,
-                    self.config.symlink.style.into(),
-                    self.width,
-                );
+            self.prefix_cell(&mut col, &row_ctx, cwd);
+            if x == 0 {
+                self.icon_and_symlink_cell(&mut col, &row_ctx, cwd, self.width);
             }
 
             let is_active_col = active_column == x;
@@ -1340,29 +1178,52 @@ impl ResultsUI {
         self.finalize_table(pass.rows, remaining_height, widths, as_cols)
     }
 
-    fn decorate_cut_col_icon_and_symlink(
+    /// The row prefix (selection marker, spinner, nav bar) on the cell that carries it.
+    fn prefix_cell(&self, t: &mut ratatui::text::Text<'_>, ctx: &RowCtx, cwd: &std::path::Path) {
+        let icon_name = ctx.icon_name_hz.as_str();
+        prefix_span(
+            t,
+            ctx.prefix.clone(),
+            self.active_prefix_style(icon_name, ctx.is_selected, ctx.is_spinner, cwd),
+            self.inactive_prefix_style(
+                icon_name,
+                ctx.is_selected && !ctx.is_current_row,
+                ctx.is_spinner,
+                cwd,
+            ),
+            ctx.is_current_row,
+            if !ctx.is_selected {
+                ctx.nav_bar_span.clone()
+            } else {
+                None
+            },
+            self.config.current_style,
+            self.config.current_nav_bar_style,
+        );
+    }
+
+    /// The file icon and the symlink target on the cell that names the item; `symlink_width`
+    /// is the room the target may take.
+    fn icon_and_symlink_cell(
         &self,
         t: &mut ratatui::text::Text<'_>,
         ctx: &RowCtx,
         cwd: &std::path::Path,
-        widths: &[u16],
-        target_prefix_col: usize,
+        symlink_width: u16,
     ) {
-        let (icon_name, nav_bar_span) = (ctx.icon_name_hz.as_str(), &ctx.nav_bar_span);
-        let (is_selected, is_current_row) = (ctx.is_selected, ctx.is_current_row);
-        let (is_pinned, is_yanked, is_cut) = (ctx.is_pinned, ctx.is_yanked, ctx.is_cut);
+        let icon_name = ctx.icon_name_hz.as_str();
         if self.config.icons {
             insert_icon_span(
                 t,
                 icon_name,
-                !is_selected && nav_bar_span.is_some(),
-                is_current_row,
+                !ctx.is_selected && ctx.nav_bar_span.is_some(),
+                ctx.is_current_row,
                 self.config.uncolor_current_icon,
                 self.config.invert_current_icon,
                 self.config.current_icon_style,
-                is_pinned,
-                is_yanked,
-                is_cut,
+                ctx.is_pinned,
+                ctx.is_yanked,
+                ctx.is_cut,
                 self.mode_index,
                 &self.config,
                 self.get_flash_op(icon_name, cwd),
@@ -1373,7 +1234,7 @@ impl ResultsUI {
                 t,
                 icon_name,
                 self.config.symlink.style.into(),
-                widths[target_prefix_col],
+                symlink_width,
             );
         }
     }
@@ -1436,61 +1297,16 @@ impl ResultsUI {
         ctx: &RowCtx,
         cwd: &std::path::Path,
     ) {
-        let (prefix, icon_name, nav_bar_span) = (
-            ctx.prefix.as_str(),
-            ctx.icon_name_hz.as_str(),
-            &ctx.nav_bar_span,
-        );
-        let (is_selected, is_spinner, is_current_row) =
-            (ctx.is_selected, ctx.is_spinner, ctx.is_current_row);
-        let (is_pinned, is_yanked, is_cut, b_color) =
-            (ctx.is_pinned, ctx.is_yanked, ctx.is_cut, ctx.b_color);
-        if let Some(color) = b_color {
+        if let Some(color) = ctx.b_color {
             apply_bookmark_text_style(col, color);
         }
-
-        prefix_span(
-            col,
-            prefix.to_owned(),
-            self.active_prefix_style(icon_name, is_selected, is_spinner, cwd),
-            self.inactive_prefix_style(icon_name, is_selected, is_spinner, cwd),
-            is_current_row,
-            if !is_selected {
-                nav_bar_span.clone()
-            } else {
-                None
-            },
-            self.config.current_style,
-            self.config.current_nav_bar_style,
-        );
-        if self.config.icons && col_idx == 0 {
-            insert_icon_span(
-                col,
-                icon_name,
-                !is_selected && nav_bar_span.is_some(),
-                is_current_row,
-                self.config.uncolor_current_icon,
-                self.config.invert_current_icon,
-                self.config.current_icon_style,
-                is_pinned,
-                is_yanked,
-                is_cut,
-                self.mode_index,
-                &self.config,
-                self.get_flash_op(icon_name, cwd),
-            );
-        }
-        if self.config.symlink.active && col_idx == 0 {
-            maybe_append_symlink_target(
-                col,
-                icon_name,
-                self.config.symlink.style.into(),
-                self.width,
-            );
+        self.prefix_cell(col, ctx, cwd);
+        if col_idx == 0 {
+            self.icon_and_symlink_cell(col, ctx, cwd, self.width);
         }
 
         let row = Row::new(vec![col.clone()]).height(height);
-        let row = if is_selected {
+        let row = if ctx.is_selected {
             row.style(Style::from(self.config.selected_style))
         } else {
             row
@@ -1515,15 +1331,14 @@ impl ResultsUI {
             cwd,
             ..
         } = *frame;
-        let (prefix, icon_name, nav_bar_span) = (&ctx.prefix, &ctx.icon_name_hz, &ctx.nav_bar_span);
+        let nav_bar_span = &ctx.nav_bar_span;
         let (is_spinner, spinner_col_idx, is_current_row, is_selected) = (
             ctx.is_spinner,
             ctx.spinner_col_idx,
             ctx.is_current_row,
             ctx.is_selected,
         );
-        let (is_pinned, is_yanked, is_cut, b_color) =
-            (ctx.is_pinned, ctx.is_yanked, ctx.is_cut, ctx.b_color);
+        let b_color = ctx.b_color;
         if self._hr() + remaining_height != h {
             for (_, t) in row.iter_mut().enumerate().filter(|(i, _)| widths[*i] != 0) {
                 clip_text_lines(t, remaining_height, !self.reverse());
@@ -1555,50 +1370,8 @@ impl ResultsUI {
                     apply_bookmark_text_style(&mut t, color);
                 }
                 if x == target_prefix_col {
-                    prefix_span(
-                        &mut t,
-                        prefix.to_owned(),
-                        self.active_prefix_style(icon_name, is_selected, is_spinner, cwd),
-                        self.inactive_prefix_style(
-                            icon_name,
-                            is_selected && !is_current_row,
-                            is_spinner,
-                            cwd,
-                        ),
-                        is_current_row,
-                        if !is_selected {
-                            nav_bar_span.clone()
-                        } else {
-                            None
-                        },
-                        self.config.current_style,
-                        self.config.current_nav_bar_style,
-                    );
-                    if self.config.icons {
-                        insert_icon_span(
-                            &mut t,
-                            icon_name,
-                            !is_selected && nav_bar_span.is_some(),
-                            is_current_row,
-                            self.config.uncolor_current_icon,
-                            self.config.invert_current_icon,
-                            self.config.current_icon_style,
-                            is_pinned,
-                            is_yanked,
-                            is_cut,
-                            self.mode_index,
-                            &self.config,
-                            self.get_flash_op(icon_name, cwd),
-                        );
-                    }
-                    if self.config.symlink.active {
-                        maybe_append_symlink_target(
-                            &mut t,
-                            icon_name,
-                            self.config.symlink.style.into(),
-                            widths[target_prefix_col],
-                        );
-                    }
+                    self.prefix_cell(&mut t, ctx, cwd);
+                    self.icon_and_symlink_cell(&mut t, ctx, cwd, widths[target_prefix_col]);
                 }
                 t
             })
