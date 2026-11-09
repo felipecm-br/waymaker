@@ -619,175 +619,28 @@ impl Previewer {
         let diagram_background = self.config.diagram_background;
 
         let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        let handle = tokio::task::spawn_blocking(move || {
-            let is_stale = || {
-                rx.has_changed().unwrap_or(false)
-                    || current_generation.load(Ordering::Acquire) != task_gen
-            };
-            if is_stale() {
-                return;
-            }
-
-            let p = std::path::Path::new(&path);
-            let is_mermaid = p
-                .extension()
-                .and_then(|e| e.to_str())
-                .is_some_and(|ext| matches!(ext.to_lowercase().as_str(), "mmd" | "mermaid"));
-
-            if is_mermaid {
-                let content = std::fs::read_to_string(p).ok();
-                if is_stale() {
-                    return;
-                }
-                if let Some(ref c) = content
-                    && let Ok(mut src_guard) = diagram_sources_state.lock()
-                {
-                    if is_stale() {
-                        return;
-                    }
-                    *src_guard = vec![c.clone()];
-                }
-                if is_stale() {
-                    return;
-                }
-                current_diagram_idx_state.store(0, std::sync::atomic::Ordering::Release);
-
-                if markdown_diagrams
-                    && inline_diagrams
-                    && crate::utils::mermaid::is_kitty_supported()
-                    && let Some(ref c) = content
-                    && let Some(diag) =
-                        crate::utils::mermaid::render_mermaid_to_unicode_placeholders_with_options(
-                            c,
-                            width,
-                            diagram_theme,
-                            diagram_background,
-                        )
-                {
-                    if is_stale() {
-                        return;
-                    }
-                    crate::utils::mermaid::transmit_kitty_image_idempotent(
-                        diag.image_id,
-                        &diag.transmission,
-                    );
-                    let mut lines = Vec::with_capacity(diag.lines.len() + 2);
-                    lines.push(Line::default());
-                    lines.extend(diag.lines);
-                    lines.push(Line::default());
-                    let rendered_text = Text::from(lines);
-                    if is_stale() {
-                        return;
-                    }
-                    finish_mermaid_text_preview(
-                        rendered_text,
-                        &is_stale,
-                        &string_state,
-                        &image_state,
-                        &image_id,
-                        &changed,
-                        event_tx,
-                    );
-                    return;
-                }
-
-                if media_enabled && markdown_diagrams {
-                    // Try graphics-based rendering fallback (Kitty protocol)
-                    let img = crate::utils::mermaid::render_mermaid_file_to_image_with_options(
-                        p,
-                        2.0,
-                        diagram_theme,
-                        diagram_background, // Scale 2.0 for high-DPI rendering
-                    );
-
-                    if is_stale() {
-                        return;
-                    }
-
-                    if let Some(rendered_img) = img {
-                        finish_mermaid_image_preview(
-                            rendered_img,
-                            &is_stale,
-                            &image_state,
-                            &image_id,
-                            &changed,
-                            &string_state,
-                            event_tx,
-                        );
-                        return;
-                    }
-                    // Fall through to text rendering if image failed
-                }
-
-                let opts = crate::utils::mermaid::MermaidOptions {
-                    max_width: width,
-                    show_box: true,
-                    title: Some("Mermaid Diagram".to_string()),
-                    theme: diagram_theme,
-                    background: diagram_background,
-                    ..Default::default()
-                };
-                let rendered_text = match content {
-                    Some(ref c) => crate::utils::mermaid::render_mermaid(c, &opts),
-                    None => {
-                        crate::utils::mermaid::render_mermaid_file(p, &opts).unwrap_or_else(|err| {
-                            Text::from(format!("Error reading Mermaid file: {err}"))
-                        })
-                    }
-                };
-
-                if is_stale() {
-                    return;
-                }
-                finish_mermaid_text_preview(
-                    rendered_text,
-                    &is_stale,
-                    &string_state,
-                    &image_state,
-                    &image_id,
-                    &changed,
-                    event_tx,
-                );
-            } else {
-                // Markdown file — render with diagram offset tracking
-                let opts = crate::utils::markdown::MarkdownOptions {
-                    max_width: width,
-                    base_path: Some(p.to_path_buf()),
-                    render_mermaid: markdown_diagrams,
-                    inline_diagrams,
-                    inline_images,
-                    diagram_theme,
-                    diagram_background,
-                    ..Default::default()
-                };
-                let (rendered_text, offsets) =
-                    crate::utils::markdown::render_markdown_file_with_diagram_offsets(p, &opts)
-                        .unwrap_or_else(|err| {
-                            (
-                                Text::from(format!("Error reading Markdown file: {err}")),
-                                vec![],
-                            )
-                        });
-
-                preview_markdown_file(
-                    p,
-                    media_enabled,
-                    diagram_theme,
-                    diagram_background,
-                    rendered_text,
-                    offsets,
-                    &is_stale,
-                    &string_state,
-                    &image_state,
-                    &image_id,
-                    &diagram_offsets_state,
-                    &diagram_sources_state,
-                    &current_diagram_idx_state,
-                    &changed,
-                    event_tx,
-                );
-            }
-        });
+        let task = MarkdownTask {
+            path,
+            width,
+            string_state,
+            image_state,
+            image_id,
+            diagram_offsets_state,
+            diagram_sources_state,
+            current_diagram_idx_state,
+            changed,
+            rx,
+            event_tx,
+            current_generation,
+            task_gen,
+            media_enabled,
+            markdown_diagrams,
+            inline_diagrams,
+            inline_images,
+            diagram_theme,
+            diagram_background,
+        };
+        let handle = tokio::task::spawn_blocking(move || task.run());
         self.current_media_task = Some(handle);
     }
 
@@ -1020,6 +873,255 @@ impl Previewer {
         } else {
             Command::from_script(cmd)
         }
+    }
+}
+
+/// A Markdown or Mermaid file preview rendered off the UI thread: where the result goes, and the
+/// settings it is rendered with. Stale once a newer preview starts (`generation`) or a message
+/// arrives (`rx`).
+struct MarkdownTask {
+    path: String,
+    width: Option<usize>,
+    string_state: Arc<Mutex<Option<Text<'static>>>>,
+    image_state: Arc<Mutex<Option<image::DynamicImage>>>,
+    image_id: Arc<AtomicU64>,
+    diagram_offsets_state: Arc<Mutex<Vec<usize>>>,
+    diagram_sources_state: Arc<Mutex<Vec<String>>>,
+    current_diagram_idx_state: Arc<std::sync::atomic::AtomicUsize>,
+    changed: Arc<AtomicBool>,
+    rx: Receiver<PreviewMessage>,
+    event_tx: Option<EventSender>,
+    current_generation: Arc<AtomicU64>,
+    task_gen: u64,
+    media_enabled: bool,
+    markdown_diagrams: bool,
+    inline_diagrams: bool,
+    inline_images: bool,
+    diagram_theme: crate::config::DiagramTheme,
+    diagram_background: crate::config::DiagramBackground,
+}
+
+impl MarkdownTask {
+    fn run(self) {
+        if self.rx.has_changed().unwrap_or(false)
+            || self.current_generation.load(Ordering::Acquire) != self.task_gen
+        {
+            return;
+        }
+        let is_mermaid = std::path::Path::new(&self.path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|ext| matches!(ext.to_lowercase().as_str(), "mmd" | "mermaid"));
+        if is_mermaid {
+            self.preview_mermaid();
+        } else {
+            self.preview_markdown();
+        }
+    }
+
+    /// A `.mmd`/`.mermaid` file: inline Kitty diagram, then an image, then text.
+    fn preview_mermaid(self) {
+        let MarkdownTask {
+            path,
+            width,
+            string_state,
+            image_state,
+            image_id,
+            diagram_sources_state,
+            current_diagram_idx_state,
+            changed,
+            rx,
+            event_tx,
+            current_generation,
+            task_gen,
+            media_enabled,
+            markdown_diagrams,
+            inline_diagrams,
+            diagram_theme,
+            diagram_background,
+            ..
+        } = self;
+        let is_stale = || {
+            rx.has_changed().unwrap_or(false)
+                || current_generation.load(Ordering::Acquire) != task_gen
+        };
+        let p = std::path::Path::new(&path);
+        let content = std::fs::read_to_string(p).ok();
+        if is_stale() {
+            return;
+        }
+        if let Some(ref c) = content
+            && let Ok(mut src_guard) = diagram_sources_state.lock()
+        {
+            if is_stale() {
+                return;
+            }
+            *src_guard = vec![c.clone()];
+        }
+        if is_stale() {
+            return;
+        }
+        current_diagram_idx_state.store(0, std::sync::atomic::Ordering::Release);
+
+        if markdown_diagrams
+            && inline_diagrams
+            && crate::utils::mermaid::is_kitty_supported()
+            && let Some(ref c) = content
+            && let Some(diag) =
+                crate::utils::mermaid::render_mermaid_to_unicode_placeholders_with_options(
+                    c,
+                    width,
+                    diagram_theme,
+                    diagram_background,
+                )
+        {
+            if is_stale() {
+                return;
+            }
+            crate::utils::mermaid::transmit_kitty_image_idempotent(
+                diag.image_id,
+                &diag.transmission,
+            );
+            let mut lines = Vec::with_capacity(diag.lines.len() + 2);
+            lines.push(Line::default());
+            lines.extend(diag.lines);
+            lines.push(Line::default());
+            let rendered_text = Text::from(lines);
+            if is_stale() {
+                return;
+            }
+            finish_mermaid_text_preview(
+                rendered_text,
+                &is_stale,
+                &string_state,
+                &image_state,
+                &image_id,
+                &changed,
+                event_tx,
+            );
+            return;
+        }
+
+        if media_enabled && markdown_diagrams {
+            // Try graphics-based rendering fallback (Kitty protocol)
+            let img = crate::utils::mermaid::render_mermaid_file_to_image_with_options(
+                p,
+                2.0,
+                diagram_theme,
+                diagram_background, // Scale 2.0 for high-DPI rendering
+            );
+
+            if is_stale() {
+                return;
+            }
+
+            if let Some(rendered_img) = img {
+                finish_mermaid_image_preview(
+                    rendered_img,
+                    &is_stale,
+                    &image_state,
+                    &image_id,
+                    &changed,
+                    &string_state,
+                    event_tx,
+                );
+                return;
+            }
+            // Fall through to text rendering if image failed
+        }
+
+        let opts = crate::utils::mermaid::MermaidOptions {
+            max_width: width,
+            show_box: true,
+            title: Some("Mermaid Diagram".to_string()),
+            theme: diagram_theme,
+            background: diagram_background,
+            ..Default::default()
+        };
+        let rendered_text = match content {
+            Some(ref c) => crate::utils::mermaid::render_mermaid(c, &opts),
+            None => crate::utils::mermaid::render_mermaid_file(p, &opts)
+                .unwrap_or_else(|err| Text::from(format!("Error reading Mermaid file: {err}"))),
+        };
+
+        if is_stale() {
+            return;
+        }
+        finish_mermaid_text_preview(
+            rendered_text,
+            &is_stale,
+            &string_state,
+            &image_state,
+            &image_id,
+            &changed,
+            event_tx,
+        );
+    }
+
+    /// A Markdown file, rendered with its diagrams' offsets tracked.
+    fn preview_markdown(self) {
+        let MarkdownTask {
+            path,
+            width,
+            string_state,
+            image_state,
+            image_id,
+            diagram_offsets_state,
+            diagram_sources_state,
+            current_diagram_idx_state,
+            changed,
+            rx,
+            event_tx,
+            current_generation,
+            task_gen,
+            media_enabled,
+            markdown_diagrams,
+            inline_diagrams,
+            inline_images,
+            diagram_theme,
+            diagram_background,
+        } = self;
+        let is_stale = || {
+            rx.has_changed().unwrap_or(false)
+                || current_generation.load(Ordering::Acquire) != task_gen
+        };
+        let p = std::path::Path::new(&path);
+        let opts = crate::utils::markdown::MarkdownOptions {
+            max_width: width,
+            base_path: Some(p.to_path_buf()),
+            render_mermaid: markdown_diagrams,
+            inline_diagrams,
+            inline_images,
+            diagram_theme,
+            diagram_background,
+            ..Default::default()
+        };
+        let (rendered_text, offsets) =
+            crate::utils::markdown::render_markdown_file_with_diagram_offsets(p, &opts)
+                .unwrap_or_else(|err| {
+                    (
+                        Text::from(format!("Error reading Markdown file: {err}")),
+                        vec![],
+                    )
+                });
+
+        preview_markdown_file(
+            p,
+            media_enabled,
+            diagram_theme,
+            diagram_background,
+            rendered_text,
+            offsets,
+            &is_stale,
+            &string_state,
+            &image_state,
+            &image_id,
+            &diagram_offsets_state,
+            &diagram_sources_state,
+            &current_diagram_idx_state,
+            &changed,
+            event_tx,
+        );
     }
 }
 
