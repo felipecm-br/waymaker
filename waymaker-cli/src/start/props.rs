@@ -187,22 +187,25 @@ pub(super) fn set_media_size(config: &mut Config, size: u32) {
     config.render.preview.media.size = Some(size);
 }
 
+/// The pixel limit a media size names: `xs`, `s`, `m`, `l`, `xl`, `full`/`0`/`none` (no limit),
+/// or a number.
+pub(super) fn parse_media_size(s: &str) -> Option<u32> {
+    match s.to_ascii_lowercase().as_str() {
+        "xs" => Some(128),
+        "s" => Some(256),
+        "m" => Some(512),
+        "l" => Some(1024),
+        "xl" => Some(2048),
+        "full" | "none" => Some(0),
+        _ => s.parse::<u32>().ok(),
+    }
+}
+
 pub(super) fn apply_media_size_str(s: &str, config: &mut Config) {
     config.render.preview.media.active = true;
-    match s.to_ascii_lowercase().as_str() {
-        "xs" => set_media_size(config, 128),
-        "s" => set_media_size(config, 256),
-        "m" => set_media_size(config, 512),
-        "l" => set_media_size(config, 1024),
-        "xl" => set_media_size(config, 2048),
-        "full" | "0" | "none" => set_media_size(config, 0),
-        _ => {
-            if let Ok(num) = s.parse::<u32>() {
-                set_media_size(config, num);
-            } else {
-                eprintln!("warning: invalid --media-size value '{}'", s);
-            }
-        }
+    match parse_media_size(s) {
+        Some(size) => set_media_size(config, size),
+        None => eprintln!("warning: invalid --media-size value '{}'", s),
     }
 }
 
@@ -218,35 +221,15 @@ pub(super) fn apply_media_props(props: &[String], config: &mut Config) {
                         "kitty" | "sixel" | "halfblocks" | "iterm2" => {
                             config.render.preview.media.protocol = Some(prop.to_string());
                         }
-                        "xs" => set_media_size(config, 128),
-                        "s" => set_media_size(config, 256),
-                        "m" => set_media_size(config, 512),
-                        "l" => set_media_size(config, 1024),
-                        "xl" => set_media_size(config, 2048),
-                        "full" | "0" | "none" => set_media_size(config, 0),
-                        _ => {
-                            if let Ok(num) = prop.parse::<u32>() {
-                                set_media_size(config, num);
-                            } else {
-                                eprintln!("warning: unknown --media property '{}'", prop);
-                            }
-                        }
+                        _ => match parse_media_size(prop) {
+                            Some(size) => set_media_size(config, size),
+                            None => eprintln!("warning: unknown --media property '{}'", prop),
+                        },
                     }
                 }
-                Some(("size", s)) => match s.to_ascii_lowercase().as_str() {
-                    "xs" => set_media_size(config, 128),
-                    "s" => set_media_size(config, 256),
-                    "m" => set_media_size(config, 512),
-                    "l" => set_media_size(config, 1024),
-                    "xl" => set_media_size(config, 2048),
-                    "full" | "0" | "none" => set_media_size(config, 0),
-                    _ => {
-                        if let Ok(num) = s.parse::<u32>() {
-                            set_media_size(config, num);
-                        } else {
-                            eprintln!("warning: invalid --media size value '{}'", s);
-                        }
-                    }
+                Some(("size", s)) => match parse_media_size(s) {
+                    Some(size) => set_media_size(config, size),
+                    None => eprintln!("warning: invalid --media size value '{}'", s),
                 },
                 Some(("type" | "protocol", s)) => {
                     config.render.preview.media.protocol = Some(s.to_string());
@@ -282,4 +265,146 @@ pub(super) fn split_nav_bind_actions(s: &str) -> Vec<&str> {
     }
 
     parts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use waymaker::config::NavProfile;
+
+    fn nav(props: &[&str]) -> Config {
+        let mut config = Config::default();
+        let props: Vec<String> = props.iter().map(|s| s.to_string()).collect();
+        apply_nav_props(&props, &mut config);
+        config
+    }
+
+    #[test]
+    fn nav_turns_navigation_on_with_inline_status_and_no_bar() {
+        let c = nav(&[]);
+        let nav = &c.render.ui.nav;
+        assert!(nav.active);
+        assert_eq!(nav.bar, None);
+        assert!(c.render.query.status_inline);
+        assert_eq!(
+            c.render.action.border.sides,
+            Some(ratatui::widgets::Borders::NONE)
+        );
+    }
+
+    #[test]
+    fn nav_flags_and_profiles() {
+        let c = nav(&["bar,blink,bold,notify", "no-filter,hints,parent-peek"]);
+        let n = &c.render.ui.nav;
+        assert_eq!(n.bar, Some(ratatui::widgets::BorderType::Thick));
+        assert!(n.blink && n.bold && n.notify && n.hints);
+        assert!(!c.render.query.show);
+        assert!(c.render.ui.parent_peek.enabled);
+
+        assert_eq!(nav(&["fm"]).render.ui.nav.profile, NavProfile::Fm);
+        assert_eq!(nav(&["jump"]).render.ui.nav.profile, NavProfile::Fm);
+        assert_eq!(nav(&["picker"]).render.ui.nav.profile, NavProfile::List);
+        assert_eq!(nav(&["strict"]).render.ui.nav.profile, NavProfile::None);
+        let basic = nav(&["profile:minimal"]);
+        assert_eq!(basic.render.ui.nav.profile, NavProfile::Basic);
+        assert!(basic.render.ui.nav.basic);
+        // An unknown profile value falls back to the list profile.
+        assert_eq!(
+            nav(&["mode:whatever"]).render.ui.nav.profile,
+            NavProfile::List
+        );
+    }
+
+    #[test]
+    fn nav_valued_properties() {
+        let c = nav(&[
+            "bar:double,action-bar:rounded,blink:fast,marker:>,prompt:nav> ,color:#a6e3a1",
+            "hints:off,parent-peek-pct:30,focus-on-start:picker",
+        ]);
+        let n = &c.render.ui.nav;
+        assert_eq!(n.bar, Some(ratatui::widgets::BorderType::Double));
+        assert_eq!(
+            c.render.action.border.sides,
+            Some(ratatui::widgets::Borders::BOTTOM)
+        );
+        assert_eq!(
+            c.render.action.border.r#type,
+            Some(ratatui::widgets::BorderType::Rounded)
+        );
+        assert!(n.blink);
+        assert_eq!(n.blink_rate, BlinkRate::Rapid);
+        assert_eq!(n.marker, ">");
+        assert_eq!(n.prompt, "nav> ");
+        assert_eq!(n.color, ratatui::style::Color::Rgb(0xa6, 0xe3, 0xa1));
+        assert!(!n.hints);
+        assert_eq!(
+            c.render.ui.parent_peek.pct,
+            waymaker::config::Percentage::new(30)
+        );
+        assert_eq!(n.focus_on_start, waymaker::config::NavFocus::Picker);
+    }
+
+    #[test]
+    fn nav_ignores_an_invalid_colour_and_unknown_properties() {
+        let before = Config::default().render.ui.nav.color;
+        let c = nav(&["color:notacolour,frobnicate,what:ever"]);
+        assert_eq!(c.render.ui.nav.color, before);
+        assert!(c.render.ui.nav.active);
+    }
+
+    #[test]
+    fn border_type_and_blink_rate_names() {
+        use ratatui::widgets::BorderType;
+        assert_eq!(parse_border_type(" Thin "), BorderType::Plain);
+        assert_eq!(parse_border_type("rounded"), BorderType::Rounded);
+        assert_eq!(parse_border_type("double"), BorderType::Double);
+        assert_eq!(parse_border_type("anything"), BorderType::Thick);
+        assert_eq!(parse_blink_rate("slow"), BlinkRate::Slow);
+        assert_eq!(parse_blink_rate("FAST"), BlinkRate::Rapid);
+        assert_eq!(parse_blink_rate(""), BlinkRate::Normal);
+    }
+
+    #[test]
+    fn media_sizes_by_name_or_number() {
+        assert_eq!(parse_media_size("xs"), Some(128));
+        assert_eq!(parse_media_size("XL"), Some(2048));
+        assert_eq!(parse_media_size("full"), Some(0));
+        assert_eq!(parse_media_size("none"), Some(0));
+        assert_eq!(parse_media_size("0"), Some(0));
+        assert_eq!(parse_media_size("640"), Some(640));
+        assert_eq!(parse_media_size("big"), None);
+    }
+
+    #[test]
+    fn media_props_set_protocol_and_size() {
+        let mut c = Config::default();
+        apply_media_props(&["kitty,s".to_string()], &mut c);
+        assert!(c.render.preview.media.active);
+        assert_eq!(c.render.preview.media.protocol.as_deref(), Some("kitty"));
+        assert_eq!(c.previewer.media_size, 256);
+
+        apply_media_props(&["type:sixel,size:full".to_string()], &mut c);
+        assert_eq!(c.render.preview.media.protocol.as_deref(), Some("sixel"));
+        assert_eq!(c.render.preview.media.size, Some(0));
+
+        // An unknown size leaves the previous one.
+        apply_media_props(&["size:huge,1024".to_string()], &mut c);
+        assert_eq!(c.previewer.media_size, 1024);
+        apply_media_props(&["size:huge".to_string()], &mut c);
+        assert_eq!(c.previewer.media_size, 1024);
+    }
+
+    #[test]
+    fn nav_bind_actions_split_on_semicolons_outside_parentheses() {
+        assert_eq!(
+            split_nav_bind_actions("ChDir(..); Reload"),
+            vec!["ChDir(..)", "Reload"]
+        );
+        assert_eq!(
+            split_nav_bind_actions("Execute(cd {};ls);Accept"),
+            vec!["Execute(cd {};ls)", "Accept"]
+        );
+        assert_eq!(split_nav_bind_actions("Up;"), vec!["Up"]);
+        assert_eq!(split_nav_bind_actions(""), Vec::<&str>::new());
+    }
 }
