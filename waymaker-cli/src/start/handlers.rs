@@ -400,30 +400,35 @@ struct Reloader {
 }
 
 impl Reloader {
-    /// Pins mode: the pinned paths.
-    fn pins(&self, state: &mut CliState<'_, '_>) {
-        let Reloader {
-            reload_render_tx,
-            splitter,
-            group_prefix,
-            ..
-        } = self;
-        let preprocess = self.preprocess;
-        state.picker_ui.worker.set_mode_index(2);
+    /// Empties the picker for a reload and returns the function the new items are pushed
+    /// through (indexing, column splitting, ANSI handling, header lines).
+    fn begin_reload(
+        &self,
+        state: &mut CliState<'_, '_>,
+    ) -> impl FnMut(Arc<str>) -> Result<(), waymaker::nucleo::WorkerError> + Send + use<> {
         state.picker_ui.worker.restart(false);
         state.reloading = true;
 
         let injector = state.injector();
         let injector = IndexedInjector::new_globally_indexed(injector);
-        let injector = SegmentedInjector::new(injector, splitter.clone());
-        let injector = AnsiInjector::new(injector, preprocess);
+        let injector = SegmentedInjector::new(injector, self.splitter.clone());
+        let injector = AnsiInjector::new(injector, self.preprocess);
 
-        let mut push_fn = inject_line(
+        inject_line(
             state.picker_ui.header.config.header_lines,
-            reload_render_tx.clone(),
+            self.reload_render_tx.clone(),
             injector,
-            group_prefix.clone(),
-        );
+            self.group_prefix.clone(),
+        )
+    }
+
+    /// Pins mode: the pinned paths.
+    fn pins(&self, state: &mut CliState<'_, '_>) {
+        let Reloader {
+            reload_render_tx, ..
+        } = self;
+        state.picker_ui.worker.set_mode_index(2);
+        let mut push_fn = self.begin_reload(state);
 
         state.picker_ui.selector.clear();
         let store = waymaker::frecency::FrecencyStore::open();
@@ -432,35 +437,16 @@ impl Reloader {
             let _ = push_fn(pin.into());
         }
 
-        let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-            waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-        ));
+        send_reload_ready(reload_render_tx);
     }
 
     /// Directories mode: pinned directories, then visited ones by frecency score and depth.
     fn frecency_dirs(&self, state: &mut CliState<'_, '_>) {
         let Reloader {
-            reload_render_tx,
-            splitter,
-            group_prefix,
-            ..
+            reload_render_tx, ..
         } = self;
-        let preprocess = self.preprocess;
         state.picker_ui.worker.set_mode_index(1);
-        state.picker_ui.worker.restart(false);
-        state.reloading = true;
-
-        let injector = state.injector();
-        let injector = IndexedInjector::new_globally_indexed(injector);
-        let injector = SegmentedInjector::new(injector, splitter.clone());
-        let injector = AnsiInjector::new(injector, preprocess);
-
-        let mut push_fn = inject_line(
-            state.picker_ui.header.config.header_lines,
-            reload_render_tx.clone(),
-            injector,
-            group_prefix.clone(),
-        );
+        let mut push_fn = self.begin_reload(state);
 
         state.picker_ui.selector.clear();
         let store = waymaker::frecency::FrecencyStore::open();
@@ -493,9 +479,7 @@ impl Reloader {
             let _ = push_fn(path.into());
         }
 
-        let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-            waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-        ));
+        send_reload_ready(reload_render_tx);
     }
 
     /// The built-in file walker: the speculative cache, else the disk cache (refreshed in the
@@ -503,13 +487,10 @@ impl Reloader {
     fn walk(&self, state: &mut CliState<'_, '_>, current_dir: PathBuf) {
         let Reloader {
             reload_render_tx,
-            splitter,
-            group_prefix,
             spec_cache_reload,
             walker_config_reload,
             ..
         } = self;
-        let preprocess = self.preprocess;
         state.picker_ui.worker.set_mode_index(0);
         let cwd_str = current_dir.to_string_lossy().to_string();
 
@@ -518,29 +499,14 @@ impl Reloader {
             && let Some(lines) = cache.remove(&current_dir)
         {
             debug!("Speculative Cache HIT for {current_dir:?}");
-            state.picker_ui.worker.restart(false);
-            state.reloading = true;
-
-            let injector = state.injector();
-            let injector = IndexedInjector::new_globally_indexed(injector);
-            let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess);
-
-            let mut push_fn = inject_line(
-                state.picker_ui.header.config.header_lines,
-                reload_render_tx.clone(),
-                injector,
-                group_prefix.clone(),
-            );
+            let mut push_fn = self.begin_reload(state);
 
             state.picker_ui.selector.clear();
             for line in lines {
                 let _ = push_fn(line.into());
             }
 
-            let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-            ));
+            send_reload_ready(reload_render_tx);
             return;
         }
 
@@ -562,20 +528,7 @@ impl Reloader {
             && !cached_rec.items.is_empty()
         {
             debug!("DirCacheStore HIT for {cwd_str}");
-            state.picker_ui.worker.restart(false);
-            state.reloading = true;
-
-            let injector = state.injector();
-            let injector = IndexedInjector::new_globally_indexed(injector);
-            let injector = SegmentedInjector::new(injector, splitter.clone());
-            let injector = AnsiInjector::new(injector, preprocess);
-
-            let mut push_fn = inject_line(
-                state.picker_ui.header.config.header_lines,
-                reload_render_tx.clone(),
-                injector,
-                group_prefix.clone(),
-            );
+            let mut push_fn = self.begin_reload(state);
 
             state.picker_ui.selector.clear();
             for item in cached_rec.items {
@@ -585,9 +538,7 @@ impl Reloader {
                 let _ = push_fn(item.into());
             }
 
-            let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-            ));
+            send_reload_ready(reload_render_tx);
 
             // Background async walk to refresh disk cache if needed
             let cwd_clone = cwd_str.clone();
@@ -601,37 +552,15 @@ impl Reloader {
                 });
                 let _ = handle.await;
 
-                let mut fresh_items: Vec<String> = collect_rx.into_iter().collect();
-                if !fresh_items.is_empty() {
-                    fresh_items.sort_by_key(|item| {
-                        let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
-                        (slashes, item.clone())
-                    });
-                    let cache_store = waymaker::cache::DirCacheStore::open();
-                    let _ = cache_store.put(&cwd_clone, fresh_items);
-                }
+                store_walk_in_cache(&cwd_clone, collect_rx.into_iter().collect());
             });
             return;
         }
 
-        state.picker_ui.worker.restart(false);
-        state.reloading = true;
-
         if let Ok(mut c) = spec_cache_reload.lock() {
             c.clear();
         }
-
-        let injector = state.injector();
-        let injector = IndexedInjector::new_globally_indexed(injector);
-        let injector = SegmentedInjector::new(injector, splitter.clone());
-        let injector = AnsiInjector::new(injector, preprocess);
-
-        let mut push_fn = inject_line(
-            state.picker_ui.header.config.header_lines,
-            reload_render_tx.clone(),
-            injector,
-            group_prefix.clone(),
-        );
+        let mut push_fn = self.begin_reload(state);
 
         state.picker_ui.selector.clear();
         let reload_render_tx = reload_render_tx.clone();
@@ -646,33 +575,19 @@ impl Reloader {
                 let res = push_fn(line.into());
                 if first {
                     first = false;
-                    let _ = reload_render_tx_ready.send(waymaker::message::RenderCommand::Action(
-                        waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(
-                            vec![],
-                        )),
-                    ));
+                    send_reload_ready(&reload_render_tx_ready);
                 }
                 res
             });
             let _ = tokio::runtime::Handle::current().block_on(handle);
 
-            let mut fresh_items: Vec<String> = collect_rx.into_iter().collect();
-            if !fresh_items.is_empty() {
-                fresh_items.sort_by_key(|item| {
-                    let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
-                    (slashes, item.clone())
-                });
-                let cwd_str = std::env::current_dir()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                let cache_store = waymaker::cache::DirCacheStore::open();
-                let _ = cache_store.put(&cwd_str, fresh_items);
-            }
+            let cwd_str = std::env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            store_walk_in_cache(&cwd_str, collect_rx.into_iter().collect());
 
             if first {
-                let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                    waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-                ));
+                send_reload_ready(&reload_render_tx);
             }
         });
     }
@@ -680,27 +595,10 @@ impl Reloader {
     /// A shell command's output, split on the input separator.
     fn command(&self, state: &mut CliState<'_, '_>, cmd: String, current_dir: PathBuf) {
         let Reloader {
-            reload_render_tx,
-            splitter,
-            group_prefix,
-            ..
+            reload_render_tx, ..
         } = self;
-        let preprocess = self.preprocess;
         let (separator, input_separator) = (self.separator, self.input_separator);
-        state.picker_ui.worker.restart(false);
-        state.reloading = true;
-
-        let injector = state.injector();
-        let injector = IndexedInjector::new_globally_indexed(injector);
-        let injector = SegmentedInjector::new(injector, splitter.clone());
-        let injector = AnsiInjector::new(injector, preprocess);
-
-        let push_fn = inject_line(
-            state.picker_ui.header.config.header_lines,
-            reload_render_tx.clone(),
-            injector,
-            group_prefix.clone(),
-        );
+        let push_fn = self.begin_reload(state);
 
         let vars = state.make_env_vars();
         debug!("Reloading: {cmd} in {current_dir:?}");
@@ -730,11 +628,29 @@ impl Reloader {
                 }
             }
 
-            let _ = reload_render_tx.send(waymaker::message::RenderCommand::Action(
-                waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
-            ));
+            send_reload_ready(&reload_render_tx);
         });
     }
+}
+
+/// Tells the picker a reload has delivered its first items (or all of them).
+fn send_reload_ready(tx: &RenderSender<MMAction>) {
+    let _ = tx.send(waymaker::message::RenderCommand::Action(
+        waymaker::action::Action::Custom(crate::action::MMAction::ReloadReady(vec![])),
+    ));
+}
+
+/// Stores a fresh walk of `cwd` in the disk cache, shallowest paths first.
+fn store_walk_in_cache(cwd: &str, mut items: Vec<String>) {
+    if items.is_empty() {
+        return;
+    }
+    items.sort_by_key(|item| {
+        let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
+        (slashes, item.clone())
+    });
+    let cache_store = waymaker::cache::DirCacheStore::open();
+    let _ = cache_store.put(cwd, items);
 }
 
 /// Resolves the actions a bind fires: `Accept` becomes the CLI's accept, and a semantic action
