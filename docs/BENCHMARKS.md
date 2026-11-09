@@ -33,6 +33,18 @@ Measured on Linux `aarch64` (release build, median of 3 runs, `stdin` redirected
 
 `sk` figures are from an earlier run. CPU time (user) on 8 cores: `wm -f` uses about 0.35 s on the narrow and no-match queries (`fzf`: 0.25–0.55 s) and 2.3 s on the broad one (`fzf`: 3.9 s). Until nucleo `041465e`, every worker thread bumped one shared counter per unmatched item, which cost about 0.9 s of CPU on these queries.
 
+## Built-in Walker (no piped input)
+
+With stdin on a terminal, both tools list the working directory themselves. In `~/.cargo/registry` (84k entries), median of 5 runs, `wm` 0.9.0 against `fzf` 0.74.3:
+
+| Query | `wm -f` | `fzf -f` |
+| :--- | ---: | ---: |
+| `zzzqqq` (no match) | **34 ms** | 86 ms |
+| `mod.rs` | **37 ms** | 100 ms |
+| `src` | **65 ms** | 177 ms |
+
+The walkers' defaults differ (directories, hidden files), so the match counts differ slightly (`src`: 80,324 against 68,380).
+
 ## Interactive Streaming Frametime (`300,000` items)
 
 | Percentile | Frametime | Budget (60 FPS) |
