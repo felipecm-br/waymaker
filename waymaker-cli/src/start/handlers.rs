@@ -641,16 +641,10 @@ fn send_reload_ready(tx: &RenderSender<MMAction>) {
 }
 
 /// Stores a fresh walk of `cwd` in the disk cache, shallowest paths first.
-fn store_walk_in_cache(cwd: &str, mut items: Vec<String>) {
-    if items.is_empty() {
-        return;
+fn store_walk_in_cache(cwd: &str, items: Vec<String>) {
+    if !items.is_empty() {
+        super::ingest::cache_listing(&waymaker::cache::DirCacheStore::open(), cwd, items);
     }
-    items.sort_by_key(|item| {
-        let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
-        (slashes, item.clone())
-    });
-    let cache_store = waymaker::cache::DirCacheStore::open();
-    let _ = cache_store.put(cwd, items);
 }
 
 /// Resolves the actions a bind fires: `Accept` becomes the CLI's accept, and a semantic action

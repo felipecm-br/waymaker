@@ -705,7 +705,7 @@ pub async fn handle_frecency_cli(args: &[String]) -> Option<i32> {
             if let Ok(count) = dir_cache.clean_stale()
                 && count > 0
             {
-                println!("Cleaned {count} stale entries from directory cache database.");
+                println!("Cleaned {count} stale entries from the directory cache.");
             }
             Some(0)
         }

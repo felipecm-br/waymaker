@@ -361,12 +361,36 @@ pub(super) fn ingest_walk(
 }
 
 /// Stores a directory listing, shallow paths first, for [`ingest_walk`] to start from.
-fn cache_listing(cache_store: &DirCacheStore, cwd: &str, mut items: Vec<String>) {
+pub(super) fn cache_listing(cache_store: &DirCacheStore, cwd: &str, items: Vec<String>) {
     if !items.is_empty() {
-        items.sort_by_key(|item| {
-            let slashes = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
-            (slashes, item.clone())
-        });
-        let _ = cache_store.put(cwd, items);
+        let _ = cache_store.put(cwd, shallow_first(items));
+    }
+}
+
+/// Sorts paths by depth, then by name. Each path's depth is computed once and no path is
+/// copied (a `sort_by_key` returning `(depth, item.clone())` copied one per comparison).
+fn shallow_first(items: Vec<String>) -> Vec<String> {
+    let mut keyed: Vec<(usize, String)> = items
+        .into_iter()
+        .map(|item| {
+            let depth = item.bytes().filter(|&b| b == b'/' || b == b'\\').count();
+            (depth, item)
+        })
+        .collect();
+    keyed.sort_unstable();
+    keyed.into_iter().map(|(_, item)| item).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shallow_first;
+
+    #[test]
+    fn shallow_first_orders_by_depth_then_name() {
+        let items = ["b/c/d", "z", "a\\b", "b/a", "a", "c/a/b"].map(String::from);
+        assert_eq!(
+            shallow_first(items.to_vec()),
+            ["a", "z", "a\\b", "b/a", "b/c/d", "c/a/b"]
+        );
     }
 }

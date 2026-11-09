@@ -13,6 +13,8 @@
 
 ### 🐛 Fixed
 
+- The directory listing cache had no size limit: `dir_cache.redb` kept the full listing of every directory the walker had listed, and redb does not give back the space of replaced listings (291 MB on one machine, 109 MB of it live). Listings are now one file each in `~/.local/state/waymaker/dir_cache/`, written atomically, at most 32 MiB in all: the oldest are deleted to make room, and a listing larger than that (over about 600,000 paths) is not cached. The old `dir_cache.redb` is deleted on first run; `WM_DIR_CACHE_DB` is replaced by `WM_DIR_CACHE_DIR`. `wm clean` also deletes unreadable listings and temp files left by interrupted writes
+- Saving a walked listing sorted it with a key that copied every path on each comparison; each path is now measured once and never copied
 - `Copy` (used by the `dict/unicode`, `dict/emoji` and `ssh/keys` presets) ran its command twice: once to copy, and once more by the plain silent-execute handler, which also wrote the output to the terminal under the picker
 - `ExecuteOrConfirm` and `BecomeOr` did not wait at "Press enter to continue" after a failed command when the items came from a pipe (`ls | wm`): the prompt read its answer from stdin, which holds the items, and was printed to stdout, so it also ended up in the output. It now uses the terminal
 - A line wider than 65,535 cells was laid out by its width modulo 65,536, so a 65,546-cell line (minified JS, a long log line) was cut to a 10-cell sliver; debug builds panicked on the overflow instead. Widths now saturate at 2,048 cells (`utils::cells`) wherever item, query or header text is measured

@@ -253,7 +253,7 @@ A window name without a matching `[[window]]` is skipped. If `session.toml` does
 With no piped input and no `start.command`, `wm` lists files itself with an in-process parallel walker (the `ignore` crate, as in ripgrep):
 
 - hidden files are included; `.gitignore`, `.ignore`, `.git/info/exclude` and the global gitignore are respected; `.git/` itself is skipped;
-- the listing is cached per directory in `~/.local/state/waymaker/dir_cache.redb` and revalidated by directory modification time, so a second run in the same directory starts from the cache;
+- the listing is cached per directory, one file each in `~/.local/state/waymaker/dir_cache/` (`$WM_DIR_CACHE_DIR` to move it), and revalidated by directory modification time, so a second run in the same directory starts from the cache. The cache holds at most 32 MiB (about 600,000 paths): the oldest listings are deleted to make room, and a directory whose listing is larger than that is not cached;
 - to include ignored files, set your own command, e.g. `[start.command] command = "fd --type f --hidden --no-ignore"`;
 - `wm clean` removes entries for paths that no longer exist from the frecency and directory caches.
 
