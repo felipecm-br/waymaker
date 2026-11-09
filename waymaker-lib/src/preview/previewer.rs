@@ -668,172 +668,29 @@ impl Previewer {
         if let Some(mut child) = cmd_builder._spawn() {
             let task_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
             if let Some(stdout) = child.stdout.take() {
-                let lines = self.lines.clone();
-                let mut guard = self.lines.read();
-                let changed = self.changed.clone();
-                let cmd_str = cmd.clone();
-                let string_state = self.string.clone();
-                let image_state = self.image.clone();
-                let image_id = self.image_id.clone();
-                let diagram_sources_state = self.diagram_sources.clone();
-                let diagram_offsets_state = self.diagram_offsets.clone();
-                let current_diagram_idx_state = self.current_diagram_idx.clone();
-                let current_generation = self.generation.clone();
-
-                let delay_clear = self.config.delay_clear;
-                let try_lossy = self.config.try_lossy;
-
+                let stream = CommandStream {
+                    guard: self.lines.read(),
+                    lines: self.lines.clone(),
+                    staged: Vec::new(),
+                    has_swapped: false,
+                    leftover: Vec::new(),
+                    changed: self.changed.clone(),
+                    generation: self.generation.clone(),
+                    task_gen,
+                    delay_clear: self.config.delay_clear,
+                    try_lossy: self.config.try_lossy,
+                    cmd: cmd.clone(),
+                    other_views: OtherViews {
+                        string: self.string.clone(),
+                        image: self.image.clone(),
+                        image_id: self.image_id.clone(),
+                        diagram_sources: self.diagram_sources.clone(),
+                        diagram_offsets: self.diagram_offsets.clone(),
+                        current_diagram_idx: self.current_diagram_idx.clone(),
+                    },
+                };
                 // false => needs refresh (i.e. invalid utf-8)
-                let handle = tokio::spawn(async move {
-                    // Blocking reads on a thread of their own, so this task can notice a quiet
-                    // command: see the timeout below.
-                    let (chunk_tx, mut chunk_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
-                    spawn_stdout_reader_thread(stdout, chunk_tx);
-                    let mut leftover = Vec::new();
-                    let mut staged = Vec::new();
-                    let mut has_swapped = false;
-                    // What the new output replaces when it is swapped in: the previous text, image
-                    // and diagrams.
-                    let clear_other_views = || {
-                        reset_other_views(
-                            &string_state,
-                            &image_state,
-                            &image_id,
-                            &diagram_sources_state,
-                            &diagram_offsets_state,
-                            &current_diagram_idx_state,
-                        );
-                    };
-
-                    loop {
-                        let chunk =
-                            match tokio::time::timeout(STAGED_SWAP_AFTER, chunk_rx.recv()).await {
-                                Ok(Some(chunk)) => chunk,
-                                Ok(None) => break, // end of output
-                                Err(_) => {
-                                    if current_generation.load(Ordering::Acquire) != task_gen {
-                                        break; // a newer preview took over
-                                    }
-                                    // The command went quiet with output still staged (delay_clear):
-                                    // show it now rather than when it exits or reaches 500 lines.
-                                    if delay_clear && !has_swapped && !staged.is_empty() {
-                                        if current_generation.load(Ordering::Acquire) != task_gen {
-                                            return true;
-                                        }
-                                        lines.replace_all(std::mem::take(&mut staged));
-                                        has_swapped = true;
-                                        guard = lines.read();
-                                        clear_other_views();
-                                        changed.store(true, Ordering::Release);
-                                    }
-                                    continue;
-                                }
-                            };
-                        if current_generation.load(Ordering::Acquire) != task_gen {
-                            break;
-                        }
-
-                        leftover.extend_from_slice(&chunk);
-                        clean_invalid_utf8_lines(&mut leftover, try_lossy, false);
-
-                        let valid_up_to = match std::str::from_utf8(&leftover) {
-                            Ok(_) => leftover.len(),
-                            Err(e) => e.valid_up_to(),
-                        };
-
-                        let split_at = leftover[..valid_up_to]
-                            .iter()
-                            .rposition(|&b| b == b'\n' || b == b'\r')
-                            .map(|pos| pos + 1)
-                            .unwrap_or(valid_up_to);
-
-                        let (valid_bytes, rest) = leftover.split_at(split_at);
-
-                        match valid_bytes.into_text() {
-                            Ok(text) => {
-                                let has_text = !text.lines.is_empty();
-                                if delay_clear && !has_swapped {
-                                    staged.extend(text.lines);
-                                    if staged.len() >= 500 {
-                                        if current_generation.load(Ordering::Acquire) != task_gen {
-                                            return true;
-                                        }
-                                        lines.replace_all(std::mem::take(&mut staged));
-                                        has_swapped = true;
-                                        guard = lines.read();
-                                        clear_other_views();
-                                        changed.store(true, Ordering::Release);
-                                    }
-                                } else {
-                                    for line in text {
-                                        if current_generation.load(Ordering::Acquire) != task_gen
-                                            || lines.is_expired(&guard)
-                                        {
-                                            return true;
-                                        }
-                                        guard.push(line);
-                                    }
-                                    if has_text {
-                                        changed.store(true, Ordering::Release);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                if try_lossy {
-                                    let mut has_text = false;
-                                    for bytes in valid_bytes.split(|b| *b == b'\n') {
-                                        let line =
-                                            Line::from(String::from_utf8_lossy(bytes).into_owned());
-                                        if delay_clear && !has_swapped {
-                                            staged.push(line);
-                                        } else {
-                                            if current_generation.load(Ordering::Acquire)
-                                                != task_gen
-                                                || lines.is_expired(&guard)
-                                            {
-                                                return true;
-                                            }
-                                            guard.push(line);
-                                            has_text = true;
-                                        }
-                                    }
-                                    if delay_clear && !has_swapped && staged.len() >= 500 {
-                                        if current_generation.load(Ordering::Acquire) != task_gen {
-                                            return true;
-                                        }
-                                        lines.replace_all(std::mem::take(&mut staged));
-                                        has_swapped = true;
-                                        guard = lines.read();
-                                        clear_other_views();
-                                        changed.store(true, Ordering::Release);
-                                    } else if has_text && has_swapped {
-                                        changed.store(true, Ordering::Release);
-                                    }
-                                } else {
-                                    error!("Error displaying {cmd_str}: {:?}", e);
-                                    return false;
-                                }
-                            }
-                        }
-
-                        leftover = rest.to_vec();
-                    }
-
-                    finish_command_preview_stream(
-                        leftover,
-                        try_lossy,
-                        delay_clear,
-                        has_swapped,
-                        staged,
-                        &current_generation,
-                        task_gen,
-                        &lines,
-                        guard,
-                        &changed,
-                        &cmd_str,
-                        &clear_other_views,
-                    )
-                });
+                let handle = tokio::spawn(stream.run(stdout));
                 self.current = Some((child, handle))
             } else {
                 error!("Failed to get stdout of preview command: {cmd}")
@@ -1282,6 +1139,247 @@ fn spawn_stdout_reader_thread(
     });
 }
 
+/// The views a command preview's output replaces when it is swapped in: the previous text,
+/// image and diagrams.
+struct OtherViews {
+    string: Arc<Mutex<Option<Text<'static>>>>,
+    image: Arc<Mutex<Option<image::DynamicImage>>>,
+    image_id: Arc<AtomicU64>,
+    diagram_sources: Arc<Mutex<Vec<String>>>,
+    diagram_offsets: Arc<Mutex<Vec<usize>>>,
+    current_diagram_idx: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+/// A preview command's output on its way into `lines`. With `delay_clear` it is staged and
+/// swapped in at once (at 500 lines, when the command goes quiet, or at the end), so the previous
+/// preview stays up until then; otherwise each line is appended as it arrives.
+struct CommandStream {
+    lines: AppendOnly<Line<'static>>,
+    guard: arc_swap::Guard<Arc<boxcar::Vec<Line<'static>>>>,
+    staged: Vec<Line<'static>>,
+    has_swapped: bool,
+    /// Bytes after the last complete line, kept for the next chunk.
+    leftover: Vec<u8>,
+    changed: Arc<AtomicBool>,
+    generation: Arc<AtomicU64>,
+    task_gen: u64,
+    delay_clear: bool,
+    try_lossy: bool,
+    cmd: String,
+    other_views: OtherViews,
+}
+
+impl CommandStream {
+    /// Reads the command's output until it ends or a newer preview takes over. Returns false
+    /// when output could not be shown (invalid UTF-8 without `try_lossy`).
+    async fn run(mut self, stdout: std::process::ChildStdout) -> bool {
+        // Blocking reads on a thread of their own, so this task can notice a quiet command:
+        // see the timeout below.
+        let (chunk_tx, mut chunk_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
+        spawn_stdout_reader_thread(stdout, chunk_tx);
+        loop {
+            let chunk = match tokio::time::timeout(STAGED_SWAP_AFTER, chunk_rx.recv()).await {
+                Ok(Some(chunk)) => chunk,
+                Ok(None) => break, // end of output
+                Err(_) => {
+                    if self.is_stale() {
+                        break; // a newer preview took over
+                    }
+                    // The command went quiet with output still staged (delay_clear): show it
+                    // now rather than when it exits or reaches 500 lines.
+                    if self.is_staging() && !self.staged.is_empty() && !self.swap_in_staged() {
+                        return true;
+                    }
+                    continue;
+                }
+            };
+            if self.is_stale() {
+                break;
+            }
+            if let Some(done) = self.take_chunk(&chunk) {
+                return done;
+            }
+        }
+        self.finish()
+    }
+
+    fn is_stale(&self) -> bool {
+        self.generation.load(Ordering::Acquire) != self.task_gen
+    }
+
+    /// Whether output is still being staged instead of shown.
+    fn is_staging(&self) -> bool {
+        self.delay_clear && !self.has_swapped
+    }
+
+    /// Shows the staged output in place of the previous preview; false if a newer preview took
+    /// over first.
+    fn swap_in_staged(&mut self) -> bool {
+        if self.is_stale() {
+            return false;
+        }
+        self.lines.replace_all(std::mem::take(&mut self.staged));
+        self.has_swapped = true;
+        self.guard = self.lines.read();
+        self.clear_other_views();
+        self.changed.store(true, Ordering::Release);
+        true
+    }
+
+    /// Appends one line to the shown output; false if a newer preview took over.
+    fn push_line(&mut self, line: Line<'static>) -> bool {
+        if self.is_stale() || self.lines.is_expired(&self.guard) {
+            return false;
+        }
+        self.guard.push(line);
+        true
+    }
+
+    fn clear_other_views(&self) {
+        let v = &self.other_views;
+        reset_other_views(
+            &v.string,
+            &v.image,
+            &v.image_id,
+            &v.diagram_sources,
+            &v.diagram_offsets,
+            &v.current_diagram_idx,
+        );
+    }
+
+    /// Adds a chunk of output: the complete, valid lines are staged or shown, the rest waits for
+    /// the next chunk. `Some(result)` ends the task.
+    fn take_chunk(&mut self, chunk: &[u8]) -> Option<bool> {
+        let mut leftover = std::mem::take(&mut self.leftover);
+        leftover.extend_from_slice(chunk);
+        clean_invalid_utf8_lines(&mut leftover, self.try_lossy, false);
+
+        let valid_up_to = match std::str::from_utf8(&leftover) {
+            Ok(_) => leftover.len(),
+            Err(e) => e.valid_up_to(),
+        };
+
+        let split_at = leftover[..valid_up_to]
+            .iter()
+            .rposition(|&b| b == b'\n' || b == b'\r')
+            .map(|pos| pos + 1)
+            .unwrap_or(valid_up_to);
+
+        let (valid_bytes, rest) = leftover.split_at(split_at);
+
+        match valid_bytes.into_text() {
+            Ok(text) => {
+                let has_text = !text.lines.is_empty();
+                if self.is_staging() {
+                    self.staged.extend(text.lines);
+                    if self.staged.len() >= 500 && !self.swap_in_staged() {
+                        return Some(true);
+                    }
+                } else {
+                    for line in text {
+                        if !self.push_line(line) {
+                            return Some(true);
+                        }
+                    }
+                    if has_text {
+                        self.changed.store(true, Ordering::Release);
+                    }
+                }
+            }
+            Err(e) => {
+                if !self.try_lossy {
+                    error!("Error displaying {}: {:?}", self.cmd, e);
+                    return Some(false);
+                }
+                let mut has_text = false;
+                for bytes in valid_bytes.split(|b| *b == b'\n') {
+                    let line = Line::from(String::from_utf8_lossy(bytes).into_owned());
+                    if self.is_staging() {
+                        self.staged.push(line);
+                    } else {
+                        if !self.push_line(line) {
+                            return Some(true);
+                        }
+                        has_text = true;
+                    }
+                }
+                if self.is_staging() && self.staged.len() >= 500 {
+                    if !self.swap_in_staged() {
+                        return Some(true);
+                    }
+                } else if has_text && self.has_swapped {
+                    self.changed.store(true, Ordering::Release);
+                }
+            }
+        }
+
+        self.leftover = rest.to_vec();
+        None
+    }
+
+    /// The command's output ended: adds what is left over and swaps in anything still staged.
+    fn finish(mut self) -> bool {
+        if self.is_stale() {
+            return true;
+        }
+
+        let mut leftover = std::mem::take(&mut self.leftover);
+        clean_invalid_utf8_lines(&mut leftover, self.try_lossy, true);
+        if !leftover.is_empty() {
+            match leftover.into_text() {
+                Ok(text) => {
+                    if self.is_staging() {
+                        self.staged.extend(text.lines);
+                    } else {
+                        let has_text = !text.lines.is_empty();
+                        for line in text {
+                            if !self.push_line(line) {
+                                return true;
+                            }
+                        }
+                        if has_text {
+                            self.changed.store(true, Ordering::Release);
+                        }
+                    }
+                }
+                Err(e) => {
+                    if !self.try_lossy {
+                        error!("Error displaying {}: {:?}", self.cmd, e);
+                        return false;
+                    }
+                    let mut has_text = false;
+                    for bytes in leftover.split(|b| *b == b'\n') {
+                        let line = Line::from(String::from_utf8_lossy(bytes).into_owned());
+                        if self.is_staging() {
+                            self.staged.push(line);
+                        } else {
+                            if !self.push_line(line) {
+                                return true;
+                            }
+                            has_text = true;
+                        }
+                    }
+                    if has_text && self.has_swapped {
+                        self.changed.store(true, Ordering::Release);
+                    }
+                }
+            }
+        }
+
+        if self.is_staging() {
+            if self.is_stale() {
+                return true;
+            }
+            self.lines.replace_all(std::mem::take(&mut self.staged));
+            self.clear_other_views();
+            self.changed.store(true, Ordering::Release);
+        }
+
+        self.changed.store(true, Ordering::Release);
+        true
+    }
+}
+
 fn reset_other_views(
     string_state: &std::sync::Mutex<Option<Text<'static>>>,
     image_state: &std::sync::Mutex<Option<image::DynamicImage>>,
@@ -1306,85 +1404,6 @@ fn reset_other_views(
         d.clear();
     }
     current_diagram_idx_state.store(0, Ordering::Release);
-}
-
-#[allow(clippy::too_many_arguments)]
-fn finish_command_preview_stream(
-    mut leftover: Vec<u8>,
-    try_lossy: bool,
-    delay_clear: bool,
-    has_swapped: bool,
-    mut staged: Vec<Line<'static>>,
-    current_generation: &AtomicU64,
-    task_gen: u64,
-    lines: &AppendOnly<Line<'static>>,
-    guard: arc_swap::Guard<Arc<boxcar::Vec<Line<'static>>>>,
-    changed: &std::sync::atomic::AtomicBool,
-    cmd_str: &str,
-    clear_other_views: &impl Fn(),
-) -> bool {
-    if current_generation.load(Ordering::Acquire) != task_gen {
-        return true;
-    }
-
-    clean_invalid_utf8_lines(&mut leftover, try_lossy, true);
-    if !leftover.is_empty() {
-        match leftover.into_text() {
-            Ok(text) => {
-                if delay_clear && !has_swapped {
-                    staged.extend(text.lines);
-                } else {
-                    let has_text = !text.lines.is_empty();
-                    for line in text {
-                        if current_generation.load(Ordering::Acquire) != task_gen
-                            || lines.is_expired(&guard)
-                        {
-                            return true;
-                        }
-                        guard.push(line);
-                    }
-                    if has_text {
-                        changed.store(true, Ordering::Release);
-                    }
-                }
-            }
-            Err(e) => {
-                if try_lossy {
-                    let mut has_text = false;
-                    for bytes in leftover.split(|b| *b == b'\n') {
-                        let line = Line::from(String::from_utf8_lossy(bytes).into_owned());
-                        if delay_clear && !has_swapped {
-                            staged.push(line);
-                        } else {
-                            if lines.is_expired(&guard) {
-                                return true;
-                            }
-                            guard.push(line);
-                            has_text = true;
-                        }
-                    }
-                    if has_text && has_swapped {
-                        changed.store(true, Ordering::Release);
-                    }
-                } else {
-                    error!("Error displaying {cmd_str}: {:?}", e);
-                    return false;
-                }
-            }
-        }
-    }
-
-    if delay_clear && !has_swapped {
-        if current_generation.load(Ordering::Acquire) != task_gen {
-            return true;
-        }
-        lines.replace_all(staged);
-        clear_other_views();
-        changed.store(true, Ordering::Release);
-    }
-
-    changed.store(true, Ordering::Release);
-    true
 }
 
 fn kill_child(child: &mut Child) {
