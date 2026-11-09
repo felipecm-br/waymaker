@@ -1280,82 +1280,40 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
 
     // preview handler
     // important that PreviewSet events don't accidentally trigger this!
-    mm.register_event_handler(Event::CursorChange | Event::PreviewChange | Event::Resize | Event::Synced, move |state, _| {
+    mm.register_event_handler(
+        Event::CursorChange | Event::PreviewChange | Event::Resize | Event::Synced,
+        move |state, _| {
             // don't clobber previewset events
             if state.contains(Event::PreviewSet) {
                 // code logic-wise, recieve PreviewSet::None semantically => will recieve PreviewMessage::Unset => we should skip anyways (events is immutable), altho semantically such a state should actually trigger a new preview tho it would be niche
                 return;
             }
-            if state.preview_visible() &&
-            let m = state.preview_payload().clone()
+            if state.preview_visible()
+                && let m = state.preview_payload().clone()
             {
-                let media = state.preview_ui.as_ref().map(|p| p.config.media.active).unwrap_or(false);
-                let markdown = state.preview_ui.as_ref().map(|p| p.config.markdown).unwrap_or(true);
+                let media = state
+                    .preview_ui
+                    .as_ref()
+                    .map(|p| p.config.media.active)
+                    .unwrap_or(false);
+                let markdown = state
+                    .preview_ui
+                    .as_ref()
+                    .map(|p| p.config.markdown)
+                    .unwrap_or(true);
                 let mut msg = None;
 
                 if media || markdown {
-                    let raw_item = use_formatter(&formatter, state, "{=1}", None);
-                    let mut trimmed = raw_item.trim();
-                    let raw_all;
-                    if trimmed.is_empty() {
-                        raw_all = use_formatter(&formatter, state, "{=}", None);
-                        trimmed = raw_all.trim();
-                    }
-                    trimmed = trimmed.trim_matches(|c| c == '\'' || c == '"' || c == '`');
-                    // Strip leading icon if present (e.g. nerd font / fontawesome icon prefix)
-                    if let Some(ch) = trimmed.chars().next()
-                        && (ch as u32) > 127 {
-                            let mut chars = trimmed.chars();
-                            chars.next();
-                            trimmed = chars.as_str().trim();
-                        }
-
-                    let clean_path = if trimmed.starts_with("~/") || trimmed.starts_with("~\\") {
-                        dirs::home_dir().map(|h| h.join(&trimmed[2..]))
-                    } else if trimmed == "~" {
-                        dirs::home_dir()
+                    let first_column = use_formatter(&formatter, state, "{=1}", None);
+                    let raw = if first_column.trim().is_empty() {
+                        use_formatter(&formatter, state, "{=}", None)
                     } else {
-                        Some(std::path::PathBuf::from(trimmed))
+                        first_column
                     };
-
-                    if let Some(p) = clean_path && p.is_file()
-                        && let Some(ext) = p.extension().and_then(|e| e.to_str()) {
-                            let ext_lower = ext.to_lowercase();
-                            if media
-                                && matches!(
-                                    ext_lower.as_str(),
-                                    "png"
-                                        | "jpg"
-                                        | "jpeg"
-                                        | "gif"
-                                        | "webp"
-                                        | "bmp"
-                                        | "ico"
-                                        | "tiff"
-                                        | "pdf"
-                                        | "mp4"
-                                        | "mkv"
-                                        | "webm"
-                                        | "mov"
-                                        | "avi"
-                                        | "flv"
-                                        | "m4v"
-                                        | "wmv"
-                                )
-                            {
-                                msg = Some(PreviewMessage::Media(p.to_string_lossy().to_string()));
-                            } else if markdown
-                                && matches!(
-                                    ext_lower.as_str(),
-                                    "md" | "markdown" | "mdown" | "mkd" | "mmd" | "mermaid"
-                                )
-                            {
-                                let width = state.previewer_area().map(|r| r.width as usize);
-                                msg = Some(PreviewMessage::Markdown(p.to_string_lossy().to_string(), width));
-                            }
-                        }
+                    let width = state.previewer_area().map(|r| r.width as usize);
+                    msg = item_path(&raw)
+                        .and_then(|p| file_preview_message(p, media, markdown, width));
                 }
-
 
                 let cmd = use_formatter(&formatter, state, &m, None);
                 if cmd.is_empty() && msg.is_none() {
@@ -1363,12 +1321,7 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                 }
                 let is_rerun = state.contains(Event::PreviewChange);
                 let msg = msg.unwrap_or_else(|| {
-                    let mut envs = state.make_env_vars();
-                    let extra = env_vars!(
-                        "COLUMNS" => state.previewer_area().map_or("0".to_string(), |r| r.width.to_string()),
-                        "LINES" => state.previewer_area().map_or("0".to_string(), |r| r.height.to_string()),
-                    );
-                    envs.extend(extra);
+                    let envs = preview_envs(state);
                     if is_rerun {
                         PreviewMessage::Rerun(cmd.clone(), envs)
                     } else {
@@ -1381,24 +1334,28 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                 }
 
                 // -----------------
-                let target = state.preview_ui.as_ref().and_then(|p| p.config.initial.index.as_ref().and_then(|index_col| {
-                    state.current_raw().and_then(|item| {
-                        state.picker_ui.worker.format_with(item, index_col).and_then(|t| atoi::atoi(t.as_bytes()))
+                let target = state.preview_ui.as_ref().and_then(|p| {
+                    p.config.initial.index.as_ref().and_then(|index_col| {
+                        state.current_raw().and_then(|item| {
+                            state
+                                .picker_ui
+                                .worker
+                                .format_with(item, index_col)
+                                .and_then(|t| atoi::atoi(t.as_bytes()))
+                        })
                     })
-                }));
+                });
 
-                if !is_rerun
-                    && let Some(p) = state.preview_ui {
-                        p.set_target(target);
-                        p.jump = Default::default();
-                    };
-
+                if !is_rerun && let Some(p) = state.preview_ui {
+                    p.set_target(target);
+                    p.jump = Default::default();
+                };
             } else if preview_tx.send(PreviewMessage::Stop).is_err() {
                 warn!("Failed to send to preview: stop")
             }
 
             state.preview_set_payload = None; // reset None here instead of on consume so that ::Help can toggle
-        }
+        },
     );
 
     mm.register_event_handler(Event::PreviewSet, move |state, _event| {
@@ -1420,12 +1377,7 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
                     if cmd.is_empty() {
                         PreviewMessage::Stop
                     } else {
-                        let mut envs = state.make_env_vars();
-                        let extra = env_vars!(
-                            "COLUMNS" => state.previewer_area().map_or("0".to_string(), |r| r.width.to_string()),
-                            "LINES" => state.previewer_area().map_or("0".to_string(), |r| r.height.to_string()),
-                        );
-                        envs.extend(extra);
+                        let envs = preview_envs(state);
                         PreviewMessage::Run(cmd, envs)
                     }
                 }
@@ -1438,6 +1390,89 @@ pub fn make_previewer<T: SSS, S: Selection + 'static>(
     });
 
     previewer
+}
+
+/// The environment a preview command runs with: the picker's variables plus the preview's size
+/// as `COLUMNS` and `LINES`.
+fn preview_envs<T: SSS, S: Selection>(state: &MMState<'_, '_, T, S>) -> cba::broc::EnvVars {
+    let mut envs = state.make_env_vars();
+    let extra = env_vars!(
+        "COLUMNS" => state.previewer_area().map_or("0".to_string(), |r| r.width.to_string()),
+        "LINES" => state.previewer_area().map_or("0".to_string(), |r| r.height.to_string()),
+    );
+    envs.extend(extra);
+    envs
+}
+
+/// The file an item's text names, for a media or Markdown preview: trimmed, unquoted, without a
+/// leading icon (any non-ASCII first character, such as a Nerd Font glyph), with `~` expanded.
+fn item_path(raw: &str) -> Option<std::path::PathBuf> {
+    let mut trimmed = raw.trim();
+    trimmed = trimmed.trim_matches(|c| c == '\'' || c == '"' || c == '`');
+    if let Some(ch) = trimmed.chars().next()
+        && (ch as u32) > 127
+    {
+        let mut chars = trimmed.chars();
+        chars.next();
+        trimmed = chars.as_str().trim();
+    }
+
+    if trimmed.starts_with("~/") || trimmed.starts_with("~\\") {
+        dirs::home_dir().map(|h| h.join(&trimmed[2..]))
+    } else if trimmed == "~" {
+        dirs::home_dir()
+    } else {
+        Some(std::path::PathBuf::from(trimmed))
+    }
+}
+
+/// A media or Markdown preview for `path`, when it is a file of a kind that is enabled.
+fn file_preview_message(
+    path: std::path::PathBuf,
+    media: bool,
+    markdown: bool,
+    width: Option<usize>,
+) -> Option<PreviewMessage> {
+    if !path.is_file() {
+        return None;
+    }
+    let ext = path.extension()?.to_str()?.to_lowercase();
+    if media
+        && matches!(
+            ext.as_str(),
+            "png"
+                | "jpg"
+                | "jpeg"
+                | "gif"
+                | "webp"
+                | "bmp"
+                | "ico"
+                | "tiff"
+                | "pdf"
+                | "mp4"
+                | "mkv"
+                | "webm"
+                | "mov"
+                | "avi"
+                | "flv"
+                | "m4v"
+                | "wmv"
+        )
+    {
+        Some(PreviewMessage::Media(path.to_string_lossy().to_string()))
+    } else if markdown
+        && matches!(
+            ext.as_str(),
+            "md" | "markdown" | "mdown" | "mkd" | "mmd" | "mermaid"
+        )
+    {
+        Some(PreviewMessage::Markdown(
+            path.to_string_lossy().to_string(),
+            width,
+        ))
+    } else {
+        None
+    }
 }
 
 fn maybe_tty_in() -> Stdio {
@@ -1470,5 +1505,73 @@ impl<T: SSS + Debug, S: Selection + Debug> Debug for Matchmaker<T, S> {
             .field("event_handlers", &self.event_handlers)
             .field("interrupt_handlers", &self.interrupt_handlers)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod preview_path_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn item_path_strips_quotes_and_a_leading_icon() {
+        assert_eq!(item_path("  notes.md \n"), Some(PathBuf::from("notes.md")));
+        assert_eq!(item_path("'notes.md'"), Some(PathBuf::from("notes.md")));
+        assert_eq!(item_path("`a b.png`"), Some(PathBuf::from("a b.png")));
+        assert_eq!(
+            item_path("\u{f48a} notes.md"),
+            Some(PathBuf::from("notes.md"))
+        );
+        // Only a non-ASCII first character counts as an icon.
+        assert_eq!(item_path("xnotes.md"), Some(PathBuf::from("xnotes.md")));
+    }
+
+    #[test]
+    fn item_path_expands_the_home_directory() {
+        // Other tests set HOME; hold the lock they hold.
+        let _env = crate::utils::lock_test_env();
+        let home = dirs::home_dir().unwrap();
+        assert_eq!(item_path("~/notes.md"), Some(home.join("notes.md")));
+        assert_eq!(item_path("~"), Some(home));
+        assert_eq!(item_path("a~/b"), Some(PathBuf::from("a~/b")));
+    }
+
+    #[test]
+    fn file_preview_message_picks_media_or_markdown_by_extension() {
+        let dir = std::env::temp_dir().join(format!("wm_preview_kind_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = |name: &str| {
+            let p = dir.join(name);
+            std::fs::write(&p, "x").unwrap();
+            p
+        };
+        let (png, md, rs) = (file("a.PNG"), file("b.md"), file("c.rs"));
+        assert!(matches!(
+            file_preview_message(png.clone(), true, true, None),
+            Some(PreviewMessage::Media(_))
+        ));
+        assert!(
+            file_preview_message(png, false, true, None).is_none(),
+            "media off"
+        );
+        assert!(matches!(
+            file_preview_message(md.clone(), true, true, Some(80)),
+            Some(PreviewMessage::Markdown(_, Some(80)))
+        ));
+        assert!(
+            file_preview_message(md, true, false, None).is_none(),
+            "markdown off"
+        );
+        assert!(
+            file_preview_message(rs, true, true, None).is_none(),
+            "not media or markdown"
+        );
+        let missing = dir.join("missing.md");
+        assert!(
+            file_preview_message(missing, true, true, None).is_none(),
+            "not a file"
+        );
+        assert!(file_preview_message(dir.clone(), true, true, None).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
