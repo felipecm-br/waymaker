@@ -19,27 +19,45 @@ pub(super) struct DrawCtx<'r, 'a, T: SSS, S: Selection, A: ActionExt> {
     pub did_resize: &'r mut bool,
 }
 
-pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
-    frame: &mut Frame,
-    cx: DrawCtx<'_, '_, T, S, A>,
-) {
+/// Where each part of the picker goes in one frame, worked out by [`layout_frame`].
+struct FrameLayout {
+    breadcrumb_spans: Vec<ratatui::text::Span<'static>>,
+    is_global_breadcrumb: bool,
+    global_breadcrumb_rect: Rect,
+    footer: Rect,
+    has_footer_separator: bool,
+    preview: Rect,
+    picker_area: Rect,
+    gap_area: Rect,
+    breadcrumb: Rect,
+    action: Rect,
+    input: Rect,
+    status: Rect,
+    header: Rect,
+    results: Rect,
+    parent_peek_rect: Rect,
+    show_sort_menu: bool,
+    show_nav_hints: bool,
+    is_filter_mode: bool,
+}
+
+/// Lays out one frame inside `area` (the space left inside the outer border), records the
+/// layout in `state`, and resizes the parts when it changed.
+fn layout_frame<T: SSS, S: Selection, A: ActionExt>(
+    area: Rect,
+    cx: &mut DrawCtx<'_, '_, T, S, A>,
+) -> FrameLayout {
     let DrawCtx {
         state,
         ui,
         picker_ui,
         footer_ui,
         preview_ui,
-        overlay_ui: mut overlay_ui_ref,
-        click,
-        mouse_hover,
+        overlay_ui: overlay_ui_ref,
         did_resize,
+        ..
     } = cx;
-
-    let mut area = frame.area();
-
-    // mutates area!
-    render_ui(frame, &mut area, ui);
-
+    let did_resize = &mut **did_resize;
     let mut _area = area;
 
     if let Some(p) = preview_ui.as_mut() {
@@ -146,7 +164,7 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
             picker_ui,
             footer_ui,
             preview_ui,
-            &mut overlay_ui_ref,
+            overlay_ui_ref,
             area,
             results,
             action,
@@ -156,6 +174,69 @@ pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
             preview,
         );
     };
+
+    FrameLayout {
+        breadcrumb_spans,
+        is_global_breadcrumb,
+        global_breadcrumb_rect,
+        footer,
+        has_footer_separator,
+        preview,
+        picker_area,
+        gap_area,
+        breadcrumb,
+        action,
+        input,
+        status,
+        header,
+        results,
+        parent_peek_rect,
+        show_sort_menu,
+        show_nav_hints,
+        is_filter_mode,
+    }
+}
+
+pub(super) fn draw_frame<T: SSS, S: Selection, A: ActionExt>(
+    frame: &mut Frame,
+    mut cx: DrawCtx<'_, '_, T, S, A>,
+) {
+    let mut area = frame.area();
+
+    // mutates area!
+    render_ui(frame, &mut area, cx.ui);
+
+    let FrameLayout {
+        breadcrumb_spans,
+        is_global_breadcrumb,
+        global_breadcrumb_rect,
+        footer,
+        has_footer_separator,
+        preview,
+        picker_area,
+        gap_area,
+        breadcrumb,
+        action,
+        input,
+        status,
+        header,
+        results,
+        parent_peek_rect,
+        show_sort_menu,
+        show_nav_hints,
+        is_filter_mode,
+    } = layout_frame(area, &mut cx);
+    let DrawCtx {
+        state,
+        ui,
+        picker_ui,
+        footer_ui,
+        preview_ui,
+        overlay_ui: overlay_ui_ref,
+        click,
+        mouse_hover,
+        ..
+    } = cx;
 
     let (nav_color, input_focus_info, results_focus_info) = focus_infos(state, ui, picker_ui);
 
