@@ -85,7 +85,6 @@ pub(crate) fn cmd_list(args: &[String]) -> Option<i32> {
         .map(|a| a.to_lowercase())
         .collect();
 
-    let full_query = keywords.join(" ");
     let store = waymaker::frecency::FrecencyStore::open();
     if !pins_only
         && dirs_only
@@ -93,84 +92,77 @@ pub(crate) fn cmd_list(args: &[String]) -> Option<i32> {
     {
         let _ = store.add(&cwd.to_string_lossy());
     }
-    let pinned_paths = store.list_pins();
-    let pins_set: std::collections::HashSet<String> = pinned_paths.iter().cloned().collect();
+    let pins = store.list_pins();
+    let scores = if pins_only {
+        Vec::new()
+    } else {
+        store.get_snapshot().scores.into_iter().collect()
+    };
+    let is_dir = |path: &str| std::path::Path::new(path).is_dir();
+    for path in ranked_list(&pins, scores, &keywords, pins_only, dirs_only, is_dir) {
+        println!("{path}");
+    }
+    Some(0)
+}
+
+/// What `wm list` prints, in order. Every lower-case `keyword` must appear in a path, and
+/// `dirs_only` keeps directories. With `pins_only`, the matching pins in their stored order.
+/// Otherwise the matching pins, then the other matching frecency entries; within each, paths
+/// ending in the query come first, then (frecency entries only) higher scores, then shallower
+/// paths. The shell's `j <query>` jumps to the first line.
+pub(crate) fn ranked_list(
+    pins: &[String],
+    scores: Vec<(String, u32)>,
+    keywords: &[String],
+    pins_only: bool,
+    dirs_only: bool,
+    is_dir: impl Fn(&str) -> bool,
+) -> Vec<String> {
+    let full_query = keywords.join(" ");
+    let matches = |path: &str| {
+        let lower_path = path.to_lowercase();
+        keywords.iter().all(|kw| lower_path.contains(kw))
+    };
+    let ends_with_query = |path: &str| {
+        let lower_path = path.to_lowercase();
+        !full_query.is_empty()
+            && (lower_path.ends_with(&full_query)
+                || keywords.last().is_some_and(|lk| lower_path.ends_with(lk)))
+    };
+    let depth = |path: &str| std::path::Path::new(path).components().count();
+    let keep = |path: &str| (!dirs_only || is_dir(path)) && matches(path);
 
     if pins_only {
-        for path in pinned_paths {
-            let path_obj = std::path::Path::new(&path);
-            if dirs_only && !path_obj.is_dir() {
-                continue;
-            }
-            let lower_path = path.to_lowercase();
-            let matches_all = keywords.iter().all(|kw| lower_path.contains(kw));
-            if matches_all {
-                println!("{path}");
-            }
-        }
-        return Some(0);
+        return pins.iter().filter(|p| keep(p)).cloned().collect();
     }
 
-    let mut pinned_matches: Vec<(String, usize, bool)> = Vec::new();
-    for path in &pinned_paths {
-        let path_obj = std::path::Path::new(path);
-        if dirs_only && !path_obj.is_dir() {
-            continue;
-        }
-        let lower_path = path.to_lowercase();
-        let matches_all = keywords.iter().all(|kw| lower_path.contains(kw));
-        if matches_all {
-            let ends_with_query = !full_query.is_empty()
-                && (lower_path.ends_with(&full_query)
-                    || keywords.last().is_some_and(|lk| lower_path.ends_with(lk)));
-            let path_depth = path_obj.components().count();
-            pinned_matches.push((path.clone(), path_depth, ends_with_query));
-        }
-    }
+    let mut pinned: Vec<(&String, usize, bool)> = pins
+        .iter()
+        .filter(|p| keep(p))
+        .map(|p| (p, depth(p), ends_with_query(p)))
+        .collect();
+    pinned.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.cmp(&b.1)));
 
-    pinned_matches.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.cmp(&b.1)));
-
-    let snapshot = store.get_snapshot();
-    let mut matches: Vec<(String, u32, usize, bool)> = Vec::new();
-
-    for (path, score) in snapshot.scores {
-        if pins_set.contains(&path) {
-            continue;
-        }
-        let path_obj = std::path::Path::new(&path);
-        if dirs_only && !path_obj.is_dir() {
-            continue;
-        }
-
-        let lower_path = path.to_lowercase();
-        let matches_all = keywords.iter().all(|kw| lower_path.contains(kw));
-        if matches_all {
-            let ends_with_query = !full_query.is_empty()
-                && (lower_path.ends_with(&full_query)
-                    || keywords.last().is_some_and(|lk| lower_path.ends_with(lk)));
-            let path_depth = path_obj.components().count();
-            matches.push((path, score, path_depth, ends_with_query));
-        }
-    }
-
-    // Sort:
-    // 1. Exact/tail match bonus (ends_with_query = true first)
-    // 2. Frecency score descending
-    // 3. Shorter path depth
-    matches.sort_by(|a, b| {
+    let pins_set: std::collections::HashSet<&String> = pins.iter().collect();
+    let mut others: Vec<(String, u32, usize, bool)> = scores
+        .into_iter()
+        .filter(|(path, _)| !pins_set.contains(path) && keep(path))
+        .map(|(path, score)| {
+            let (d, tail) = (depth(&path), ends_with_query(&path));
+            (path, score, d, tail)
+        })
+        .collect();
+    others.sort_by(|a, b| {
         b.3.cmp(&a.3)
             .then_with(|| b.1.cmp(&a.1))
             .then_with(|| a.2.cmp(&b.2))
     });
 
-    // Output pins first (Tier 0), then frecency matches (Tier 1)
-    for (path, _, _) in pinned_matches {
-        println!("{path}");
-    }
-    for (path, _, _, _) in matches {
-        println!("{path}");
-    }
-    Some(0)
+    pinned
+        .into_iter()
+        .map(|(p, ..)| p.clone())
+        .chain(others.into_iter().map(|(p, ..)| p))
+        .collect()
 }
 
 /// `wm mermaid <file>`: renders a Mermaid diagram to the terminal.
@@ -370,4 +362,74 @@ pub(crate) async fn cmd_markdown(args: &[String]) -> Option<i32> {
         }
     }
     Some(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn list(pins: &[&str], scores: &[(&str, u32)], query: &[&str], dirs_only: bool) -> Vec<String> {
+        let pins: Vec<String> = pins.iter().map(|s| s.to_string()).collect();
+        let scores = scores.iter().map(|(p, s)| (p.to_string(), *s)).collect();
+        let keywords: Vec<String> = query.iter().map(|s| s.to_lowercase()).collect();
+        // Paths without a '.' stand for directories here.
+        ranked_list(&pins, scores, &keywords, false, dirs_only, |p| {
+            !p.contains('.')
+        })
+    }
+
+    #[test]
+    fn pins_come_first_then_frecency_by_tail_match_score_and_depth() {
+        let got = list(
+            &["/pinned/deep/web", "/pin/web"],
+            &[
+                ("/a/web-old", 90),
+                ("/b/c/web", 10),
+                ("/web", 10),
+                ("/x/website", 50),
+            ],
+            &["web"],
+            false,
+        );
+        assert_eq!(
+            got,
+            [
+                "/pin/web", // pins: both end in the query, shallower first
+                "/pinned/deep/web",
+                "/web", // tail matches: equal score, shallower first
+                "/b/c/web",
+                "/a/web-old", // no tail match: higher score first
+                "/x/website",
+            ]
+        );
+    }
+
+    #[test]
+    fn every_keyword_must_match_case_insensitively() {
+        let got = list(
+            &[],
+            &[("/Code/Waymaker", 1), ("/code/other", 9)],
+            &["CODE", "way"],
+            false,
+        );
+        assert_eq!(got, ["/Code/Waymaker"]);
+    }
+
+    #[test]
+    fn dirs_only_drops_files_and_a_pin_is_not_listed_twice() {
+        let got = list(&["/p/dir"], &[("/p/dir", 5), ("/p/file.txt", 9)], &[], true);
+        assert_eq!(got, ["/p/dir"]);
+    }
+
+    #[test]
+    fn pins_only_keeps_the_stored_order() {
+        let pins: Vec<String> = ["/z/b", "/a", "/m/file.txt"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let got = ranked_list(&pins, vec![("/other".into(), 1)], &[], true, true, |p| {
+            !p.contains('.')
+        });
+        assert_eq!(got, ["/z/b", "/a"]);
+    }
 }
