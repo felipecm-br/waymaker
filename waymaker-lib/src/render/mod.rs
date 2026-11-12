@@ -516,7 +516,9 @@ pub(crate) async fn render_loop<'a, W: Write, T: SSS, S: Selection, A: ActionExt
             }
         }
 
-        if ui.config.nav.active {
+        // The phase is only drawn when the indicator blinks; toggling it otherwise redrew an
+        // unchanged frame every `blink_rate` ticks (about every 2 s) while idle.
+        if ui.config.nav.active && ui.config.nav.blink {
             let blink_ticks = ui.config.nav.blink_rate.ticks();
             let prev_blink = state.focus_blink;
             state.focus_tick = state.focus_tick.wrapping_add(1);

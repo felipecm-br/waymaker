@@ -507,7 +507,9 @@ fn markdown_preview_goes_idle() {
     let wm = Launch::new("notes.txt\nREADME.md\n").files(files).start();
     wm.send(DOWN); // waits until the screen has been quiet for 300 ms, or panics after 10 s
     let before = wm.screen_text().len();
-    thread::sleep(Duration::from_secs(1));
+    // Longer than the nav blink period (30 ticks, ~2 s), whose toggle used to redraw an
+    // unchanged frame even with blinking off; a 1 s window caught that only half the time.
+    thread::sleep(Duration::from_millis(2500));
     assert_eq!(
         wm.screen_text().len(),
         before,
