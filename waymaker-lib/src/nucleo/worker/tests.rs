@@ -1154,3 +1154,24 @@ fn test_width_of_a_line_wider_than_u16_saturates() {
     assert_eq!(results.len(), 4);
     assert_eq!(medians[0], crate::utils::MAX_CELLS, "medians: {medians:?}");
 }
+
+/// `all_items` ignores the query: leaving a directory caches its listing from it, and the query
+/// is cleared on the way back, so caching only the matches hid the rest of the directory.
+#[test]
+fn test_all_items_includes_unmatched_items() {
+    let mut worker = Worker::<String>::new_single_column();
+    let injector = worker.nucleo.injector();
+    for item in ["alpha", "beta", "gamma"] {
+        injector.push(item.to_string(), |val, cols| {
+            cols[0] = val.clone().into();
+        });
+    }
+    worker.find("alpha");
+    while worker.nucleo.tick(10).running || worker.nucleo.snapshot().item_count() < 3 {}
+
+    assert_eq!(worker.raw_results().collect::<Vec<_>>(), ["alpha"]);
+    assert_eq!(
+        worker.all_items().collect::<Vec<_>>(),
+        ["alpha", "beta", "gamma"]
+    );
+}

@@ -416,6 +416,12 @@ impl<T: SSS> Worker<T> {
         snapshot.matched_items(..).map(|item| item.data)
     }
 
+    /// Every item, matched or not, in the order it was pushed.
+    pub fn all_items(&self) -> impl Iterator<Item = &T> + '_ {
+        let snapshot = self.nucleo.snapshot();
+        (0..snapshot.item_count()).filter_map(|i| snapshot.get_item(i).map(|item| item.data))
+    }
+
     /// matched item count, total item count
     pub fn counts(&self) -> (u32, u32) {
         #[cfg(feature = "frizbee")]

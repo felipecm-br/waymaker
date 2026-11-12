@@ -80,11 +80,12 @@ pub(super) fn chdir_handler(
         {
             history.insert(cwd.clone(), state.picker_ui.query.input.clone());
 
-            // Save old_cwd items in speculative cache so returning to parent is instant
+            // Save old_cwd items in speculative cache so returning to parent is instant. All of
+            // them, not only the ones the query matched: the query is cleared on the way back.
             let items: Vec<String> = state
                 .picker_ui
                 .worker
-                .raw_results()
+                .all_items()
                 .map(|item| state.picker_ui.worker.columns[0].raw(item).into_owned())
                 .collect();
             if state.picker_ui.results.mode_index == 0
