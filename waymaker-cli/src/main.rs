@@ -15,6 +15,8 @@ use subcommands::*;
 mod register;
 pub mod session;
 mod start;
+#[cfg(test)]
+mod test_support;
 mod utils;
 pub mod watch;
 
@@ -40,6 +42,9 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 fn main() {
+    // Restore the default SIGPIPE action so `wm -f .. | head` exits quietly
+    // instead of panicking on a closed stdout, as other Unix filters do.
+    // SAFETY: SIG_DFL installs no Rust handler, and no other thread exists yet.
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL)

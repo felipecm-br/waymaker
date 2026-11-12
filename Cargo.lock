@@ -3817,6 +3817,7 @@ dependencies = [
  "proptest",
  "ratatui",
  "regex",
+ "rustix 1.1.4",
  "serde",
  "serde_ignored",
  "strum",

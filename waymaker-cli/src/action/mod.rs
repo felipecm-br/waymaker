@@ -946,6 +946,7 @@ mod tests {
 
     #[test]
     fn test_fm_toggle_pin() {
+        crate::test_support::isolate_frecency();
         let _global_guard = GLOBAL_STATE_TEST_LOCK.blocking_lock();
         use std::sync::{Arc, Mutex};
         use waymaker::Selector;
@@ -1009,13 +1010,6 @@ mod tests {
             &controller_tx,
         );
 
-        let db_file =
-            std::env::temp_dir().join(format!("test_frecency_{}.redb", std::process::id()));
-        let _ = std::fs::remove_file(&db_file);
-        unsafe {
-            std::env::set_var("WM_FRECENCY_DB", db_file.to_str().unwrap());
-            std::env::set_var("MM_FRECENCY_DB", db_file.to_str().unwrap());
-        }
         let cwd = std::env::current_dir()
             .unwrap()
             .to_string_lossy()
@@ -1032,16 +1026,11 @@ mod tests {
         action_handler(MMAction::FmTogglePin, &mut mm_state, &mut action_context);
         let after_2nd = store.is_pinned(&cwd);
         assert_eq!(after_2nd, initial_state);
-
-        unsafe {
-            std::env::remove_var("WM_FRECENCY_DB");
-            std::env::remove_var("MM_FRECENCY_DB");
-        }
-        let _ = std::fs::remove_file(&db_file);
     }
 
     #[tokio::test]
     async fn test_fm_paste_into_and_flash() {
+        crate::test_support::isolate_frecency();
         let _global_guard = GLOBAL_STATE_TEST_LOCK.lock().await;
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
@@ -1221,6 +1210,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_batch_paste_and_undo_clipboard_restoration() {
+        crate::test_support::isolate_frecency();
         let _global_guard = GLOBAL_STATE_TEST_LOCK.lock().await;
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
@@ -1363,6 +1353,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_paste_into_chdir_and_undo_return_and_redo() {
+        crate::test_support::isolate_frecency();
         let _global_guard = GLOBAL_STATE_TEST_LOCK.lock().await;
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
@@ -1585,6 +1576,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fm_paste_into_cut_and_undo_return_and_redo() {
+        crate::test_support::isolate_frecency();
         let _global_guard = GLOBAL_STATE_TEST_LOCK.lock().await;
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;

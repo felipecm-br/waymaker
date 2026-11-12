@@ -1468,6 +1468,7 @@ mod tests {
         std::fs::write(&file_path, "graph TD\n    A[Client] --> B[Server]").unwrap();
 
         let _env_lock = crate::utils::lock_test_env_async().await;
+        // SAFETY: `_env_lock` serializes env mutation across this crate's tests.
         unsafe {
             std::env::set_var("WM_INLINE_DIAGRAMS", "1");
             std::env::set_var("MM_INLINE_DIAGRAMS", "1");
@@ -1501,6 +1502,7 @@ mod tests {
 
         handle.abort();
         let _ = std::fs::remove_file(&file_path);
+        // SAFETY: `_env_lock` is still held.
         unsafe {
             std::env::remove_var("WM_INLINE_DIAGRAMS");
             std::env::remove_var("MM_INLINE_DIAGRAMS");

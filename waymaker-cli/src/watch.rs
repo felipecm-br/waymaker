@@ -94,35 +94,40 @@ pub fn render_and_flush(
 
 #[cfg(target_os = "linux")]
 mod linux {
+    use rustix::fs::inotify::{self, CreateFlags, ReadFlags, WatchFlags};
+    use std::ffi::{OsStr, OsString};
+    use std::mem::MaybeUninit;
+    use std::os::fd::OwnedFd;
     use std::os::unix::ffi::OsStrExt;
-    use std::os::unix::io::{AsRawFd, RawFd};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
-    pub struct InotifyFd(pub RawFd);
+    const DIR_MASK: WatchFlags = WatchFlags::CLOSE_WRITE
+        .union(WatchFlags::MOVED_TO)
+        .union(WatchFlags::MOVED_FROM)
+        .union(WatchFlags::MODIFY)
+        .union(WatchFlags::ATTRIB)
+        .union(WatchFlags::CREATE)
+        .union(WatchFlags::DELETE);
 
-    impl AsRawFd for InotifyFd {
-        fn as_raw_fd(&self) -> RawFd {
-            self.0
-        }
-    }
+    const FILE_MASK: WatchFlags = WatchFlags::CLOSE_WRITE
+        .union(WatchFlags::MODIFY)
+        .union(WatchFlags::ATTRIB)
+        .union(WatchFlags::MOVE_SELF)
+        .union(WatchFlags::DELETE_SELF);
 
-    impl Drop for InotifyFd {
-        fn drop(&mut self) {
-            if self.0 >= 0 {
-                unsafe { libc::close(self.0) };
-            }
-        }
-    }
+    /// The watched file's own watch ends when it is deleted, moved or replaced.
+    const FILE_GONE: ReadFlags = ReadFlags::IGNORED
+        .union(ReadFlags::DELETE_SELF)
+        .union(ReadFlags::MOVE_SELF);
 
     pub struct LinuxInotifyWatcher {
-        async_fd: tokio::io::unix::AsyncFd<InotifyFd>,
-        real_file_c_str: std::ffi::CString,
-        real_file_name: std::ffi::OsString,
-        symlink_file_name: Option<std::ffi::OsString>,
-        file_wd: libc::c_int,
-        dir_wd: libc::c_int,
-        symlink_dir_wd: libc::c_int,
-        file_mask: u32,
+        async_fd: tokio::io::unix::AsyncFd<OwnedFd>,
+        real_path: PathBuf,
+        real_file_name: OsString,
+        symlink_file_name: Option<OsString>,
+        file_wd: Option<i32>,
+        dir_wd: i32,
+        symlink_dir_wd: Option<i32>,
     }
 
     impl LinuxInotifyWatcher {
@@ -144,190 +149,87 @@ mod linux {
                 anyhow::anyhow!("Path has no parent directory: {}", real_path.display())
             })?;
 
-            let real_file_c_str = std::ffi::CString::new(real_path.as_os_str().as_bytes())?;
-            let real_parent_c_str = std::ffi::CString::new(real_parent_dir.as_os_str().as_bytes())?;
+            let fd = inotify::init(CreateFlags::CLOEXEC | CreateFlags::NONBLOCK)
+                .map_err(|e| anyhow::anyhow!("Failed to initialize inotify: {e}"))?;
 
-            let fd = unsafe { libc::inotify_init1(libc::IN_CLOEXEC | libc::IN_NONBLOCK) };
-            if fd < 0 {
-                return Err(anyhow::anyhow!(
-                    "Failed to initialize inotify: {}",
-                    std::io::Error::last_os_error()
-                ));
-            }
+            let dir_wd = inotify::add_watch(&fd, real_parent_dir, DIR_MASK).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to add inotify watch on parent directory '{}': {e}",
+                    real_parent_dir.display()
+                )
+            })?;
 
-            let dir_mask = libc::IN_CLOSE_WRITE
-                | libc::IN_MOVED_TO
-                | libc::IN_MOVED_FROM
-                | libc::IN_MODIFY
-                | libc::IN_ATTRIB
-                | libc::IN_CREATE
-                | libc::IN_DELETE;
-
-            let file_mask = libc::IN_CLOSE_WRITE
-                | libc::IN_MODIFY
-                | libc::IN_ATTRIB
-                | libc::IN_MOVE_SELF
-                | libc::IN_DELETE_SELF;
-
-            let dir_wd =
-                unsafe { libc::inotify_add_watch(fd, real_parent_c_str.as_ptr(), dir_mask) };
-            if dir_wd < 0 {
-                unsafe { libc::close(fd) };
-                return Err(anyhow::anyhow!(
-                    "Failed to add inotify watch on parent directory '{}': {}",
-                    real_parent_dir.display(),
-                    std::io::Error::last_os_error()
-                ));
-            }
-
-            let file_wd =
-                unsafe { libc::inotify_add_watch(fd, real_file_c_str.as_ptr(), file_mask) };
+            // The file may not exist yet; the parent watch reports its creation.
+            let file_wd = inotify::add_watch(&fd, &real_path, FILE_MASK).ok();
 
             let (symlink_dir_wd, symlink_file_name) = if abs_path != real_path {
-                if let (Some(sym_parent), Some(sym_name)) =
-                    (abs_path.parent(), abs_path.file_name())
-                {
-                    if sym_parent != real_parent_dir {
-                        if let Ok(sym_parent_c_str) =
-                            std::ffi::CString::new(sym_parent.as_os_str().as_bytes())
-                        {
-                            let swd = unsafe {
-                                libc::inotify_add_watch(fd, sym_parent_c_str.as_ptr(), dir_mask)
-                            };
-                            (swd, Some(sym_name.to_os_string()))
-                        } else {
-                            (-1, None)
-                        }
-                    } else {
-                        (-1, Some(sym_name.to_os_string()))
-                    }
-                } else {
-                    (-1, None)
+                match (abs_path.parent(), abs_path.file_name()) {
+                    (Some(sym_parent), Some(sym_name)) if sym_parent != real_parent_dir => (
+                        inotify::add_watch(&fd, sym_parent, DIR_MASK).ok(),
+                        Some(sym_name.to_os_string()),
+                    ),
+                    (Some(_), Some(sym_name)) => (None, Some(sym_name.to_os_string())),
+                    _ => (None, None),
                 }
             } else {
-                (-1, None)
+                (None, None)
             };
 
-            // SAFETY: `fd` is the open inotify descriptor created above. It is
-            // owned by the InotifyFd moved into the AsyncFd and only closed when
-            // that is dropped, so it stays valid for the AsyncFd's lifetime.
-            let async_fd = unsafe { tokio::io::unix::AsyncFd::register(InotifyFd(fd)) }?;
+            // SAFETY: `fd` is an `OwnedFd` moved into the AsyncFd: it is open,
+            // nothing else can close it, and `as_raw_fd` always returns the
+            // same descriptor until the AsyncFd drops it.
+            let async_fd = unsafe { tokio::io::unix::AsyncFd::register(fd) }?;
 
             Ok(Self {
                 async_fd,
-                real_file_c_str,
+                real_path,
                 real_file_name,
                 symlink_file_name,
                 file_wd,
                 dir_wd,
                 symlink_dir_wd,
-                file_mask,
             })
         }
 
-        fn fd(&self) -> RawFd {
-            self.async_fd.get_ref().0
-        }
-
+        /// Reads every queued event and reports whether one concerns the
+        /// watched file. Stops when the queue is empty (`EAGAIN`) or on error.
         pub fn drain_events(&mut self) -> bool {
             let mut target_changed = false;
-            let mut buf = [0u8; 4096];
+            let mut file_gone = false;
+            let mut buf = [MaybeUninit::<u8>::uninit(); 4096];
+            let mut reader = inotify::Reader::new(self.async_fd.get_ref(), &mut buf);
 
-            loop {
-                // SAFETY: writes at most `buf.len()` bytes into `buf`.
-                let n = unsafe {
-                    libc::read(self.fd(), buf.as_mut_ptr() as *mut libc::c_void, buf.len())
-                };
-
-                if n < 0 {
-                    let err = std::io::Error::last_os_error();
-                    if err.raw_os_error() == Some(libc::EAGAIN)
-                        || err.raw_os_error() == Some(libc::EWOULDBLOCK)
-                    {
-                        break;
-                    }
-                    break;
-                }
-                if n == 0 {
-                    break;
-                }
-
-                let mut offset = 0;
-                let total = n as usize;
-                while offset + std::mem::size_of::<libc::inotify_event>() <= total {
-                    // SAFETY: the loop condition keeps a whole header inside the
-                    // `total` bytes read; `read_unaligned` needs no alignment.
-                    let event: libc::inotify_event = unsafe {
-                        std::ptr::read_unaligned(
-                            buf[offset..].as_ptr() as *const libc::inotify_event
-                        )
-                    };
-                    let event_len = event.len as usize;
-                    let next_offset =
-                        offset + std::mem::size_of::<libc::inotify_event>() + event_len;
-                    if next_offset > total {
-                        break;
-                    }
-
-                    if (event.mask & libc::IN_Q_OVERFLOW) != 0 {
-                        target_changed = true;
-                    } else if self.file_wd >= 0 && event.wd == self.file_wd {
-                        target_changed = true;
-                        if (event.mask
-                            & (libc::IN_IGNORED | libc::IN_DELETE_SELF | libc::IN_MOVE_SELF))
-                            != 0
-                        {
-                            self.file_wd = -1;
-                        }
-                    } else if event.wd == self.dir_wd && event_len > 0 {
-                        let name_start = offset + std::mem::size_of::<libc::inotify_event>();
-                        let name_bytes = &buf[name_start..name_start + event_len];
-                        let nul_pos = name_bytes
-                            .iter()
-                            .position(|&b| b == 0)
-                            .unwrap_or(name_bytes.len());
-                        let event_name = std::ffi::OsStr::from_bytes(&name_bytes[..nul_pos]);
-                        if event_name == self.real_file_name {
-                            target_changed = true;
-                        }
-                    } else if self.symlink_dir_wd >= 0
-                        && event.wd == self.symlink_dir_wd
-                        && event_len > 0
-                    {
-                        let name_start = offset + std::mem::size_of::<libc::inotify_event>();
-                        let name_bytes = &buf[name_start..name_start + event_len];
-                        let nul_pos = name_bytes
-                            .iter()
-                            .position(|&b| b == 0)
-                            .unwrap_or(name_bytes.len());
-                        let event_name = std::ffi::OsStr::from_bytes(&name_bytes[..nul_pos]);
-                        if Some(event_name) == self.symlink_file_name.as_deref() {
-                            target_changed = true;
-                        }
-                    }
-
-                    offset = next_offset;
+            while let Ok(event) = reader.next() {
+                let flags = event.events();
+                let name = event.file_name().map(|n| OsStr::from_bytes(n.to_bytes()));
+                if flags.contains(ReadFlags::QUEUE_OVERFLOW) {
+                    target_changed = true;
+                } else if self.file_wd == Some(event.wd()) {
+                    target_changed = true;
+                    file_gone |= flags.intersects(FILE_GONE);
+                } else if event.wd() == self.dir_wd {
+                    target_changed |= name == Some(self.real_file_name.as_os_str());
+                } else if self.symlink_dir_wd == Some(event.wd()) {
+                    target_changed |= name.is_some() && name == self.symlink_file_name.as_deref();
                 }
             }
 
+            if file_gone {
+                self.file_wd = None;
+            }
             target_changed
         }
 
+        /// Re-adds the file watch after an atomic save replaced the inode.
         pub fn refresh_file_watch(&mut self) {
-            let new_wd = unsafe {
-                libc::inotify_add_watch(self.fd(), self.real_file_c_str.as_ptr(), self.file_mask)
-            };
-            if new_wd >= 0 {
-                if self.file_wd >= 0 && self.file_wd != new_wd {
-                    unsafe { libc::inotify_rm_watch(self.fd(), self.file_wd) };
-                }
-                self.file_wd = new_wd;
-            } else {
-                if self.file_wd >= 0 {
-                    unsafe { libc::inotify_rm_watch(self.fd(), self.file_wd) };
-                }
-                self.file_wd = -1;
+            let fd = self.async_fd.get_ref();
+            let new_wd = inotify::add_watch(fd, &self.real_path, FILE_MASK).ok();
+            if let Some(old_wd) = self.file_wd
+                && new_wd != Some(old_wd)
+            {
+                let _ = inotify::remove_watch(fd, old_wd);
             }
+            self.file_wd = new_wd;
         }
 
         pub async fn wait_for_change(&mut self) -> anyhow::Result<()> {
