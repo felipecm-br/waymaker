@@ -247,10 +247,8 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
         &self,
         (group, item): Self::InputItem,
     ) -> Result<<Self::Inner as Injector>::InputItem, WorkerError> {
-        let ranges = if self.single_column
-            && let Some(len) = item.byte_len()
-        {
-            ColumnRanges::single(0, len as u32)
+        let ranges = if self.single_column && item.byte_len().is_some() {
+            ColumnRanges::Whole
         } else {
             (self.splitter)(&item)
         };
@@ -269,7 +267,7 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
             let splitter = &self.splitter;
             let wrapped = items.map(|(group, item)| {
                 let ranges = match item.byte_len() {
-                    Some(len) => ColumnRanges::single(0, len as u32),
+                    Some(_) => ColumnRanges::Whole,
                     None => (splitter)(&item),
                 };
                 Segmented::new(item, ranges, group)

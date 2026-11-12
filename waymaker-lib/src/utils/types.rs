@@ -14,12 +14,24 @@ define_either! {
     }
 }
 
+/// `text.to_string().len()`, without building the string: lines are joined by `\n`, and a
+/// span is shown without the line breaks in its content (see ratatui's `Display` impls).
+pub fn text_byte_len(text: &Text<'_>) -> usize {
+    let spans: usize = text
+        .lines
+        .iter()
+        .flat_map(|line| &line.spans)
+        .map(|span| span.content.lines().map(str::len).sum::<usize>())
+        .sum();
+    spans + text.lines.len().saturating_sub(1)
+}
+
 impl Either<SharedStr, Box<Text<'static>>> {
     #[inline]
     pub fn byte_len(&self) -> usize {
         match self {
             Either::Left(s) => s.len(),
-            Either::Right(t) => t.to_string().len(),
+            Either::Right(t) => text_byte_len(t),
         }
     }
 
@@ -48,6 +60,27 @@ impl Either<SharedStr, Box<Text<'static>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_text_byte_len_matches_to_string() {
+        use ratatui::text::{Line, Span};
+        let texts = [
+            Text::default(),
+            Text::from(""),
+            Text::from("plain"),
+            Text::from("two\nlines"),
+            Text::from(vec![Line::from(""), Line::from("")]),
+            Text::from(Line::from(vec![Span::raw("a\nb"), Span::raw("c\r\nd\n")])),
+            Text::from(vec![
+                Line::from(vec![Span::raw("ü"), Span::raw("→x")]),
+                Line::default(),
+                Line::from(Span::raw("\n")),
+            ]),
+        ];
+        for text in texts {
+            assert_eq!(text_byte_len(&text), text.to_string().len(), "{text:?}");
+        }
+    }
 
     #[test]
     fn test_either_left_and_right() {

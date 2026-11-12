@@ -44,28 +44,38 @@ impl SegmentableItem for String {
     fn slice_str(&self, range: Range<usize>) -> Cow<'_, str> {
         (&self[range]).into()
     }
+    #[inline]
+    fn byte_len(&self) -> Option<usize> {
+        Some(self.len())
+    }
 }
 
-/// The byte range of each column of an item. One range (a plain line) is stored inline, so
-/// the type is 16 bytes, two words: every item carries one, and at millions of items each word
-/// matters. Two or more ranges are boxed.
-#[derive(Debug, Clone)]
+/// The byte range of each column of an item.
+///
+/// Every item carries one, so at millions of items each word matters: this is one pointer
+/// (8 bytes). An item that is one column spanning its whole text, the common case, stores
+/// nothing ([`ColumnRanges::Whole`]); [`Segmented`] works out that range from the item's
+/// length. Any other ranges are boxed.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ColumnRanges {
-    Single((u32, u32)),
-    Multi(Box<[(u32, u32)]>),
+    /// One column, the item's whole text. Only for items whose
+    /// [`SegmentableItem::byte_len`] is known; otherwise the column reads as empty.
+    Whole,
+    /// Explicit ranges, behind a thin pointer so the type stays one word.
+    Listed(Box<Box<[(u32, u32)]>>),
 }
 
-const _: () = assert!(std::mem::size_of::<ColumnRanges>() == 16);
+const _: () = assert!(std::mem::size_of::<ColumnRanges>() == 8);
 
 impl ColumnRanges {
     #[inline]
     pub fn single(start: u32, end: u32) -> Self {
-        Self::Single((start, end))
+        Self::from(&[(start, end)][..])
     }
 
     #[inline]
     pub fn pair(first: (u32, u32), second: (u32, u32)) -> Self {
-        Self::Multi(Box::new([first, second]))
+        Self::from(&[first, second][..])
     }
 
     #[inline]
@@ -77,49 +87,33 @@ impl ColumnRanges {
     pub fn multi(ranges: Box<[(u32, u32)]>) -> Self {
         Self::from(ranges)
     }
-}
 
-impl std::ops::Deref for ColumnRanges {
-    type Target = [(u32, u32)];
-
+    /// The ranges, given the byte length of the whole item (`None` if unknown).
     #[inline]
-    fn deref(&self) -> &Self::Target {
+    pub fn resolve(&self, whole_len: Option<usize>) -> std::borrow::Cow<'_, [(u32, u32)]> {
         match self {
-            Self::Single(r) => std::slice::from_ref(r),
-            Self::Multi(b) => b,
+            Self::Whole => match whole_len {
+                Some(len) => std::borrow::Cow::Owned(vec![(0, len as u32)]),
+                None => std::borrow::Cow::Borrowed(&[]),
+            },
+            Self::Listed(ranges) => std::borrow::Cow::Borrowed(ranges),
         }
     }
-}
 
-impl AsRef<[(u32, u32)]> for ColumnRanges {
+    /// Column `i`, given the byte length of the whole item (`None` if unknown).
     #[inline]
-    fn as_ref(&self) -> &[(u32, u32)] {
-        self
-    }
-}
-
-// Equality and hashing go by the ranges, whichever way they are stored.
-impl PartialEq for ColumnRanges {
-    fn eq(&self, other: &Self) -> bool {
-        **self == **other
-    }
-}
-
-impl Eq for ColumnRanges {}
-
-impl std::hash::Hash for ColumnRanges {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        (**self).hash(state)
+    pub fn get(&self, i: usize, whole_len: Option<usize>) -> Option<(u32, u32)> {
+        match self {
+            Self::Whole => whole_len.filter(|_| i == 0).map(|len| (0, len as u32)),
+            Self::Listed(ranges) => ranges.get(i).copied(),
+        }
     }
 }
 
 impl From<&[(u32, u32)]> for ColumnRanges {
     #[inline]
     fn from(ranges: &[(u32, u32)]) -> Self {
-        match ranges {
-            [r] => Self::Single(*r),
-            _ => Self::Multi(ranges.into()),
-        }
+        Self::Listed(Box::new(ranges.into()))
     }
 }
 
@@ -133,10 +127,7 @@ impl From<arrayvec::ArrayVec<(u32, u32), 2>> for ColumnRanges {
 impl From<Box<[(u32, u32)]>> for ColumnRanges {
     #[inline]
     fn from(b: Box<[(u32, u32)]>) -> Self {
-        match *b {
-            [r] => Self::Single(r),
-            _ => Self::Multi(b),
-        }
+        Self::Listed(Box::new(b))
     }
 }
 
@@ -202,7 +193,7 @@ pub struct Segmented<T> {
 
 impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
     fn get_str(&self, i: usize) -> std::borrow::Cow<'_, str> {
-        if let Some(&(start, end)) = self.ranges.get(i) {
+        if let Some((start, end)) = self.range(i) {
             self.inner.slice_str(start as usize..end as usize)
         } else {
             "".into()
@@ -210,7 +201,7 @@ impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
     }
 
     fn get_text(&self, i: usize) -> Text<'_> {
-        if let Some(&(start, end)) = self.ranges.get(i) {
+        if let Some((start, end)) = self.range(i) {
             self.inner.slice(start as usize..end as usize)
         } else {
             Text::default()
@@ -220,10 +211,10 @@ impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
     #[inline]
     fn get_shared(&self, i: usize) -> Option<SharedStr> {
         let text = self.inner.shared()?;
-        match self.ranges.get(i) {
-            Some(&(0, end)) if end as usize == text.len() => Some(text.clone()),
+        match self.range(i) {
+            Some((0, end)) if end as usize == text.len() => Some(text.clone()),
             // A column is a slice of the same chunk, so it is shared too.
-            Some(&(start, end)) => {
+            Some((start, end)) => {
                 let range = start as usize..end as usize;
                 text.get(range.clone()).is_some().then(|| text.slice(range))
             }
@@ -254,9 +245,16 @@ impl<T: SegmentableItem> Segmented<T> {
         }
     }
 
+    /// Byte range of column `i`.
+    #[inline]
+    pub fn range(&self, i: usize) -> Option<(u32, u32)> {
+        self.ranges.get(i, self.inner.byte_len())
+    }
+
     pub fn len(&self) -> usize {
         // Find the last range that is nonempty (start != end)
         self.ranges
+            .resolve(self.inner.byte_len())
             .iter()
             .rposition(|&(start, end)| start != end)
             .map_or(0, |idx| idx + 1)
@@ -271,6 +269,7 @@ impl<T: SegmentableItem> Segmented<T> {
         F: Fn(&T, usize, usize) -> U,
     {
         self.ranges
+            .resolve(self.inner.byte_len())
             .iter()
             .take(self.len()) // only map the "active" ranges
             .map(|&(start, end)| f(&self.inner, start as usize, end as usize))
@@ -372,46 +371,78 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_column_ranges_single() {
+    fn test_column_ranges_listed() {
+        let none = None;
         let cr = ColumnRanges::single(0, 10);
-        assert_eq!(cr.len(), 1);
-        assert_eq!(cr[0], (0, 10));
-        assert!(matches!(cr, ColumnRanges::Single(_)));
-        assert_eq!(cr.as_ref(), &[(0, 10)]);
-    }
+        assert_eq!(cr.resolve(none).as_ref(), &[(0, 10)]);
+        assert_eq!(cr.get(0, none), Some((0, 10)));
+        assert_eq!(cr.get(1, none), None);
 
-    #[test]
-    fn test_column_ranges_pair() {
         let cr = ColumnRanges::pair((0, 5), (6, 12));
-        assert_eq!(cr.len(), 2);
-        assert_eq!(cr[0], (0, 5));
-        assert_eq!(cr[1], (6, 12));
-        assert!(matches!(cr, ColumnRanges::Multi(_)));
+        assert_eq!(cr.resolve(none).as_ref(), &[(0, 5), (6, 12)]);
+        assert_eq!(cr.get(1, none), Some((6, 12)));
+
+        let cr = ColumnRanges::from(vec![(0, 2), (3, 5), (6, 9)]);
+        assert_eq!(cr.resolve(none).as_ref(), &[(0, 2), (3, 5), (6, 9)]);
     }
 
     #[test]
     fn test_column_ranges_equal_by_content() {
-        // One range is always stored inline, however it is built, so equal ranges compare equal.
-        let from_vec = ColumnRanges::from(vec![(0, 10)]);
-        assert!(matches!(from_vec, ColumnRanges::Single(_)));
-        assert_eq!(from_vec, ColumnRanges::single(0, 10));
         assert_eq!(
-            ColumnRanges::Multi(Box::new([(0, 10)])),
+            ColumnRanges::from(vec![(0, 10)]),
+            ColumnRanges::single(0, 10)
+        );
+        assert_eq!(
+            ColumnRanges::multi(Box::new([(0, 10)])),
             ColumnRanges::single(0, 10)
         );
         assert_ne!(ColumnRanges::single(0, 10), ColumnRanges::single(0, 9));
-        let empty = ColumnRanges::from(Vec::new());
-        assert!(empty.is_empty());
+        assert!(ColumnRanges::from(Vec::new()).resolve(None).is_empty());
     }
 
     #[test]
-    fn test_column_ranges_multi_fallback() {
-        let cr = ColumnRanges::from(vec![(0, 2), (3, 5), (6, 9)]);
-        assert_eq!(cr.len(), 3);
-        assert!(matches!(cr, ColumnRanges::Multi(_)));
-        assert_eq!(cr[0], (0, 2));
-        assert_eq!(cr[1], (3, 5));
-        assert_eq!(cr[2], (6, 9));
+    fn test_column_ranges_whole() {
+        let cr = ColumnRanges::Whole;
+        assert_eq!(cr.resolve(Some(7)).as_ref(), &[(0, 7)]);
+        assert_eq!(cr.get(0, Some(7)), Some((0, 7)));
+        assert_eq!(cr.get(1, Some(7)), None);
+        // Without a known length there is no column to show.
+        assert!(cr.resolve(None).is_empty());
+        assert_eq!(cr.get(0, None), None);
+    }
+
+    /// The point of [`ColumnRanges::Whole`]: an item of the default picker is 40 bytes.
+    #[test]
+    fn test_config_item_size() {
+        assert_eq!(std::mem::size_of::<crate::ConfigMMInnerItem>(), 32);
+        assert_eq!(std::mem::size_of::<crate::ConfigMMItem>(), 40);
+    }
+
+    #[test]
+    fn test_segmented_whole_reads_like_its_full_range() {
+        for text in ["hello world", ""] {
+            let whole = Segmented::new(text.to_string(), ColumnRanges::Whole, None);
+            let listed = Segmented::new(
+                text.to_string(),
+                ColumnRanges::single(0, text.len() as u32),
+                None,
+            );
+            assert_eq!(whole.get_str(0), listed.get_str(0));
+            assert_eq!(whole.get_str(1), listed.get_str(1));
+            assert_eq!(whole.get_text(0), listed.get_text(0));
+            assert_eq!(whole.len(), listed.len());
+            assert_eq!(whole.is_empty(), listed.is_empty());
+            let cols = |s: &Segmented<String>| s.map_to_vec(|t, a, b| t[a..b].to_string());
+            assert_eq!(cols(&whole), cols(&listed));
+        }
+        let shared = SharedStr::from("abc");
+        let whole = Segmented::new(
+            crate::nucleo::injector::Either::<SharedStr, Box<Text<'static>>>::Left(shared.clone()),
+            ColumnRanges::Whole,
+            None,
+        );
+        assert_eq!(whole.get_shared(0).as_deref(), Some("abc"));
+        assert_eq!(whole.get_shared(1), None);
     }
 
     #[test]

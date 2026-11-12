@@ -336,7 +336,7 @@ fn make_splitter(
                         }
 
                         ranges.push((last_end as u32, s.len() as u32));
-                        ColumnRanges::Multi(ranges.into_boxed_slice())
+                        ColumnRanges::from(ranges)
                     })
                 }
             }
@@ -358,7 +358,13 @@ fn make_splitter(
                 ColumnRanges::from(ranges)
             })
         }
-        Split::None => Arc::new(|s| ColumnRanges::single(0u32, s.byte_len() as u32)),
+        Split::None => Arc::new(|s| {
+            if crate::nucleo::SegmentableItem::byte_len(s).is_some() {
+                ColumnRanges::Whole
+            } else {
+                ColumnRanges::single(0u32, s.byte_len() as u32)
+            }
+        }),
     };
     (splitter, has_error)
 }
