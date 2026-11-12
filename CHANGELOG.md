@@ -22,6 +22,10 @@
 - Changing the query moves the cursor to the best match. It used to keep its row, so after moving down, typing and pressing `enter` could accept a worse match (with `apple`, `foobar`, `banana`: two `down`s, then `ba` and `enter` printed `foobar` instead of `banana`)
 - `matcher.raw` is removed: it was documented as unimplemented and did nothing; a config that sets it now gets an unknown-key warning. `matcher.reverse` was also documented as unimplemented but works (fzf's `--tac`); the docs say so now
 - `#[partial]` on a tuple or unit struct reports a compile error at the struct's fields instead of panicking inside the proc macro
+- A mouse click bound without modifiers (`none+left`, `none+right`) was saved as `left`/`right`, which read back as the arrow key. It now keeps `none+`. The bind docs said a bare `left` or `right` binds the mouse button; it binds the arrow key
+- An idle picker in navigation mode redrew its unchanged screen every 2 seconds: the cursor blink phase toggled even with `nav.blink = false`
+- Two threads opening the frecency database at the same moment could leave one with a read-only copy, so its pins and visits never reached the database
+- `wm --test-keys` without a terminal panicked (exit 134); it now says it needs a terminal and exits 1. `--download` on Windows and `WM_DEV=1` with an unwritable `dev.toml` also report the error instead of panicking
 
 ### 🔄 Changed
 

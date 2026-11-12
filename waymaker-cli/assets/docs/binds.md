@@ -27,6 +27,7 @@ Mouse events can be bound with modifiers:
 - **Buttons**: `left`, `middle`, `right`.
 - **Scrolling**: `scrollup`, `scrolldown`, `scrollleft`, `scrollright`.
 - **Modifiers**: `ctrl+left`, `alt+scrollup`, `shift+right`.
+- A bare `left` or `right` is the arrow key. Write `none+left` or `none+right` for a click without modifiers.
 
 **Example:**
 `alt+scrollup = "Up(5)"` (Bind Alt+ScrollUp to move the cursor up 5 lines)

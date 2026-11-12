@@ -477,7 +477,13 @@ impl Display for TriggerKind {
                 if event.modifiers.contains(KeyModifiers::META) {
                     write!(f, "meta+")?;
                 }
-                write!(f, "{}", mouse_event_kind_as_str(event.kind))
+                let name = mouse_event_kind_as_str(event.kind);
+                // A bare `left`/`right` parses as the arrow key, so an unmodified click
+                // keeps the `none+` it was written with.
+                if event.modifiers.is_empty() && KeyCombination::from_str(name).is_ok() {
+                    write!(f, "none+")?;
+                }
+                write!(f, "{name}")
             }
             TriggerKind::Event(event) => write!(f, "{}", event),
             TriggerKind::Semantic(alias) => write!(f, "@{alias}"),
@@ -850,6 +856,29 @@ fn format_help_entries<A: ActionExt + Display>(
 mod test {
     use super::*;
     use crossterm::event::MouseEvent;
+
+    /// Found by the `trigger` fuzz target: `none+left` (a click) was saved as `left`,
+    /// which reads back as the Left arrow key.
+    #[test]
+    fn unmodified_click_round_trips_apart_from_the_arrow_key() {
+        for (text, shown) in [
+            ("none+left", "none+left"),
+            ("none+right", "none+right"),
+            ("none+middle", "middle"),
+            ("middle", "middle"),
+            ("scrollup", "scrollup"),
+            ("shift+left", "shift+left"),
+        ] {
+            let trigger = Trigger::from_str(text).unwrap();
+            assert!(matches!(trigger.kind, TriggerKind::Mouse(_)), "{text}");
+            assert_eq!(trigger.to_string(), shown, "{text}");
+            assert_eq!(Trigger::from_str(shown), Ok(trigger), "{text}");
+        }
+        for arrow in ["left", "right"] {
+            let trigger = Trigger::from_str(arrow).unwrap();
+            assert!(matches!(trigger.kind, TriggerKind::Key(_)), "{arrow}");
+        }
+    }
 
     #[test]
     fn nav_help_has_a_heading_and_a_stable_order() {
