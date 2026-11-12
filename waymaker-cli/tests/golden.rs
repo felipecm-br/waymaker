@@ -104,7 +104,10 @@ fn golden_jump_nav_mode() {
         .no_input()
         .args(&["-o", "jump"])
         .size(30, 100)
-        .ready("top.md")
+        // `top.md` comes from the first (shallow) walk; the deep entries arrive later from
+        // parallel threads in any order. `alpha/one.txt` sorts first among them, so once it is
+        // on screen the frame is the same whichever thread finished first.
+        .ready("alpha/one.txt")
         .start();
     insta::assert_snapshot!(wm.styled_screen());
 }
