@@ -353,19 +353,20 @@ impl FrecencyStore {
             }
         });
 
-        // 1. Check if another thread in this process already has an active Database open
+        // 1. Check if another thread in this process already has an active Database open.
+        // The lock is held until the new Database is cached (step 4): two threads that both
+        // missed the cache would otherwise race to open the file, and the loser fell back to a
+        // read-only shadow copy that never saw later writes.
+        let mut instances = FRECENCY_DB_INSTANCES.lock().unwrap();
+        let map = instances.get_or_insert_with(rustc_hash::FxHashMap::default);
+        if let Some(weak) = map.get(&canonical_path)
+            && let Some(existing) = weak.upgrade()
         {
-            let mut lock = FRECENCY_DB_INSTANCES.lock().unwrap();
-            let map = lock.get_or_insert_with(rustc_hash::FxHashMap::default);
-            if let Some(weak) = map.get(&canonical_path)
-                && let Some(existing) = weak.upgrade()
-            {
-                return Ok(Self {
-                    db: Some(existing),
-                    db_path: Some(canonical_path),
-                    _shadow_guard: None,
-                });
-            }
+            return Ok(Self {
+                db: Some(existing),
+                db_path: Some(canonical_path),
+                _shadow_guard: None,
+            });
         }
 
         // 2. Attempt to open primary database with retry on lock contention
@@ -427,8 +428,6 @@ impl FrecencyStore {
             let actual_canonical = path
                 .canonicalize()
                 .unwrap_or_else(|_| canonical_path.clone());
-            let mut lock = FRECENCY_DB_INSTANCES.lock().unwrap();
-            let map = lock.get_or_insert_with(rustc_hash::FxHashMap::default);
             map.insert(actual_canonical, Arc::downgrade(d));
             map.insert(canonical_path.clone(), Arc::downgrade(d));
         }
@@ -1020,6 +1019,42 @@ mod tests {
 
         let removed_again = store.remove(path)?;
         assert!(!removed_again);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+        Ok(())
+    }
+
+    #[test]
+    fn test_concurrent_open_shares_one_database() -> anyhow::Result<()> {
+        // Threads that opened the same path at once used to race past the instance cache:
+        // the losers got a read-only shadow copy, so a pin made through one store was
+        // invisible to the others.
+        let temp_dir = test_dir("mm_test_frecency_concurrent_open");
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir)?;
+        let db_path = temp_dir.join("test.redb");
+        let pinned = temp_dir.to_str().unwrap().to_string();
+
+        for _ in 0..20 {
+            let _ = fs::remove_file(&db_path);
+            let barrier = Arc::new(std::sync::Barrier::new(8));
+            let stores: Vec<FrecencyStore> = (0..8)
+                .map(|_| {
+                    let (barrier, db_path) = (barrier.clone(), db_path.clone());
+                    std::thread::spawn(move || {
+                        barrier.wait();
+                        FrecencyStore::open_at(&db_path).unwrap()
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|t| t.join().unwrap())
+                .collect();
+
+            assert!(stores.iter().all(|s| !s.is_shadow()));
+            stores[0].pin(&pinned)?;
+            assert!(stores.iter().all(|s| s.is_pinned(&pinned)));
+        }
 
         let _ = fs::remove_dir_all(&temp_dir);
         Ok(())
