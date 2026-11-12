@@ -782,19 +782,9 @@ fg = "Cyan"
 # 9. MATCHER, SORTING & FRECENCY ([matcher])
 # ==============================================================================
 [matcher]
-# Fuzzy matching engine:
-# - "frizbee": Ultra-low latency, SIMD-accelerated, optimized for fast typing.
-# - "nucleo": Comprehensive fuzzy matching engine.
-# Values: "frizbee", "nucleo" | Default: "nucleo"
-engine = "frizbee"
-
 # Score penalty subtracted per directory slash ('/' or '\').
 # Values: integers >= 0 | Default: 0
 depth_penalty = 15
-
-# Tolerates typos and transpositions in queries >= 3 characters.
-# Values: true, false | Default: false
-typo_tolerance = true
 
 # Prioritizes direct subdirectories at the top of the list before regular files.
 # Values: true, false | Default: false

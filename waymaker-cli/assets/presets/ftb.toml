@@ -15,9 +15,6 @@ prompt = ">"
 prompt_style.fg = "Cyan"
 prompt_style.modifier = "BOLD"
 
-[matcher]
-typo_tolerance = true
-
 [matcher.sort]
 threshold = "smart"
 

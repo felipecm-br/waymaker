@@ -153,7 +153,7 @@ jobs:
       - name: Clippy (waymaker-lib without default features)
         run: cargo clippy -p waymaker-lib --all-targets --no-default-features --locked -- -D warnings
       - name: Clippy (wm without diagram-images)
-        run: cargo clippy -p waymaker-cli --all-targets --no-default-features -F frizbee --locked -- -D warnings
+        run: cargo clippy -p waymaker-cli --all-targets --no-default-features --locked -- -D warnings
 
   # Old vs new binary on the same 500k-line input: `wm -f` output must be identical, peak RSS
   # may grow at most 10%, and only a large slowdown fails (see scripts/regress.py).

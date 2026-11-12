@@ -1012,53 +1012,6 @@ fn test_find_item_index() {
 }
 
 #[test]
-#[cfg(feature = "frizbee")]
-fn test_frizbee_worker_startup_drain_and_immediate_results() {
-    let mut worker = Worker::<String>::new_single_column();
-    worker.engine = crate::config::MatcherEngineType::Frizbee;
-    worker.dir_first = true;
-
-    let items = vec![
-        "src/".to_string(),
-        "docs/".to_string(),
-        "Cargo.toml".to_string(),
-    ];
-
-    let injector = worker.nucleo.injector();
-    for item in &items {
-        injector.push(item.clone(), |val, cols| {
-            cols[0] = val.clone().into();
-        });
-    }
-
-    // Without calling tick manually prior to results(), results() must drain
-    // the injector, populate frizbee cache, and immediately return the items!
-    let mut matcher = nucleo::Matcher::new(nucleo::Config::DEFAULT);
-    let (results, _, _, status) = worker.results(
-        0,
-        10,
-        &[100],
-        false,
-        0,
-        Style::default(),
-        &mut matcher,
-        AutoscrollSettings::default(),
-        0,
-        (0, false),
-        true,
-        false,
-    );
-
-    assert_eq!(status.item_count, 3);
-    assert_eq!(status.matched_count, 3);
-    assert_eq!(results.len(), 3);
-    // dir_first ordering: docs/, src/, Cargo.toml
-    assert_eq!(*results[0].2, "docs/");
-    assert_eq!(*results[1].2, "src/");
-    assert_eq!(*results[2].2, "Cargo.toml");
-}
-
-#[test]
 fn test_active_query_ranks_by_relevance_within_tier_over_alphabetical() {
     let mut worker = Worker::<String>::new_single_column();
     worker.dir_first = true;
@@ -1088,36 +1041,6 @@ fn test_active_query_ranks_by_relevance_within_tier_over_alphabetical() {
     worker.find("oi.md");
     while worker.nucleo.tick(10).running {}
 
-    let all_filtered = worker.get_all_sorted();
-    assert_eq!(*all_filtered[0], "oi.md");
-}
-
-#[test]
-#[cfg(feature = "frizbee")]
-fn test_frizbee_active_query_ranks_exact_match_first() {
-    let mut worker = Worker::<String>::new_single_column();
-    worker.engine = crate::config::MatcherEngineType::Frizbee;
-    worker.dir_first = true;
-    worker.typo_tolerance = true;
-
-    let items = vec![
-        "CHANGELOG.md".to_string(),
-        "oi.md".to_string(),
-        "HELLO.md".to_string(),
-    ];
-
-    let injector = worker.nucleo.injector();
-    for item in &items {
-        injector.push(item.clone(), |val, cols| {
-            cols[0] = val.clone().into();
-        });
-    }
-
-    while worker.nucleo.snapshot().item_count() < items.len() as u32 {
-        worker.nucleo.tick(10);
-    }
-
-    worker.find("oi.md");
     let all_filtered = worker.get_all_sorted();
     assert_eq!(*all_filtered[0], "oi.md");
 }

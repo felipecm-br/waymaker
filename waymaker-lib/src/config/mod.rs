@@ -163,9 +163,6 @@ pub struct WorkerConfig {
     #[partial(recurse)]
     #[serde(deserialize_with = "deserialize_worker_frecency", default)]
     pub frecency: WorkerFrecencyConfig,
-    /// Enable typo tolerance for search queries >= 3 characters.
-    #[partial(alias = "tt")]
-    pub typo_tolerance: bool,
     /// Prioritize direct child directories over files and deeper paths.
     #[partial(alias = "df")]
     pub dir_first: bool,
@@ -177,18 +174,6 @@ pub struct WorkerConfig {
     /// Percentage bonus boost for items located inside or relative to current working directory (CWD). Default is 30 (i.e. +30%).
     #[partial(alias = "lb")]
     pub location_bias: u32,
-    /// Fuzzy matcher engine backend ("nucleo" or "frizbee").
-    #[partial(alias = "eng")]
-    pub engine: MatcherEngineType,
-}
-
-/// Matcher engine backend used for fuzzy searching.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum MatcherEngineType {
-    #[default]
-    Nucleo,
-    Frizbee,
 }
 
 impl Default for WorkerConfig {
@@ -197,12 +182,10 @@ impl Default for WorkerConfig {
             sort: WorkerSortConfig::default(),
             depth_penalty: 0,
             frecency: WorkerFrecencyConfig::default(),
-            typo_tolerance: false,
             dir_first: false,
             track: false,
             reverse: false,
             location_bias: 30,
-            engine: MatcherEngineType::default(),
         }
     }
 }

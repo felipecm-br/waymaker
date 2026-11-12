@@ -64,8 +64,6 @@ resvg = { version = "0.47", default-features = false, optional = true }
 usvg = { version = "0.47", default-features = false, optional = true }
 
 
-frizbee = { version = "0.13.0", optional = true }
-
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31.1", features = ["poll", "signal", "term"] }
 
@@ -73,7 +71,7 @@ nix = { version = "0.31.1", features = ["poll", "signal", "term"] }
 windows-sys = "0.61.2"
 
 [features]
-default = ["frizbee", "diagram-images"]
+default = ["diagram-images"]
 # Rasterize Mermaid diagrams and SVG images (mermaid-rs-renderer, resvg, usvg).
 # Without it, diagrams fall back to the Unicode text renderer.
 diagram-images = ["dep:mermaid-rs-renderer", "dep:resvg", "dep:usvg"]
@@ -81,7 +79,6 @@ bracketed-paste = ["crossterm/bracketed-paste"]
 parallelism = []
 experimental = []
 partial = ["waymaker-partial", "waymaker-partial-macros/partial"]
-frizbee = ["dep:frizbee"]
 
 [lib]
 name = "waymaker"
@@ -103,20 +100,13 @@ path = "examples/pick_1.rs"
 name = "ripgrep"
 path = "examples/ripgrep.rs"
 
-[[example]]
-name = "scratch"
-path = "examples/scratch.rs"
-required-features = ["frizbee"]
-
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
-frizbee = "0.13.0"
 proptest = { version = "1", default-features = false, features = ["std"] }
 
 [[bench]]
 name = "matcher"
 harness = false
-required-features = ["frizbee"]
 
 [lints]
 workspace = true

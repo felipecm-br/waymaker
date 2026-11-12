@@ -416,45 +416,6 @@ fn bench_head_to_head(c: &mut Criterion) {
                 });
             },
         );
-
-        // 3. Frizbee SIMD (Single thread, typo=0)
-        let frizbee_config = frizbee::Config::default();
-        group.bench_with_input(
-            BenchmarkId::new("frizbee_simd", case_name),
-            &query,
-            |b, &q| {
-                b.iter(|| {
-                    let mut matcher = frizbee::Matcher::new(black_box(q), &frizbee_config);
-                    black_box(matcher.match_list(&dataset));
-                });
-            },
-        );
-
-        // 4. Frizbee Parallel (Multi-threaded SIMD)
-        group.bench_with_input(
-            BenchmarkId::new("frizbee_parallel", case_name),
-            &query,
-            |b, &q| {
-                b.iter(|| {
-                    let mut matcher = frizbee::Matcher::new(black_box(q), &frizbee_config);
-                    black_box(matcher.match_list_parallel(&dataset, 0));
-                });
-            },
-        );
-
-        // 5. Frizbee with Typo Tolerance (typo=1)
-        let mut typo_config = frizbee::Config::default();
-        typo_config.max_typos = Some(1);
-        group.bench_with_input(
-            BenchmarkId::new("frizbee_typo_1", case_name),
-            &query,
-            |b, &q| {
-                b.iter(|| {
-                    let mut matcher = frizbee::Matcher::new(black_box(q), &typo_config);
-                    black_box(matcher.match_list(&dataset));
-                });
-            },
-        );
     }
 
     group.finish();

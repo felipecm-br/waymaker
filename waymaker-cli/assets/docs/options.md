@@ -160,7 +160,6 @@ All colors and modifiers come from ratatui:
 - `frecency`, `frec`: (bool) Enable frecency (frequency + recency) score boosting for matched items. Default `false`.
 - `frecency_weight`: (number) Weight multiplier for frecency bonus points. Default `1`.
 - `sort_cap`, `sc`: (number) Maximum number of top matched items to re-sort by frecency/depth penalty. Default `1000`. Set to `0` for unlimited.
-- `typo_tolerance`, `tt`: (bool) Enable typo-tolerant fuzzy matching for queries >= 3 characters. Default `false`.
 - `dir_first`, `df`: (bool) Prioritize direct child directories over files and deeper paths, putting local subfolders at the top for interactive directory navigation. Default `false`.
 - `track`: (bool) Keep the cursor on the same item when the query changes, instead of moving it to the best match (fzf's `--track`). Default `false`.
 - `reverse`: (bool) Reverse the order of the input (fzf's `--tac`). Default `false`.
@@ -366,7 +365,6 @@ See `wm --doc binds`.
   - `half_life_days` / `hl`: (number) Half-life in days for continuous exponential frecency decay (default: 7). Set 0 to use legacy discrete time buckets.
 - `location_bias` / `lb`: (number) Percentage bonus boost for items located inside or relative to current working directory (default: 30, i.e. +30%). Set 0 to disable.
 - `depth_penalty` / `dp`: (number) Score penalty per path depth level ('/' or '\'). 0 disables.
-- `typo_tolerance` / `tt`: (bool) Allow character substitutions/typo matching for queries >= 3 chars.
 - `dir_first` / `df`: (bool) Prioritize direct child directories over files and deeper paths (Tier 0: direct dirs, Tier 1: direct files, Tier 2: deeper items).
 
 

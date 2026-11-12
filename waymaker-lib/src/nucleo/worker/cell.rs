@@ -9,7 +9,6 @@ use crate::{
     utils::text::wrapping_indicator,
 };
 
-#[cfg_attr(not(test), allow(dead_code))]
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_cell<T: SSS>(
     cell: Text<'_>,
@@ -21,39 +20,8 @@ pub(super) fn render_cell<T: SSS>(
     wrap: bool,
     width_limit: u16,
     col_indices_buffer: &mut Vec<u32>,
-    autoscroll: AutoscrollSettings,
-    hscroll_offset: i8,
-) -> (Text<'static>, usize) {
-    render_cell_inner(
-        cell,
-        col_idx,
-        snapshot,
-        item,
-        matcher,
-        highlight_style,
-        wrap,
-        width_limit,
-        col_indices_buffer,
-        autoscroll,
-        hscroll_offset,
-        None,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn render_cell_inner<T: SSS>(
-    cell: Text<'_>,
-    col_idx: usize,
-    snapshot: &nucleo::Snapshot<T>,
-    item: &nucleo::Item<T>,
-    matcher: &mut nucleo::Matcher,
-    highlight_style: Style,
-    wrap: bool,
-    width_limit: u16,
-    col_indices_buffer: &mut Vec<u32>,
     mut autoscroll: AutoscrollSettings,
     hscroll_offset: i8,
-    custom_indices: Option<&[u32]>,
 ) -> (Text<'static>, usize) {
     if !autoscroll.always {
         autoscroll.enabled &= !wrap;
@@ -65,17 +33,13 @@ pub(super) fn render_cell_inner<T: SSS>(
     // get indices
     let indices_buffer = col_indices_buffer;
     indices_buffer.clear();
-    if let Some(custom) = custom_indices {
-        indices_buffer.extend_from_slice(custom);
-    } else {
-        snapshot.pattern().column_pattern(col_idx).indices(
-            item.matcher_columns[col_idx].slice(..),
-            matcher,
-            indices_buffer,
-        );
-        indices_buffer.sort_unstable();
-        indices_buffer.dedup();
-    }
+    snapshot.pattern().column_pattern(col_idx).indices(
+        item.matcher_columns[col_idx].slice(..),
+        matcher,
+        indices_buffer,
+    );
+    indices_buffer.sort_unstable();
+    indices_buffer.dedup();
     let mut indices = indices_buffer.drain(..);
 
     let mut lines = vec![];

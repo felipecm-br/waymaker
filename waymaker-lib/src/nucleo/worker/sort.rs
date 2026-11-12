@@ -422,17 +422,6 @@ impl<T: SSS> Worker<T> {
     }
 
     pub fn get_nth(&self, n: u32) -> Option<&T> {
-        #[cfg(feature = "frizbee")]
-        if self.engine == crate::config::MatcherEngineType::Frizbee {
-            self.ensure_frizbee_cache();
-            let snapshot = self.nucleo.snapshot();
-            let cache = self.frizbee_cache.lock().unwrap();
-            return cache
-                .ranked_indices
-                .get(n as usize)
-                .and_then(|&(idx, _)| snapshot.get_item(idx).map(|item| item.data));
-        }
-
         let snapshot = self.nucleo.snapshot();
         let total = snapshot.matched_item_count();
         if n >= total {
@@ -461,21 +450,6 @@ impl<T: SSS> Worker<T> {
     where
         F: FnMut(&T) -> bool,
     {
-        #[cfg(feature = "frizbee")]
-        if self.engine == crate::config::MatcherEngineType::Frizbee {
-            self.ensure_frizbee_cache();
-            let snapshot = self.nucleo.snapshot();
-            let cache = self.frizbee_cache.lock().unwrap();
-            for (pos, &(idx, _)) in cache.ranked_indices.iter().enumerate() {
-                if let Some(item) = snapshot.get_item(idx)
-                    && predicate(item.data)
-                {
-                    return Some(pos);
-                }
-            }
-            return None;
-        }
-
         let snapshot = self.nucleo.snapshot();
         let total = snapshot.matched_item_count();
         if total == 0 {
@@ -534,18 +508,6 @@ impl<T: SSS> Worker<T> {
 
     /// Retrieve all currently matched items in exact ranked (sorted) order.
     pub fn get_all_sorted(&self) -> Vec<&T> {
-        #[cfg(feature = "frizbee")]
-        if self.engine == crate::config::MatcherEngineType::Frizbee {
-            self.ensure_frizbee_cache();
-            let snapshot = self.nucleo.snapshot();
-            let cache = self.frizbee_cache.lock().unwrap();
-            return cache
-                .ranked_indices
-                .iter()
-                .filter_map(|&(idx, _)| snapshot.get_item(idx).map(|item| item.data))
-                .collect();
-        }
-
         let snapshot = self.nucleo.snapshot();
         let total = snapshot.matched_item_count();
         if total == 0 {

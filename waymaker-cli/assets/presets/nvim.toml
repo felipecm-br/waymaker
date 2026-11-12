@@ -19,7 +19,6 @@ status_inline = true
 
 [matcher]
 depth_penalty = 15
-typo_tolerance = true
 dir_first = false
 
 [matcher.sort]

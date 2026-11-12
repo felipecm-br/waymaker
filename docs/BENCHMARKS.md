@@ -15,7 +15,7 @@ just bench-filter --audit --markdown
 seq 1 300000 | awk '{print "src/module_" $1 % 977 "/file_" $1 ".rs"}' \
   | wm --config waymaker-cli/assets/config.toml --benchmark-input mod97
 
-# 4. Criterion microbenchmarks for Nucleo & Frizbee matching engines
+# 4. Criterion microbenchmarks for the Nucleo matching engine
 just bench
 ```
 

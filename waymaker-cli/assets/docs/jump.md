@@ -80,7 +80,6 @@ color = "Black"
 
 [matcher]
 depth_penalty = 15
-typo_tolerance = true
 dir_first = true
 
 [matcher.sort]
