@@ -325,7 +325,10 @@ pub(crate) fn layer_nav_profile_defaults(config: &mut Config) {
 
 pub fn enter(mut cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
     if cli.test_keys {
-        super::crokey::main();
+        if let Err(e) = super::crokey::main() {
+            ebog!("--test-keys needs a terminal: {e}");
+            exit(1);
+        }
         exit(0);
     }
 
@@ -344,10 +347,10 @@ pub fn enter(mut cli: Cli, partial: PartialConfig) -> anyhow::Result<Config> {
 
     if crate::paths::dev_mode() && cli.config.is_none() {
         #[cfg(target_os = "windows")]
-        write_str(cfg_path, include_str!("../../assets/win.dev.toml")).unwrap();
+        write_str(cfg_path, include_str!("../../assets/win.dev.toml"))?;
 
         #[cfg(not(target_os = "windows"))]
-        write_str(cfg_path, include_str!("../../assets/dev.toml")).unwrap();
+        write_str(cfg_path, include_str!("../../assets/dev.toml"))?;
     }
 
     let mut config: Config = load_base_config(&cli, cfg_path);

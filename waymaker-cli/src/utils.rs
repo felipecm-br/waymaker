@@ -96,10 +96,9 @@ fn fetch_presets(temp_dir: &Path) -> PathBuf {
                     temp_dir.display()
                 ),
             ])
-            .status()
-            .expect("Failed to execute powershell");
-        if !status.success() {
-            eprintln!("Error: powershell failed to extract the zip.");
+            .status();
+        if !status.is_ok_and(|x| x.success()) {
+            ebog!("powershell failed to extract the zip.");
             exit(1);
         }
     }

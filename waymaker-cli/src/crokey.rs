@@ -34,7 +34,9 @@ use {
     std::io::stdout,
 };
 
-pub fn main() {
+/// Echoes each key combination typed until Esc, Ctrl-q or Ctrl-c. Fails
+/// without a terminal, since raw mode needs one.
+pub fn main() -> std::io::Result<()> {
     let fmt = KeyCombinationFormat::default();
     let _ = execute!(
         stdout(),
@@ -46,9 +48,12 @@ pub fn main() {
 
     println!("Type any key combination (remember that your terminal intercepts many ones)");
     loop {
-        terminal::enable_raw_mode().unwrap();
+        if let Err(err) = terminal::enable_raw_mode() {
+            let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
+            return Err(err);
+        }
         let e = read();
-        terminal::disable_raw_mode().unwrap();
+        terminal::disable_raw_mode()?;
         match e {
             Ok(Event::Key(key_event)) => {
                 let key_combination = key_event.into();
@@ -82,4 +87,5 @@ pub fn main() {
         }
     }
     let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
+    Ok(())
 }
