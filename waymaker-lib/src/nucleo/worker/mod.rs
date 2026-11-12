@@ -9,6 +9,7 @@ mod tests;
 
 pub use frizbee::FrizbeeWorkerCache;
 
+use super::SharedStr;
 use super::{Style, Text};
 use bitflags::bitflags;
 use std::{
@@ -36,7 +37,7 @@ use sort::get_item_tier_and_clean_path;
 
 type ColumnFormatFn<T> = Box<dyn for<'a> Fn(&'a T) -> Text<'a> + Send + Sync>;
 type ColumnRawFn<T> = Box<dyn for<'a> Fn(&'a T) -> Cow<'a, str> + Send + Sync>;
-type ColumnSharedFn<T> = Box<dyn Fn(&T) -> Option<Arc<str>> + Send + Sync>;
+type ColumnSharedFn<T> = Box<dyn Fn(&T) -> Option<SharedStr> + Send + Sync>;
 pub struct Column<T> {
     pub name: Arc<str>,
     pub(super) format: ColumnFormatFn<T>,
@@ -44,7 +45,7 @@ pub struct Column<T> {
     /// The column text as a shared string, when the item can lend one; see [`Column::haystack`].
     pub(super) shared: Option<ColumnSharedFn<T>>,
     /// Direct function pointer fast path for `shared` when no closure state is captured (e.g. col 0).
-    pub(super) shared_fn: Option<fn(&T) -> Option<Arc<str>>>,
+    pub(super) shared_fn: Option<fn(&T) -> Option<SharedStr>>,
     /// Whether the column should be passed to nucleo for matching and filtering.
     pub(super) filter: bool,
 }
@@ -87,14 +88,14 @@ impl<T> Column<T> {
     /// `f` returns `Some` (it must be the same text `raw` returns).
     pub fn with_shared<F>(mut self, f: F) -> Self
     where
-        F: Fn(&T) -> Option<Arc<str>> + SSS,
+        F: Fn(&T) -> Option<SharedStr> + SSS,
     {
         self.shared = Some(Box::new(f));
         self
     }
 
     /// Non-capturing function pointer version of [`Column::with_shared`].
-    pub fn with_shared_fn(mut self, f: fn(&T) -> Option<Arc<str>>) -> Self {
+    pub fn with_shared_fn(mut self, f: fn(&T) -> Option<SharedStr>) -> Self {
         self.shared_fn = Some(f);
         self
     }

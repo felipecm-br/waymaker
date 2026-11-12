@@ -1,6 +1,8 @@
-use std::{borrow::Cow, sync::Arc};
+use std::borrow::Cow;
 
 use cba::define_either;
+
+use crate::nucleo::SharedStr;
 pub use ratatui::text::Text;
 
 define_either! {
@@ -12,7 +14,7 @@ define_either! {
     }
 }
 
-impl Either<Arc<str>, Box<Text<'static>>> {
+impl Either<SharedStr, Box<Text<'static>>> {
     #[inline]
     pub fn byte_len(&self) -> usize {
         match self {
@@ -50,16 +52,16 @@ mod tests {
     #[test]
     fn test_either_left_and_right() {
         assert_eq!(
-            std::mem::size_of::<Either<Arc<str>, Box<Text<'static>>>>(),
+            std::mem::size_of::<Either<SharedStr, Box<Text<'static>>>>(),
             16
         );
 
-        let left: Either<Arc<str>, Box<Text<'static>>> = Either::Left("sample left".into());
+        let left: Either<SharedStr, Box<Text<'static>>> = Either::Left("sample left".into());
         assert_eq!(left.to_cow(), Cow::Borrowed("sample left"));
         assert_eq!(left.as_text(), Text::from("sample left"));
         assert_eq!(left.to_text(), Text::from("sample left"));
 
-        let right: Either<Arc<str>, Box<Text<'static>>> =
+        let right: Either<SharedStr, Box<Text<'static>>> =
             Either::Right(Box::new(Text::from("sample right")));
         assert_eq!(right.to_cow(), Cow::Borrowed("sample right"));
         assert_eq!(right.as_text(), Text::from("sample right"));

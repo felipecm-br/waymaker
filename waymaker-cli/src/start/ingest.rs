@@ -1,6 +1,9 @@
 use super::*;
-use std::sync::Arc;
-use waymaker::{cache::DirCacheStore, config::WalkerConfig, nucleo::WorkerError};
+use waymaker::{
+    cache::DirCacheStore,
+    config::WalkerConfig,
+    nucleo::{SharedChunk, SharedStr, WorkerError},
+};
 
 /// Splits `reader` into records ending in `delim` and passes each one to `f`, without the
 /// delimiter (and without a `\r` before it when `delim` is `\n`). A last record with no
@@ -8,12 +11,13 @@ use waymaker::{cache::DirCacheStore, config::WalkerConfig, nucleo::WorkerError};
 ///
 /// Invalid UTF-8 is replaced with U+FFFD, like fzf, instead of dropping the record: one
 /// non-UTF-8 file name must not hide it, or (as `read_line`'s error did in the headless
-/// filter) the whole input. Records are found with `memchr` in a large buffer and each
-/// costs one allocation: the `Arc<str>` is the text the item and the matcher both keep.
+/// filter) the whole input. Records are found with `memchr` in a large buffer, and the
+/// records of one buffer fill are slices of one [`SharedChunk`]: the item and the matcher
+/// both keep that text, so a line costs its bytes plus a 16-byte handle, not an allocation.
 pub fn for_each_record<E>(
     reader: impl Read,
     delim: u8,
-    mut f: impl FnMut(Arc<str>) -> Result<(), E>,
+    mut f: impl FnMut(SharedStr) -> Result<(), E>,
 ) -> Result<usize, MapReaderError<E>> {
     use std::io::BufRead;
 
@@ -26,7 +30,7 @@ pub fn for_each_record<E>(
     fn emit_record<E>(
         mut record: &[u8],
         delim: u8,
-        f: &mut impl FnMut(Arc<str>) -> Result<(), E>,
+        f: &mut impl FnMut(SharedStr) -> Result<(), E>,
         count: &mut usize,
         lossy: &mut usize,
     ) -> Result<(), MapReaderError<E>> {
@@ -35,7 +39,7 @@ pub fn for_each_record<E>(
         {
             record = rest;
         }
-        let text: Arc<str> = match std::str::from_utf8(record) {
+        let text: SharedStr = match std::str::from_utf8(record) {
             Ok(s) => s.into(),
             Err(_) => {
                 *lossy += 1;
@@ -73,6 +77,7 @@ pub fn for_each_record<E>(
         if let Some(last_rel_end) = memchr::memrchr(delim, &buf[start..]) {
             let last_end = start + last_rel_end;
             if let Ok(valid) = std::str::from_utf8(&buf[start..last_end]) {
+                let chunk = SharedChunk::new(valid);
                 let valid_bytes = valid.as_bytes();
                 let mut rel_start = 0;
                 for rel_end in memchr::memchr_iter(delim, valid_bytes) {
@@ -81,7 +86,7 @@ pub fn for_each_record<E>(
                     {
                         line_end -= 1;
                     }
-                    f(valid[rel_start..line_end].into()).map_err(MapReaderError::Custom)?;
+                    f(chunk.slice(rel_start..line_end)).map_err(MapReaderError::Custom)?;
                     count += 1;
                     rel_start = rel_end + 1;
                 }
@@ -89,7 +94,7 @@ pub fn for_each_record<E>(
                 if delim == b'\n' && line_end > rel_start && valid_bytes[line_end - 1] == b'\r' {
                     line_end -= 1;
                 }
-                f(valid[rel_start..line_end].into()).map_err(MapReaderError::Custom)?;
+                f(chunk.slice(rel_start..line_end)).map_err(MapReaderError::Custom)?;
                 count += 1;
                 start = last_end + 1;
             } else {
@@ -130,7 +135,7 @@ pub(super) fn record_delimiter(input_separator: Option<char>) -> u8 {
 /// Read aborts on error. Read errors are logged.
 pub fn map_reader<E: SSS + std::fmt::Display>(
     reader: impl Read + SSS,
-    f: impl FnMut(Arc<str>) -> Result<(), E> + SSS,
+    f: impl FnMut(SharedStr) -> Result<(), E> + SSS,
     input_separator: Option<char>,
     abort_empty: Option<RenderSender<MMAction>>,
 ) -> tokio::task::JoinHandle<Result<usize, MapReaderError<E>>> {
@@ -147,7 +152,8 @@ pub fn map_reader<E: SSS + std::fmt::Display>(
     })
 }
 
-/// Spawns a tokio task reading records (see [`for_each_record`]) and batching 4,096 items into `injector.extend()`.
+/// Spawns a tokio task reading records (see [`for_each_record`]) and batching them (at least
+/// 4,096 items, cut where a chunk ends) into `injector.extend()`.
 pub fn map_reader_batched(
     reader: impl Read + Send + 'static,
     injector: ConfigInjector,
@@ -156,9 +162,11 @@ pub fn map_reader_batched(
     abort_empty: Option<RenderSender<MMAction>>,
 ) -> tokio::task::JoinHandle<Result<usize, anyhow::Error>> {
     const BATCH_SIZE: usize = 4096;
+    // Bounds a batch of very short lines, which share one large chunk.
+    const MAX_BATCH_SIZE: usize = 16 * BATCH_SIZE;
     tokio::task::spawn_blocking(move || {
         let mut total = 0;
-        let mut batch: Vec<(Option<waymaker::nucleo::GroupLabel>, Arc<str>)> =
+        let mut batch: Vec<(Option<waymaker::nucleo::GroupLabel>, SharedStr)> =
             Vec::with_capacity(BATCH_SIZE);
         let mut current_group: Option<waymaker::nucleo::GroupLabel> = None;
 
@@ -182,11 +190,19 @@ pub fn map_reader_batched(
                 return Ok(());
             }
             total += 1;
-            batch.push((current_group.clone(), line));
-            if batch.len() >= BATCH_SIZE {
+            // Send a full batch when the next line starts a new chunk, so the injector thread
+            // never clones handles of the chunk this thread is still cutting lines from (both
+            // would bump one reference count, and its cache line would bounce between cores).
+            if batch.len() >= BATCH_SIZE
+                && batch
+                    .last()
+                    .is_none_or(|(_, last)| !SharedStr::same_chunk(last, &line))
+                || batch.len() >= MAX_BATCH_SIZE
+            {
                 let chunk = std::mem::replace(&mut batch, Vec::with_capacity(BATCH_SIZE));
                 batch_tx.send(chunk).map_err(|_| ())?;
             }
+            batch.push((current_group.clone(), line));
             Ok(())
         });
 
@@ -220,14 +236,14 @@ pub(super) fn inject_line(
     render_tx: RenderSender<MMAction>,
     injector: ConfigInjector,
     group_prefix: Option<String>,
-) -> impl FnMut(Arc<str>) -> Result<(), waymaker::nucleo::WorkerError> + Send {
+) -> impl FnMut(waymaker::nucleo::SharedStr) -> Result<(), waymaker::nucleo::WorkerError> + Send {
     let mut header_buf = Vec::with_capacity(header_lines);
     let mut remaining = header_lines;
     let injector = injector;
     let mut current_group: Option<waymaker::nucleo::GroupLabel> = None;
 
     // For each row, take the first line of each segmented column, building a Vec<Vec<Line>>
-    move |line: Arc<str>| {
+    move |line: SharedStr| {
         if let Some(prefix) = &group_prefix
             && line.starts_with(prefix)
         {
@@ -297,7 +313,7 @@ pub(super) fn to_static(line: Line<'_>) -> Line<'static> {
 /// valid cached listing is injected at once and refreshed in the background; otherwise items
 /// stream in as they are found. Either way the fresh listing is cached for the next run.
 pub(super) fn ingest_walk(
-    push_fn: impl FnMut(Arc<str>) -> Result<(), WorkerError> + Send + 'static,
+    push_fn: impl FnMut(SharedStr) -> Result<(), WorkerError> + Send + 'static,
     walker_config: &WalkerConfig,
 ) -> tokio::task::JoinHandle<Result<usize, MapReaderError<WorkerError>>> {
     let cwd_str = std::env::current_dir()
@@ -319,11 +335,18 @@ pub(super) fn ingest_walk(
         && !cached_rec.items.is_empty()
     {
         let mut push_fn = push_fn;
-        for item in cached_rec.items {
-            if is_ignored_item(&item) {
-                continue;
-            }
-            if push_fn(item.into()).is_err() {
+        // One chunk for the whole listing instead of one allocation per entry.
+        let mut chunk = waymaker::nucleo::ChunkBuilder::with_capacity(cached_rec.items.len());
+        for item in cached_rec
+            .items
+            .iter()
+            .filter(|item| !is_ignored_item(item))
+        {
+            chunk.push(None, item);
+        }
+        drop(cached_rec);
+        for (_, item) in chunk.take() {
+            if push_fn(item).is_err() {
                 break;
             }
         }

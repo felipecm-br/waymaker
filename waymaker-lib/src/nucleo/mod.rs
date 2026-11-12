@@ -16,6 +16,7 @@ pub use variants::*;
 pub use worker::*;
 
 pub use nucleo;
+pub use nucleo::{SharedChunk, SharedStr};
 pub use ratatui::prelude::*;
 
 // ------------- Wrapper structs
@@ -24,9 +25,9 @@ pub trait SegmentableItem: SSS {
     fn slice_str(&self, range: Range<usize>) -> Cow<'_, str> {
         self.slice(range).to_string().into()
     }
-    /// The item's whole text, when it is held in an `Arc<str>` that the matcher can share
+    /// The item's whole text, when it is held in a [`SharedStr`] that the matcher can share
     /// instead of copying (see [`ColumnIndexable::get_shared`]).
-    fn shared(&self) -> Option<&Arc<str>> {
+    fn shared(&self) -> Option<&SharedStr> {
         None
     }
     /// Byte length of the full item when known cheaply without splitting.
@@ -150,6 +151,47 @@ impl From<Vec<(u32, u32)>> for ColumnRanges {
 /// bytes for it rather than 16; the items of one group share one allocation.
 pub type GroupLabel = Arc<Arc<str>>;
 
+/// Collects the texts of a batch of items into one buffer, so the whole batch becomes one
+/// [`SharedChunk`] instead of one allocation per item.
+#[derive(Default)]
+pub struct ChunkBuilder {
+    text: String,
+    items: Vec<(Option<GroupLabel>, usize, usize)>,
+}
+
+impl ChunkBuilder {
+    pub fn with_capacity(items: usize) -> Self {
+        Self {
+            text: String::new(),
+            items: Vec::with_capacity(items),
+        }
+    }
+
+    pub fn push(&mut self, group: Option<GroupLabel>, text: &str) {
+        let start = self.text.len();
+        self.text.push_str(text);
+        self.items.push((group, start, self.text.len()));
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// The batch's items, each a slice of one new chunk. Leaves the builder empty.
+    pub fn take(
+        &mut self,
+    ) -> impl ExactSizeIterator<Item = (Option<GroupLabel>, SharedStr)> + use<> {
+        let chunk = SharedChunk::new(std::mem::take(&mut self.text));
+        std::mem::take(&mut self.items)
+            .into_iter()
+            .map(move |(group, start, end)| (group, chunk.slice(start..end)))
+    }
+}
+
 /// This struct implements ColumnIndexable, and can instantiate a worker with columns.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Segmented<T> {
@@ -176,10 +218,15 @@ impl<T: SegmentableItem + std::fmt::Debug> ColumnIndexable for Segmented<T> {
     }
 
     #[inline]
-    fn get_shared(&self, i: usize) -> Option<Arc<str>> {
+    fn get_shared(&self, i: usize) -> Option<SharedStr> {
         let text = self.inner.shared()?;
         match self.ranges.get(i) {
             Some(&(0, end)) if end as usize == text.len() => Some(text.clone()),
+            // A column is a slice of the same chunk, so it is shared too.
+            Some(&(start, end)) => {
+                let range = start as usize..end as usize;
+                text.get(range.clone()).is_some().then(|| text.slice(range))
+            }
             _ => None,
         }
     }
@@ -271,7 +318,7 @@ impl<T: ColumnIndexable> ColumnIndexable for Indexed<T> {
     }
 
     #[inline]
-    fn get_shared(&self, i: usize) -> Option<Arc<str>> {
+    fn get_shared(&self, i: usize) -> Option<SharedStr> {
         self.inner.get_shared(i)
     }
 }

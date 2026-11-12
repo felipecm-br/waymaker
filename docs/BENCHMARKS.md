@@ -21,17 +21,19 @@ just bench
 
 ## Headless Filter (`2,000,000` lines, 113 MB)
 
-Measured on Linux `aarch64` (release build, median of 3 runs, `stdin` redirected from file, `stdout` to `/dev/null`):
+Measured on Linux `aarch64` (release build, median of 11 interleaved runs, `stdin` redirected from file, `stdout` to `/dev/null`; `fzf` 0.74.3):
 
 | Query Pattern | Query | Matches | `wm -f` | `fzf -f` | `sk -f` |
 | :--- | :--- | ---: | ---: | ---: | ---: |
-| Narrow | `mod97file12` | 27,305 | **120 ms** | 331 ms | 613 ms |
-| Broad | `src/module_5` | 1,559,075 | **386 ms** | 1,181 ms | 2,521 ms |
-| No match | `xyzzy` | 0 | **111 ms** | 175 ms | 241 ms |
-| Peak RSS (narrow) | `mod97file12` | — | **318 MiB** | 245 MiB | 296 MiB |
-| Peak RSS (broad) | `src/module_5` | — | **364 MiB** | 533 MiB | — |
+| Narrow | `mod97file12` | 27,305 | **87 ms** | 195 ms | 613 ms |
+| Broad | `src/module_5` | 1,559,075 | **420 ms** | 1,149 ms | 2,521 ms |
+| No match | `xyzzy` | 0 | **76 ms** | 145 ms | 241 ms |
+| Peak RSS (narrow) | `mod97file12` | — | 275 MiB | **244 MiB** | 296 MiB |
+| Peak RSS (broad) | `src/module_5` | — | **323 MiB** | 530 MiB | — |
 
 `sk` figures are from an earlier run. CPU time (user) on 8 cores: `wm -f` uses about 0.35 s on the narrow and no-match queries (`fzf`: 0.25–0.55 s) and 2.3 s on the broad one (`fzf`: 3.9 s). Until nucleo `041465e`, every worker thread bumped one shared counter per unmatched item, which cost about 0.9 s of CPU on these queries.
+
+Input lines are slices of one shared chunk per 256 KiB read (`SharedStr`), so a line costs its bytes plus a 16-byte handle in the item and one in the matcher, instead of an 80-byte allocation each (narrow RSS 318 → 275 MiB). The chunk records once that it is plain ASCII, so the injector no longer scans every line again (narrow 120 → 87 ms, no match 111 → 76 ms). The broad median is within run-to-run noise of the old 386–440 ms; in 21 interleaved runs it was 392–406 ms against 419–442 ms before.
 
 ## Built-in Walker (no piped input)
 

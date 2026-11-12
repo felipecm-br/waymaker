@@ -820,7 +820,7 @@ struct InputSource {
 /// the built-in file walker, else the start command's output. Exits 99 when there is no input.
 fn spawn_input_reader(
     source: InputSource,
-    push_fn: impl FnMut(Arc<str>) -> Result<(), waymaker::nucleo::WorkerError> + SSS,
+    push_fn: impl FnMut(waymaker::nucleo::SharedStr) -> Result<(), waymaker::nucleo::WorkerError> + SSS,
     walker_config: waymaker::config::WalkerConfig,
     render_tx: RenderSender<MMAction>,
 ) -> tokio::task::JoinHandle<Result<usize, MapReaderError<waymaker::nucleo::WorkerError>>> {
@@ -910,7 +910,7 @@ struct HandlerDeps {
     separator: Option<char>,
     input_separator: Option<char>,
     splitter: waymaker::nucleo::injector::SplitterFn<
-        Either<Arc<str>, Box<waymaker::nucleo::Text<'static>>>,
+        Either<waymaker::nucleo::SharedStr, Box<waymaker::nucleo::Text<'static>>>,
     >,
     preprocess: waymaker::nucleo::injector::PreprocessOptions,
     group_prefix: Option<String>,

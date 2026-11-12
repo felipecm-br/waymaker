@@ -4,37 +4,57 @@ use ratatui::style::{Color, Style};
 use ratatui::text::Text;
 use std::sync::Arc;
 
-/// Plain items store their text once: the matcher's haystack is the item's own `Arc<str>`.
-/// A column that is only part of the line cannot be shared and is copied.
+/// Plain items store their text once: the matcher's haystack is a slice of the item's own
+/// chunk, for the whole line and for each column of a split line.
 #[test]
 fn test_plain_item_text_is_shared_with_the_matcher() {
-    use crate::nucleo::{ColumnRanges, Indexed, Segmented, injector::Injector};
+    use crate::nucleo::{
+        ColumnRanges, Indexed, Segmented, SharedChunk, SharedStr, injector::Injector,
+    };
     use crate::utils::Either;
     use nucleo::Utf32String;
-    type Item = Indexed<Segmented<Either<Arc<str>, Box<Text<'static>>>>>;
-    let item = |text: &Arc<str>, ranges: ColumnRanges| Indexed {
+    type Item = Indexed<Segmented<Either<SharedStr, Box<Text<'static>>>>>;
+    let item = |text: &SharedStr, ranges: ColumnRanges| Indexed {
         index: 0,
         inner: Segmented::new(Either::Left(text.clone()), ranges, None),
     };
+    let shares = |h: &Utf32String, text: &SharedStr, want: &str| {
+        matches!(h, Utf32String::Shared(h)
+            if SharedChunk::ptr_eq(&h.chunk(), &text.chunk()) && h.as_str() == want)
+    };
 
     let worker = Worker::<Item>::new_indexable([""], None);
-    let text: Arc<str> = "src/main.rs".into();
+    let text = SharedChunk::new("src/main.rs\nnext").slice(0..11);
     worker
         .injector()
         .push(item(&text, ColumnRanges::single(0, text.len() as u32)))
         .unwrap();
     let snapshot = worker.nucleo.snapshot();
     let haystack = &snapshot.get_item(0).unwrap().matcher_columns[0];
-    assert!(matches!(haystack, Utf32String::Shared(h) if Arc::ptr_eq(h, &text)));
+    assert!(shares(haystack, &text, "src/main.rs"));
 
     let worker = Worker::<Item>::new_indexable(["path", "line"], None);
-    let text: Arc<str> = "src/main.rs:12".into();
+    let text = SharedStr::from("src/main.rs:12");
     let ranges = ColumnRanges::from(vec![(0, 11), (12, 14)]);
     worker.injector().push(item(&text, ranges)).unwrap();
     let snapshot = worker.nucleo.snapshot();
     let columns = snapshot.get_item(0).unwrap().matcher_columns;
-    assert!(matches!(&columns[0], Utf32String::Ascii(h) if &**h == "src/main.rs"));
-    assert!(matches!(&columns[1], Utf32String::Ascii(h) if &**h == "12"));
+    assert!(shares(&columns[0], &text, "src/main.rs"));
+    assert!(shares(&columns[1], &text, "12"));
+}
+
+/// A column range that is not on a char boundary is copied (lossily) instead of panicking.
+#[test]
+fn test_column_off_char_boundary_is_not_shared() {
+    use crate::nucleo::{ColumnIndexable, ColumnRanges, Segmented, SharedStr};
+    use crate::utils::Either;
+    let seg: Segmented<Either<SharedStr, Box<Text<'static>>>> = Segmented::new(
+        Either::Left(SharedStr::from("ab\u{e9}c")),
+        ColumnRanges::from(vec![(0, 3), (3, 5)]),
+        None,
+    );
+    assert!(seg.get_shared(0).is_none());
+    assert!(seg.get_shared(1).is_none());
 }
 
 /// Sets up the necessary Nucleo state to trigger a match

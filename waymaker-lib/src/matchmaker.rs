@@ -8,6 +8,7 @@ use std::{
     sync::Arc,
 };
 
+use crate::nucleo::SharedStr;
 use cba::{bait::ResultExt, bath::PathExt, broc::CommandExt, ebog, env_vars};
 use easy_ext::ext;
 use log::{debug, info, warn};
@@ -64,7 +65,7 @@ pub struct Matchmaker<T: SSS, S: Selection = T> {
 // ----------- MAIN -----------------------
 
 pub struct OddEnds {
-    pub splitter: SplitterFn<Either<Arc<str>, Box<Text<'static>>>>,
+    pub splitter: SplitterFn<Either<SharedStr, Box<Text<'static>>>>,
     pub hidden_columns: Vec<bool>,
     pub has_error: bool,
 }
@@ -105,16 +106,16 @@ pub fn set_host_clipboard_universal(text: &str) -> io::Result<()> {
 
 pub type ConfigInjector = AnsiInjector<
     SegmentedInjector<
-        Either<Arc<str>, Box<Text<'static>>>,
+        Either<SharedStr, Box<Text<'static>>>,
         IndexedInjector<
-            Segmented<Either<Arc<str>, Box<Text<'static>>>>,
+            Segmented<Either<SharedStr, Box<Text<'static>>>>,
             WorkerInjector<ConfigMMItem>,
         >,
     >,
 >;
 pub type ConfigMatchmaker =
-    Matchmaker<ConfigMMItem, Segmented<Either<Arc<str>, Box<Text<'static>>>>>;
-pub type ConfigMMInnerItem = Segmented<Either<Arc<str>, Box<Text<'static>>>>;
+    Matchmaker<ConfigMMItem, Segmented<Either<SharedStr, Box<Text<'static>>>>>;
+pub type ConfigMMInnerItem = Segmented<Either<SharedStr, Box<Text<'static>>>>;
 pub type ConfigMMItem = Indexed<ConfigMMInnerItem>;
 
 pub type ConfigWaymaker = ConfigMatchmaker;
@@ -231,10 +232,10 @@ fn make_splitter(
     cc: &ColumnsConfig,
     worker: &Worker<ConfigMMItem>,
     col_count: usize,
-) -> (SplitterFn<Either<Arc<str>, Box<Text<'static>>>>, bool) {
+) -> (SplitterFn<Either<SharedStr, Box<Text<'static>>>>, bool) {
     let mut has_error = false;
     // Arc over box due to capturing
-    let splitter: SplitterFn<Either<Arc<str>, Box<Text<'static>>>> = match cc.split {
+    let splitter: SplitterFn<Either<SharedStr, Box<Text<'static>>>> = match cc.split {
         Split::Delimiter(ref rg) => {
             let rg = rg.clone();
             let names = cc.names.clone();

@@ -302,7 +302,7 @@ pub(super) struct ReloadDeps<F> {
     pub spec_cache_reload: SpecCache,
     pub walker_config_reload: WalkerConfig,
     pub splitter: waymaker::nucleo::injector::SplitterFn<
-        Either<Arc<str>, Box<waymaker::nucleo::Text<'static>>>,
+        Either<waymaker::nucleo::SharedStr, Box<waymaker::nucleo::Text<'static>>>,
     >,
     pub preprocess: waymaker::nucleo::injector::PreprocessOptions,
     pub group_prefix: Option<String>,
@@ -389,7 +389,7 @@ where
 struct Reloader {
     reload_render_tx: RenderSender<MMAction>,
     splitter: waymaker::nucleo::injector::SplitterFn<
-        Either<Arc<str>, Box<waymaker::nucleo::Text<'static>>>,
+        Either<waymaker::nucleo::SharedStr, Box<waymaker::nucleo::Text<'static>>>,
     >,
     preprocess: waymaker::nucleo::injector::PreprocessOptions,
     group_prefix: Option<String>,
@@ -405,7 +405,9 @@ impl Reloader {
     fn begin_reload(
         &self,
         state: &mut CliState<'_, '_>,
-    ) -> impl FnMut(Arc<str>) -> Result<(), waymaker::nucleo::WorkerError> + Send + use<> {
+    ) -> impl FnMut(waymaker::nucleo::SharedStr) -> Result<(), waymaker::nucleo::WorkerError>
+    + Send
+    + use<> {
         state.picker_ui.worker.restart(false);
         state.reloading = true;
 
@@ -502,8 +504,13 @@ impl Reloader {
             let mut push_fn = self.begin_reload(state);
 
             state.picker_ui.selector.clear();
-            for line in lines {
-                let _ = push_fn(line.into());
+            let mut chunk = waymaker::nucleo::ChunkBuilder::with_capacity(lines.len());
+            for line in &lines {
+                chunk.push(None, line);
+            }
+            drop(lines);
+            for (_, line) in chunk.take() {
+                let _ = push_fn(line);
             }
 
             send_reload_ready(reload_render_tx);

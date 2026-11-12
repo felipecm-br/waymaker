@@ -286,13 +286,15 @@ impl<T: SegmentableItem, I: Injector<InputItem = Segmented<T>>> Injector
 }
 
 mod ansi {
-    use std::{borrow::Cow, ops::Range, sync::Arc};
+    use std::{borrow::Cow, ops::Range};
 
     use crate::{
         nucleo::Text,
         utils::text::{scrub_text_styles, slice_ratatui_text},
     };
     use ansi_to_tui::IntoText;
+
+    use crate::nucleo::SharedStr;
 
     pub type PreprocessOptions = (bool, bool);
 
@@ -310,12 +312,12 @@ mod ansi {
         I: Injector<
             InputItem = (
                 Option<crate::nucleo::GroupLabel>,
-                Either<Arc<str>, Box<Text<'static>>>,
+                Either<SharedStr, Box<Text<'static>>>,
             ),
         >,
     > Injector for AnsiInjector<I>
     {
-        type InputItem = (Option<crate::nucleo::GroupLabel>, Arc<str>);
+        type InputItem = (Option<crate::nucleo::GroupLabel>, SharedStr);
         type Inner = I;
         type Context = PreprocessOptions;
 
@@ -363,17 +365,18 @@ mod ansi {
         }
     }
 
-    /// Trims and/or parses ANSI styles. Plain text stays the same `Arc<str>` (shared with the
-    /// matcher); trimming only reallocates when there is whitespace to remove.
+    /// Trims and/or parses ANSI styles. Plain text stays a [`SharedStr`] (shared with the
+    /// matcher); trimming slices the same chunk instead of copying.
     fn preprocess(
-        mut item: Arc<str>,
+        mut item: SharedStr,
         parse: bool,
         trim: bool,
-    ) -> Either<Arc<str>, Box<Text<'static>>> {
+    ) -> Either<SharedStr, Box<Text<'static>>> {
         if trim {
-            let trimmed = item.trim();
-            if trimmed.len() != item.len() {
-                item = trimmed.into();
+            let start = item.len() - item.trim_start().len();
+            let end = item.trim_end().len().max(start);
+            if start != 0 || end != item.len() {
+                item = item.slice(start..end);
             }
         }
         if !parse {
@@ -388,7 +391,7 @@ mod ansi {
         }
     }
 
-    impl SegmentableItem for Either<Arc<str>, Box<Text<'static>>> {
+    impl SegmentableItem for Either<SharedStr, Box<Text<'static>>> {
         fn slice(&self, range: Range<usize>) -> Text<'_> {
             match self {
                 Either::Left(s) => ratatui::text::Text::from(&s[range]),
@@ -409,7 +412,7 @@ mod ansi {
             }
         }
         #[inline]
-        fn shared(&self) -> Option<&Arc<str>> {
+        fn shared(&self) -> Option<&SharedStr> {
             match self {
                 Either::Left(s) => Some(s),
                 Either::Right(_) => None,

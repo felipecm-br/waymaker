@@ -1,6 +1,9 @@
 use std::{borrow::Cow, sync::Arc};
 
-use crate::{RenderFn, SSS, nucleo::Indexed};
+use crate::{
+    RenderFn, SSS,
+    nucleo::{Indexed, SharedStr},
+};
 
 use super::{
     Text,
@@ -129,9 +132,9 @@ pub trait ColumnIndexable {
         Text::from(self.get_str(i))
     }
 
-    /// Column `i` as a shared string, when the item holds it in an `Arc<str>`. The matcher
+    /// Column `i` as a shared string, when the item holds it in a [`SharedStr`]. The matcher
     /// then keeps a reference instead of its own copy of the text.
-    fn get_shared(&self, _i: usize) -> Option<Arc<str>> {
+    fn get_shared(&self, _i: usize) -> Option<SharedStr> {
         None
     }
 }

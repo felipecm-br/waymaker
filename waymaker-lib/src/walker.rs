@@ -201,7 +201,7 @@ impl AsyncWalker {
     pub fn spawn_walk_parallel<I>(&self, injector: I) -> tokio::task::JoinHandle<()>
     where
         I: crate::nucleo::injector::Injector<
-                InputItem = (Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>),
+                InputItem = (Option<crate::nucleo::GroupLabel>, crate::nucleo::SharedStr),
             > + Clone
             + Send
             + 'static,
@@ -212,7 +212,7 @@ impl AsyncWalker {
         tokio::task::spawn_blocking(move || {
             // Pass 1: Immediate shallow walk (max_depth = 1) to deliver top-level items on Frame 0
             let shallow_walker = builder.clone().max_depth(Some(1)).build();
-            let mut shallow_batch = Vec::new();
+            let mut shallow_batch = crate::nucleo::ChunkBuilder::default();
             for result in shallow_walker {
                 let Ok(entry) = result else { continue };
                 if entry.depth() == 0 {
@@ -232,9 +232,9 @@ impl AsyncWalker {
                     options.strip_cwd_prefix,
                     is_dir,
                 );
-                shallow_batch.push((None, formatted.into()));
+                shallow_batch.push(None, &formatted);
             }
-            if !shallow_batch.is_empty() && injector.extend(shallow_batch.into_iter()).is_err() {
+            if !shallow_batch.is_empty() && injector.extend(shallow_batch.take()).is_err() {
                 return;
             }
 
@@ -246,23 +246,22 @@ impl AsyncWalker {
 
             struct BatchWorker<
                 I: crate::nucleo::injector::Injector<
-                        InputItem = (Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>),
+                        InputItem = (Option<crate::nucleo::GroupLabel>, crate::nucleo::SharedStr),
                     >,
             > {
                 injector: I,
-                batch: Vec<(Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>)>,
+                batch: crate::nucleo::ChunkBuilder,
             }
 
             impl<
                 I: crate::nucleo::injector::Injector<
-                        InputItem = (Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>),
+                        InputItem = (Option<crate::nucleo::GroupLabel>, crate::nucleo::SharedStr),
                     >,
             > Drop for BatchWorker<I>
             {
                 fn drop(&mut self) {
                     if !self.batch.is_empty() {
-                        let drained = std::mem::take(&mut self.batch);
-                        let _ = self.injector.extend(drained.into_iter());
+                        let _ = self.injector.extend(self.batch.take());
                     }
                 }
             }
@@ -270,7 +269,7 @@ impl AsyncWalker {
             walker.run(move || {
                 let mut worker = BatchWorker {
                     injector: injector.clone(),
-                    batch: Vec::with_capacity(512),
+                    batch: crate::nucleo::ChunkBuilder::with_capacity(512),
                 };
                 let entry_type = entry_type.clone();
                 let root = root.clone();
@@ -298,12 +297,11 @@ impl AsyncWalker {
                     let path = entry.path();
                     let formatted = format_path(path, &root, strip_cwd, is_dir);
 
-                    worker.batch.push((None, formatted.into()));
-                    if worker.batch.len() >= 512 {
-                        let drained = std::mem::take(&mut worker.batch);
-                        if worker.injector.extend(drained.into_iter()).is_err() {
-                            return WalkState::Quit;
-                        }
+                    worker.batch.push(None, &formatted);
+                    if worker.batch.len() >= 512
+                        && worker.injector.extend(worker.batch.take()).is_err()
+                    {
+                        return WalkState::Quit;
                     }
 
                     WalkState::Continue
@@ -685,7 +683,7 @@ mod tests {
         struct CollectInjector(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
 
         impl crate::nucleo::injector::Injector for CollectInjector {
-            type InputItem = (Option<crate::nucleo::GroupLabel>, std::sync::Arc<str>);
+            type InputItem = (Option<crate::nucleo::GroupLabel>, crate::nucleo::SharedStr);
             type Inner = ();
             type Context = ();
             fn new(_: (), _: ()) -> Self {
