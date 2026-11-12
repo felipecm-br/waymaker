@@ -98,16 +98,18 @@ fn golden_jump_nav_mode() {
         ("beta/three.txt", "3\n"),
         ("gamma/", ""),
         ("top.md", "# top\n"),
+        // Fills the last list row. With an empty query, deeper entries keep the order the
+        // parallel walk delivers them in, which depends on the filesystem's readdir order
+        // (CI showed `alpha/one.txt`, `alpha/two.txt` and `beta/three.txt` there), so none of
+        // them may be on screen.
+        ("zeta.txt", "z\n"),
     ];
     let wm = Launch::new("")
         .files(files)
         .no_input()
         .args(&["-o", "jump"])
         .size(30, 100)
-        // `top.md` comes from the first (shallow) walk; the deep entries arrive later from
-        // parallel threads in any order. `alpha/one.txt` sorts first among them, so once it is
-        // on screen the frame is the same whichever thread finished first.
-        .ready("alpha/one.txt")
+        .ready("zeta.txt")
         .start();
     insta::assert_snapshot!(wm.styled_screen());
 }
