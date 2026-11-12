@@ -19,8 +19,8 @@ fn test_plain_item_text_is_shared_with_the_matcher() {
         inner: Segmented::new(Either::Left(text.clone()), ranges, None),
     };
     let shares = |h: &Utf32String, text: &SharedStr, want: &str| {
-        matches!(h, Utf32String::Shared(h)
-            if SharedChunk::ptr_eq(&h.chunk(), &text.chunk()) && h.as_str() == want)
+        h.shared()
+            .is_some_and(|h| SharedChunk::ptr_eq(&h.chunk(), &text.chunk()) && h.as_str() == want)
     };
 
     let worker = Worker::<Item>::new_indexable([""], None);
