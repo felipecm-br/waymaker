@@ -15,6 +15,8 @@
 
 ### 🐛 Fixed
 
+- Windows: frecency now ranks files picked from the walker. Stored paths kept Windows' `\\?\` prefix and relative paths were joined to the working directory with `/`, so a relative `src\main.rs` never matched its entry. A rooted path such as `/usr/bin` shows as `/usr/bin/` in file operations instead of `.//usr/bin/`
+- Windows CI runs the unit tests of every crate, not only the partial-merge crates
 - In `jump`, leaving a directory while a filter was active and coming back (`l` then `h`) showed only the items that had matched: the listing saved on the way out was the filtered results, not the whole directory. It is now every item. frizbee, which `jump` used, hid this, because it never set nucleo's own filter
 - The directory listing cache had no size limit: `dir_cache.redb` kept the full listing of every directory the walker had listed, and redb does not give back the space of replaced listings (291 MB on one machine, 109 MB of it live). Listings are now one file each in `~/.local/state/waymaker/dir_cache/`, written atomically, at most 32 MiB in all: the oldest are deleted to make room, and a listing larger than that (over about 600,000 paths) is not cached. The old `dir_cache.redb` is deleted on first run; `WM_DIR_CACHE_DB` is replaced by `WM_DIR_CACHE_DIR`. `wm clean` also deletes unreadable listings and temp files left by interrupted writes
 - Saving a walked listing sorted it with a key that copied every path on each comparison; each path is now measured once and never copied

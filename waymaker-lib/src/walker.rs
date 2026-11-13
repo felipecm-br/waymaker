@@ -531,6 +531,7 @@ mod tests {
         while let Ok(item) = rx.try_recv() {
             items.push(item);
         }
+        let items = slashes(items);
 
         // Verify all depth 1 and depth 2 items are present
         assert!(items.iter().any(|i| i == "src/" || i == "src"));
