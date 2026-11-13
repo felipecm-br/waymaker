@@ -119,7 +119,7 @@ impl FrecencySnapshot {
         // 1. Direct exact match in scores table
         if let Some(&score) = self.scores.get(clean) {
             let is_cwd_child =
-                !self.cwd.is_empty() && (clean.starts_with(&self.cwd) || !clean.starts_with('/'));
+                !self.cwd.is_empty() && (clean.starts_with(&self.cwd) || !is_rooted(clean));
             if is_cwd_child && location_bias > 0 {
                 return score.saturating_add((score as u64 * location_bias as u64 / 100) as u32);
             }
@@ -129,40 +129,26 @@ impl FrecencySnapshot {
         let mut buf = [0u8; 1024];
         // 2. Expand ~/ with self.home and check exact path
         if (clean.starts_with("~/") || clean.starts_with("~\\")) && !self.home.is_empty() {
-            let rest = &clean[2..];
-            let needed = self.home.len() + 1 + rest.len();
-            if needed <= buf.len() {
-                buf[..self.home.len()].copy_from_slice(self.home.as_bytes());
-                buf[self.home.len()] = b'/';
-                buf[self.home.len() + 1..needed].copy_from_slice(rest.as_bytes());
-                if let Ok(full_str) = std::str::from_utf8(&buf[..needed])
-                    && let Some(&score) = self.scores.get(clean_path(full_str))
-                {
-                    let is_cwd_child = !self.cwd.is_empty() && full_str.starts_with(&self.cwd);
-                    if is_cwd_child && location_bias > 0 {
-                        return score
-                            .saturating_add((score as u64 * location_bias as u64 / 100) as u32);
-                    }
-                    return score;
+            if let Some(full_str) = join_into(&mut buf, &self.home, &clean[2..])
+                && let Some(&score) = self.scores.get(clean_path(full_str))
+            {
+                let is_cwd_child = !self.cwd.is_empty() && full_str.starts_with(&self.cwd);
+                if is_cwd_child && location_bias > 0 {
+                    return score
+                        .saturating_add((score as u64 * location_bias as u64 / 100) as u32);
                 }
+                return score;
             }
         // 3. Resolve relative path against self.cwd and check exact path
-        } else if !clean.starts_with('/') && !clean.starts_with('\\') && !self.cwd.is_empty() {
-            let needed = self.cwd.len() + 1 + clean.len();
-            if needed <= buf.len() {
-                buf[..self.cwd.len()].copy_from_slice(self.cwd.as_bytes());
-                buf[self.cwd.len()] = b'/';
-                buf[self.cwd.len() + 1..needed].copy_from_slice(clean.as_bytes());
-                if let Ok(full_str) = std::str::from_utf8(&buf[..needed])
-                    && let Some(&score) = self.scores.get(clean_path(full_str))
-                {
-                    if location_bias > 0 {
-                        return score
-                            .saturating_add((score as u64 * location_bias as u64 / 100) as u32);
-                    }
-                    return score;
-                }
+        } else if !is_rooted(clean)
+            && !self.cwd.is_empty()
+            && let Some(full_str) = join_into(&mut buf, &self.cwd, clean)
+            && let Some(&score) = self.scores.get(clean_path(full_str))
+        {
+            if location_bias > 0 {
+                return score.saturating_add((score as u64 * location_bias as u64 / 100) as u32);
             }
+            return score;
         }
 
         0
@@ -179,19 +165,70 @@ impl FrecencySnapshot {
             return true;
         }
         let mut buf = [0u8; 1024];
-        if !trimmed.starts_with('/') && !trimmed.starts_with('\\') && !self.cwd.is_empty() {
-            let needed = self.cwd.len() + 1 + trimmed.len();
-            if needed <= buf.len() {
-                buf[..self.cwd.len()].copy_from_slice(self.cwd.as_bytes());
-                buf[self.cwd.len()] = b'/';
-                buf[self.cwd.len() + 1..needed].copy_from_slice(trimmed.as_bytes());
-                if let Ok(full_str) = std::str::from_utf8(&buf[..needed]) {
-                    return self.scores.contains_key(full_str);
-                }
-            }
+        if !is_rooted(trimmed)
+            && !self.cwd.is_empty()
+            && let Some(full_str) = join_into(&mut buf, &self.cwd, trimmed)
+        {
+            return self.scores.contains_key(full_str);
         }
         false
     }
+}
+
+/// Whether `path` is absolute or starts at a root, so it is not resolved against the cwd:
+/// `/x` or `\x`, and on Windows also `C:\x`.
+#[inline]
+fn is_rooted(path: &str) -> bool {
+    path.starts_with('/')
+        || path.starts_with('\\')
+        || (cfg!(windows) && path.as_bytes().get(1) == Some(&b':'))
+}
+
+/// `base` and `rel` joined as the store keys them, in `buf`: one platform separator between
+/// them, and on Windows every `/` of `rel` written as `\`. `None` if it does not fit.
+#[inline]
+fn join_into<'b>(buf: &'b mut [u8; 1024], base: &str, rel: &str) -> Option<&'b str> {
+    let base = if base.len() > 1 {
+        base.trim_end_matches(['/', '\\'])
+    } else {
+        base
+    };
+    let sep = usize::from(!base.ends_with(['/', '\\']));
+    let needed = base.len() + sep + rel.len();
+    if needed > buf.len() {
+        return None;
+    }
+    buf[..base.len()].copy_from_slice(base.as_bytes());
+    if sep == 1 {
+        buf[base.len()] = std::path::MAIN_SEPARATOR as u8;
+    }
+    let tail = &mut buf[base.len() + sep..needed];
+    tail.copy_from_slice(rel.as_bytes());
+    if cfg!(windows) {
+        for b in tail.iter_mut().filter(|b| **b == b'/') {
+            *b = b'\\';
+        }
+    }
+    std::str::from_utf8(&buf[..needed]).ok()
+}
+
+/// [`Path::canonicalize`] without the `\\?\` prefix Windows adds, so a key reads like the
+/// paths the picker shows and the cwd it resolves them against.
+pub fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
+    let resolved = path.canonicalize()?;
+    #[cfg(windows)]
+    {
+        let s = resolved.to_string_lossy();
+        if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+            return Ok(PathBuf::from(format!(r"\\{rest}")));
+        }
+        if let Some(rest) = s.strip_prefix(r"\\?\")
+            && rest.as_bytes().get(1) == Some(&b':')
+        {
+            return Ok(PathBuf::from(rest));
+        }
+    }
+    Ok(resolved)
 }
 
 /// Helper function to normalize path strings (expand tilde, convert relative paths to absolute, trim trailing slashes).
@@ -220,7 +257,7 @@ pub fn normalize_path(path: &str) -> String {
         p
     };
 
-    let resolved = abs.canonicalize().unwrap_or(abs);
+    let resolved = canonicalize(&abs).unwrap_or(abs);
     let mut s = resolved.to_string_lossy().to_string();
     if s.len() > 1 && (s.ends_with('/') || s.ends_with('\\')) {
         s.pop();
@@ -914,7 +951,19 @@ mod tests {
     /// A scratch dir under the canonical temp dir. On macOS `temp_dir()` is a
     /// `/var` symlink to `/private/var`, and stored paths are canonicalized.
     fn test_dir(name: &str) -> PathBuf {
-        std::env::temp_dir().canonicalize().unwrap().join(name)
+        canonicalize(&std::env::temp_dir()).unwrap().join(name)
+    }
+
+    #[test]
+    fn test_relative_lookup_joins_one_separator() {
+        let mut buf = [0u8; 1024];
+        let sep = std::path::MAIN_SEPARATOR;
+        assert_eq!(join_into(&mut buf, "/", "etc"), Some("/etc"));
+        let joined = join_into(&mut buf, "/home/u/", "a").map(str::to_owned);
+        assert_eq!(joined, Some(format!("/home/u{sep}a")));
+        assert_eq!(join_into(&mut buf, "/home", &"x".repeat(1024)), None);
+        assert!(is_rooted("/etc") && is_rooted("\\\\server") && !is_rooted("src/main.rs"));
+        assert_eq!(is_rooted("C:\\x"), cfg!(windows));
     }
 
     #[test]
@@ -1233,6 +1282,9 @@ mod tests {
         Ok(())
     }
 
+    // Windows does not let another handle read a database file redb holds open, so there the
+    // fallback cannot copy it and a second store runs without frecency.
+    #[cfg(not(windows))]
     #[test]
     fn test_shadow_copy_fallback_on_locked_database() -> anyhow::Result<()> {
         let temp_dir = test_dir("mm_test_shadow_fallback");

@@ -410,6 +410,11 @@ mod tests {
     use super::*;
     use std::fs;
 
+    /// The walker writes paths with the platform's separator; the tests spell them with `/`.
+    fn slashes(items: Vec<String>) -> Vec<String> {
+        items.into_iter().map(|i| i.replace('\\', "/")).collect()
+    }
+
     #[test]
     fn test_walker_collect_sync() -> anyhow::Result<()> {
         let temp_dir = std::env::temp_dir().join("mm_test_walker");
@@ -425,7 +430,7 @@ mod tests {
         };
 
         let walker = AsyncWalker::new(options);
-        let items = walker.collect_sync();
+        let items = slashes(walker.collect_sync());
 
         assert!(items.iter().any(|i| i == "src/" || i == "src"));
         assert!(items.iter().any(|i| i == "src/main.rs"));
@@ -448,7 +453,7 @@ mod tests {
             entry_type: EntryType::Files,
             ..Default::default()
         };
-        let items_files = AsyncWalker::new(options_files).collect_sync();
+        let items_files = slashes(AsyncWalker::new(options_files).collect_sync());
         assert!(items_files.iter().all(|i| !i.ends_with('/')));
         assert!(items_files.iter().any(|i| i == "file.txt"));
 
@@ -458,7 +463,7 @@ mod tests {
             entry_type: EntryType::Directories,
             ..Default::default()
         };
-        let items_dirs = AsyncWalker::new(options_dirs).collect_sync();
+        let items_dirs = slashes(AsyncWalker::new(options_dirs).collect_sync());
         assert!(items_dirs.iter().any(|i| i.ends_with('/') || i == "sub"));
 
         let _ = fs::remove_dir_all(&temp_dir);
@@ -482,7 +487,7 @@ mod tests {
         };
 
         let walker = AsyncWalker::new(options);
-        let items = walker.collect_sync();
+        let items = slashes(walker.collect_sync());
 
         // Should include hidden files like .config and .zshrc
         assert!(items.iter().any(|i| i == ".config/" || i == ".config"));
@@ -582,7 +587,7 @@ mod tests {
         };
 
         let walker = AsyncWalker::new(options);
-        let items = walker.collect_sync();
+        let items = slashes(walker.collect_sync());
 
         // Normal directories and files MUST be present
         assert!(items.iter().any(|i| i == ".config/" || i == ".config"));
@@ -648,7 +653,7 @@ mod tests {
         };
 
         let walker = AsyncWalker::new(options);
-        let items = walker.collect_sync();
+        let items = slashes(walker.collect_sync());
 
         // custom_noise should be ignored
         assert!(!items.iter().any(|i| i.contains("custom_noise")));
@@ -718,7 +723,7 @@ mod tests {
         let handle = walker.spawn_walk_parallel(injector);
         handle.await?;
 
-        let items = collected.lock().unwrap().clone();
+        let items = slashes(collected.lock().unwrap().clone());
         assert!(items.iter().any(|i| i == "src/" || i == "src"));
         assert!(items.iter().any(|i| i == "README.md"));
         assert!(items.iter().any(|i| i == "src/main.rs"));

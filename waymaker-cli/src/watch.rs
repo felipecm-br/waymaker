@@ -562,6 +562,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
+    // Creating a symlink on Windows needs developer mode or admin rights.
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_watch_symlink_atomic_save() {
         let temp_dir = std::env::temp_dir().join("mm_test_watch_symlink");
@@ -574,7 +576,6 @@ mod tests {
         let symlink_file = link_dir.join("linked_doc.md");
         std::fs::write(&real_file, "# Real Original\n").unwrap();
 
-        #[cfg(unix)]
         std::os::unix::fs::symlink(&real_file, &symlink_file).unwrap();
 
         let opts = MarkdownOptions {

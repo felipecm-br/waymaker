@@ -250,7 +250,8 @@ pub(crate) fn abbreviate_target_dir_display(dest_display_name: &str) -> String {
             segments[n - 2],
             segments[n - 1]
         )
-    } else if p.is_absolute() {
+    } else if p.has_root() || p.is_absolute() {
+        // `has_root`: on Windows `/usr/bin` is not absolute (no drive) but is not relative.
         format!("{clean}/")
     } else {
         format!("./{clean}/")

@@ -760,7 +760,7 @@ fn test_worker_metadata_sort_orders() {
         );
         results
             .iter()
-            .map(|r| r.2.rsplit('/').next().unwrap().to_string())
+            .map(|r| r.2.rsplit(['/', '\\']).next().unwrap().to_string())
             .collect::<Vec<_>>()
     };
 
