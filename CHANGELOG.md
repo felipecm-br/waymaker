@@ -15,6 +15,7 @@
 
 ### 🐛 Fixed
 
+- A picker whose pane is killed or respawned (`tmux respawn-pane -k`, closing a popup's pane) no longer aborts on its way out. Restoring the cursor on the dead terminal failed, ratatui's own `Drop` tried again and reported it with `eprintln!`, which panicked on the same dead stderr, and a panic in `Drop` aborts: every such exit left a core dump and took ~1.3 s while systemd-coredump wrote it (`-o ai-launch` here). A terminal that fails to restore its cursor is now marked lost and never handed to ratatui's `Drop`; the exit takes 13–60 ms and leaves no core
 - Windows: frecency now ranks files picked from the walker. Stored paths kept Windows' `\\?\` prefix and relative paths were joined to the working directory with `/`, so a relative `src\main.rs` never matched its entry. A rooted path such as `/usr/bin` shows as `/usr/bin/` in file operations instead of `.//usr/bin/`
 - Windows CI runs the unit tests of every crate, not only the partial-merge crates
 - In `jump`, leaving a directory while a filter was active and coming back (`l` then `h`) showed only the items that had matched: the listing saved on the way out was the filtered results, not the whole directory. It is now every item. frizbee, which `jump` used, hid this, because it never set nucleo's own filter

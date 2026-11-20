@@ -21,11 +21,17 @@ pub struct Tui<W>
 where
     W: Write,
 {
-    pub terminal: ratatui::Terminal<CrosstermBackend<W>>,
+    /// Dropped by hand in [`Tui`]'s `Drop`: see `terminal_lost`.
+    pub terminal: std::mem::ManuallyDrop<ratatui::Terminal<CrosstermBackend<W>>>,
     pub area: Rect,
     pub config: TerminalConfig,
 
     in_execute: bool,
+    /// The terminal went away under us (the pane was killed or respawned): restoring the cursor
+    /// failed. ratatui's own `Drop` tries again and reports the failure with `eprintln!`, which
+    /// panics on the same dead stderr, and a panic in `Drop` aborts: the process then sat for
+    /// about a second while systemd-coredump saved a core. Such a terminal is leaked instead.
+    terminal_lost: bool,
 }
 
 impl<W> Tui<W>
@@ -104,10 +110,11 @@ where
 
         let terminal = Terminal::with_options(backend, options)?;
         Ok(Self {
-            terminal,
+            terminal: std::mem::ManuallyDrop::new(terminal),
             config,
             area,
             in_execute: false,
+            terminal_lost: false,
         })
     }
 
@@ -251,7 +258,10 @@ where
             _ => {}
         }
 
-        self.terminal.show_cursor()._wlog();
+        if let Err(e) = self.terminal.show_cursor() {
+            log::warn!("Failed to show the cursor: {e}");
+            self.terminal_lost = true;
+        }
 
         disable_raw_mode()._wlog();
 
@@ -341,10 +351,11 @@ impl Tui<Box<dyn Write + Send>> {
         };
         let terminal = Terminal::with_options(CrosstermBackend::new(writer), options)?;
         Ok(Self {
-            terminal,
+            terminal: std::mem::ManuallyDrop::new(terminal),
             config,
             area,
             in_execute: false,
+            terminal_lost: false,
         })
     }
 }
@@ -355,6 +366,10 @@ where
 {
     fn drop(&mut self) {
         self.exit(None);
+        if !self.terminal_lost {
+            // SAFETY: dropped once, here, and never used again.
+            unsafe { std::mem::ManuallyDrop::drop(&mut self.terminal) };
+        }
     }
 }
 
@@ -502,5 +517,74 @@ mod utils {
     pub fn query_cursor_position(_timeout: Duration) -> Result<(u16, u16)> {
         let ret = crossterm::cursor::position()?;
         Ok(ret)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    /// A terminal that goes away: every write fails once `dead` is set.
+    struct Vanishing(Arc<AtomicBool>);
+
+    impl Write for Vanishing {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if self.0.load(Ordering::SeqCst) {
+                return Err(io::Error::from_raw_os_error(5)); // EIO, as from a killed pane
+            }
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            if self.0.load(Ordering::SeqCst) {
+                return Err(io::Error::from_raw_os_error(5));
+            }
+            Ok(())
+        }
+    }
+
+    fn tui(dead: &Arc<AtomicBool>) -> Tui<Box<dyn Write + Send>> {
+        let writer: Box<dyn Write + Send> = Box::new(Vanishing(dead.clone()));
+        let area = Rect::new(0, 0, 20, 5);
+        let terminal = Terminal::with_options(
+            CrosstermBackend::new(writer),
+            TerminalOptions {
+                viewport: Viewport::Fixed(area),
+            },
+        )
+        .unwrap();
+        Tui {
+            terminal: std::mem::ManuallyDrop::new(terminal),
+            area,
+            config: TerminalConfig::default(),
+            in_execute: false,
+            terminal_lost: false,
+        }
+    }
+
+    #[test]
+    fn a_terminal_that_went_away_is_never_handed_to_ratatuis_drop() {
+        let dead = Arc::new(AtomicBool::new(false));
+        let mut t = tui(&dead);
+        t.terminal.hide_cursor().unwrap();
+        dead.store(true, Ordering::SeqCst);
+        t.exit(None);
+        // ratatui's Drop would retry the cursor and eprintln! the failure: on a dead stderr
+        // that panics inside Drop and aborts the process.
+        assert!(t.terminal_lost);
+        drop(t);
+    }
+
+    #[test]
+    fn a_live_terminal_restores_the_cursor_and_drops_normally() {
+        let dead = Arc::new(AtomicBool::new(false));
+        let mut t = tui(&dead);
+        t.terminal.hide_cursor().unwrap();
+        t.exit(None);
+        assert!(!t.terminal_lost);
+        drop(t);
     }
 }
